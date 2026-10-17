@@ -46,9 +46,9 @@ RetDec 定義の引数を超えて、本体が `%argN` を読むのに定義が�
 - `pass_f2` で署名が変わった関数は全部で 30 件。そのうち上の 6 件だけが「本体が未定義の `%argN` を読む」。残りの 24 件は本体が読まないため、emcc は通る。
 - 呼び出し側 (`function_1804d98b0` 等の call) は RetDec の 4 引数のまま。署名を直す場合は call 側の引数数も揃える必要がある。
 
-## 4. 別欠陥 (本 issue の範囲外・未修正)
+## 4. 別欠陥 (修正済み: 測定 commit `f8f37b452`・PR #6128。検証状態は §7)
 
-`pass_branches` (`kh_passes.py` 209 行〜) の出力で、`khbd17` (`final.ll` の 5210 行付近) は terminator を 2 つ持ち、直後の `khsk18` は命令も terminator も持たない空のブロック:
+`pass_branches` (`kh_passes.py` 209 行〜) の出力で、`khbd17` (`final.ll` の 5210 行付近) は terminator を 2 つ持ち、直後の `khsk18` は命令も terminator も持たない空のブロック (修正前の状態):
 
 ```
 khbd17:
@@ -75,3 +75,60 @@ khsk18:
 | `pass_f2` の署名組み立ての修正 (§5) | 既定 `--path a` の emcc 失敗 | #4689 (KH-111) |
 | `pass_branches` の二重 terminator (§4) | 署名修正後に emcc が止まる | #4689 (KH-111) の範囲に追記 |
 | 6 関数の本体の動作一致 (`--no-compare` を外した比較) | 未測定 | #4689 (KH-111) |
+
+## 7. 二重 terminator 修正 (`f8f37b452`) の検証状態
+
+- 修正の commit: `f8f37b452` (`tools/targets/kilohearts/snapins/lift/kh_passes.py` の `pass_branches`。13 行追加・1 行削除)。
+- 測定 commit = HEAD = `f8f37b452`。HEAD の差分は 0 行:
+  `git diff f8f37b452 HEAD -- tools/targets/kilohearts/snapins/lift/` → 出力 0 行。
+
+### 7.1 この run で再測定できたもの
+
+なし。素材が無かったため、どの値も測り直していない。
+
+- `$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ。`plugins-kilohearts` (HeartCore.core_64) と `toolchain-emsdk`・`toolchain-retdec` は未展開。
+- [EMSDK]・[RETDEC] の展開先は存在しない。`emcc`・`retdec-decompiler`・`wasm-ld` は PATH に無い。`clang` のみ在る。
+- 従って `work/` の `final.ll` も生成していない。以下の数値は測定値ではない。
+
+### 7.2 PR 本文の申告値 (未検証)
+
+前 run (PR 本文の検証節) が申告した値。この run では再現していないので、実測として扱わない。
+
+| 項目 | 申告値 | 状態 |
+|---|---|---|
+| `build.py ladder --no-compare` (既定 `--path a`) | rc=1、`final.ll:4918:36: undefined value '%arg3'` (修正前と同じ) | 未検証 |
+| `--skip f2` | IR 構文エラー (修正前 `final.ll:5227`) は消えた。その後 wasm-ld で `rax`/`r8` 未定義 | 未検証 |
+| `--path s0 --no-compare` | rc=0、`wasm_bytes` 574,264、`undefined_imports []` | 未検証 |
+| 修正前 `fe48dca85` の同コマンド | `wasm_bytes` 574,264 | 未検証 |
+| 所要秒・load average・並列数 | 申告なし | 未測定 |
+
+- 574,270 B (issue 本文・`REPORT_APPENDIX_780.md` の `--path s0` 記録) と 574,264 B (申告) の差: 差の原因 (commit 差か環境差か素材差か) を示すデータは、この run には無い。原因は未確定。
+- 二重 terminator の解消の数え方 (`khbd17` の terminator 数: 修正前 2 / 修正後 1)、`clang -x ir` の rc と先頭エラーは、この run では未測定。
+
+### 7.3 再測定の手順 (素材を展開できる run で実施)
+
+PR 本文に `oc_artifacts: plugins-kilohearts toolchain-emsdk toolchain-retdec` を入れて、次を同じ worktree で順に実行する。
+
+```
+cd tools/targets/kilohearts/snapins/lift
+# 既定経路 (--path a)
+python3 build.py ladder --no-compare; echo rc=$?
+# ablation
+python3 build.py ladder --no-compare --skip f2; echo rc=$?
+# 基準 (s0)
+python3 build.py ladder --path s0 --no-compare --tag s0; echo rc=$?
+# 修正前後の terminator 数 (khbd17 付近)
+grep -n -A3 '^khbd17:' work/ladder/final.ll
+# clang -x ir の検査
+clang -x ir -fsyntax-only work/ladder/final.ll; echo rc=$?
+```
+
+- 所要秒と load average は `/usr/bin/time -v` と `uptime` で同時に取る。
+- 修正前の対照は `git worktree add` で `f8f37b452~1` を別 dir に取り、同じ手順で `final.ll` を作る。
+- 受入 2 の基準 (574,270 B) との差は、§7.2 の差と同じ方法で原因を書く。
+
+### 7.4 状態
+
+- 受入 1 (既定 `--path a` が exit 0): 未達 (`%arg3` の署名問題は #4689 の次 run)。
+- 受入 2 (`--path s0` の `wasm_bytes` 不変): 未検証。
+- 二重 terminator の解消: コード上は `pass_branches` で terminator 直後の `br` を `fn.after` に足さないことで対応。実行による確認は未了。
