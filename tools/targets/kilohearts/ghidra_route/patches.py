@@ -169,6 +169,21 @@ ABI = {
         #   機械語: 180fe34d3 `call 180fe4394` の直前は rcx = 入口 param_1 (180fe34b1 `mov rbx,rcx` で保持・180fe34c1)。callee 180fe4394 は入口で test rcx,rcx・rbx = rcx。
         #   よって引数は FUN_180fe34b0 の入力 param_1 (undefined *)。
         ('delay 6887 FUN_180fe4394 rcx=param_1 (180fe34d3)', r'(\(\*\(int \*\)\(param_1 \+ 0x15c\) == 0\)\) \{\n\s*)FUN_180fe4394\(\);', r'\1FUN_180fe4394((longlong)param_1);'),
+        # #5361 (KH-153): FUN_180fe4020 (undefined8 *・配列先頭 + 要素数 int) の呼出し 10 件 (FUN_180fe4394 内)。
+        #   機械語 (180fe4394〜180fe4457・capstone): rcx = rbx + off (rbx = 入口 param_1)、edx = 件数 (7・12・2)。
+        #   off と件数は C の添字と一致 (0x00・0x38・0x70・0xd0・0x130・0x160・0x198・0x1d0・0x230・0x290)。
+        #   C 宣言は longlong (整数) で、本体は rcx を qword 配列の先頭ポインタとして読む。整数の param_1 + off をそのまま渡す。
+        #   規則 1 件 = 呼出し 1 件 (件数 1 を assert)。
+        ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x00 (180fe43b6, n=7)', r'FUN_180fe4020\(param_1,7\);', 'FUN_180fe4020((undefined8 *)param_1,7);'),
+        ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x38 (180fe43c1, n=7)', r'FUN_180fe4020\(param_1 \+ 0x38,7\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x38),7);'),
+        ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x70 (180fe43cf, n=12)', r'FUN_180fe4020\(param_1 \+ 0x70,0xc\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x70),0xc);'),
+        ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0xd0 (180fe43dd, n=12)', r'FUN_180fe4020\(param_1 \+ 0xd0,0xc\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0xd0),0xc);'),
+        ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x130 (180fe43ec, n=2)', r'FUN_180fe4020\(param_1 \+ 0x130,2\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x130),2);'),
+        ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x160 (180fe441e, n=7)', r'FUN_180fe4020\(param_1 \+ 0x160,7\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x160),7);'),
+        ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x198 (180fe442c, n=7)', r'FUN_180fe4020\(param_1 \+ 0x198,7\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x198),7);'),
+        ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x1d0 (180fe443a, n=12)', r'FUN_180fe4020\(param_1 \+ 0x1d0,0xc\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x1d0),0xc);'),
+        ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x230 (180fe4448, n=12)', r'FUN_180fe4020\(param_1 \+ 0x230,0xc\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x230),0xc);'),
+        ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x290 (180fe4457, n=2)', r'FUN_180fe4020\(param_1 \+ 0x290,2\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x290),2);'),
         # #5401 (KH-160・3 件目): FUN_180fd0ac8 (undefined4 1 引数を rcx で読む) の呼出し 3 件。宣言は 4 引数のまま。
         #   callee 180fd0ac8 は入口で `mov ebx,ecx` のみ rcx を読み、rdx・r8・r9 は `lea` で書いてから使う (読まない)。
         #   よって呼出し側は rcx = param_1 だけが意味を持つ。3 件とも `FUN_180fd0ac8(param_1);` で字句が同じため、直前の文脈で 1 件ずつ特定する。
