@@ -226,6 +226,11 @@
 
 ## 4n. 証拠表の行 226〜232 (#5750・母数 7: 真陽性 5 (構造)・保留 2)。正本は `REPORT_APPENDIX_5750.md`。行 226 は #5780 で真陽性 (構造) に確定。行 230・231 は #5773 で真陽性 (構造) に確定 (`REPORT_APPENDIX_5773.md`)。行 228・229 は保留のまま
 
+## 4p. 証拠表の行 224・225 (#6211・母数 2: 真陽性 0・偽陽性 0・保留 2)。正本は `REPORT_APPENDIX_6211.md`
+
+- 両件とも count 源が `.data` の同じスロットを参照するが、機械語は 2 段の deref (`[[slot]]+0x10`)、IR は 1 段 (`[slot]+16`) で、段数が一致しない。構造判定の前提を満たさないため保留。段数の差が lift 段の欠陥か IR の読み方かは未確定 (判断は PM)。
+- 偽陽性率は母数 288 の判定が終わるまで書かない。
+
 ## 5. 再現
 再現手段は `guard699/scan_guard.py`・`trap_triage/strict_evidence.py`・`trap_triage/judge_entry_check.py`。入力は `work-m11` の `boot_final.ll` (`oc_artifacts: fl-win64 work-m11`)。
 
