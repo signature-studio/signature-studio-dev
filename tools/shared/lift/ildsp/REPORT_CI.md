@@ -219,18 +219,17 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 外部グローバル: `global_var_1803f6610` は絶対アドレス化済み (§9-2・ci_link.sh)。`@0` (`__unnamed_1`) は shim の仮置きのまま (画像に敷設しない方式を決定、§9-2) | リンクは通るが、仮置きの値で意味が変わりうる | 意味の確認は #3320 |
+| `uselistorder` 行 (174 行) を emcc が読めない | ci_link.sh は行を除いて回避 (リンクは通る)。ir_normalize の対応は未起票 | 未起票 (PR 本文の未解決表に記載) |
+| 直接 jcc 先 `function_1801aef40` (閉包の誤モデル・§8-1) | 未解決 (リンクエラー・1 件) | #6231 (T-SH-163) |
 
 ### 9-4. 再測定 (T-SH-152 #5748・受入 2)
-- 測定 commit: `f46916860` (`ci_link.sh` に `ci_iat.o`・`ci_traps.o` を追加した commit。以後コードは変えていない)。`git diff f46916860 HEAD -- tools/shared/lift/ildsp` は本節の REPORT_CI.md のみ。
+- 測定 commit: `f46916860` (`ci_link.sh` に `ci_iat.o`・`ci_traps.o` を追加した commit)。以後の変更は `ci_link.sh` の出力文言とヘッダコメントのみで、リンクの入力・期待集合・終了条件は変えていない。`git diff f46916860 HEAD -- tools/shared/lift/ildsp` は `ci_link.sh` の文言・コメントと本 REPORT の差分だけ。
 - 素材: `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を `$RUNNER_TEMP/art` に展開。
 - `ci_lift.sh` → rc 0 (ALL OK。census FAIL は #6184 で解消済み)。
 - `ci_link.sh` → rc 0 (wasm-ld rc 1)。未解決は **`function_1801aef40` の 1 件のみ** (想定外 0 件)。
-- 前回 §9-1 の 149 行のうち IAT 10 種 (147 行) と `function_1801cb600` (5 行) は消えた。原因: `ci_link.sh` が `ci_iat.o` (#5747) と `ci_traps.o` (#3318 の trap 化) をリンクしていなかった。
-- 残り `function_1801aef40`: 閉包の jcc 誤モデル (§8-1)。stub で埋めると意味の誤りを隠すため置かない。#3318 で扱う。
+- 前回 §9-1 の 153 行のうち IAT 10 種 (147 行) と `function_1801cb600` (5 行) は消えた。原因: `ci_link.sh` が `ci_iat.o` (#5747) と `ci_traps.o` (#3318 の trap 化) をリンクしていなかった。残りは 153 − 147 − 5 = 1 行 (`function_1801aef40`)。
+- 残り `function_1801aef40`: 閉包の jcc 誤モデル (§8-1)。stub で埋めると意味の誤りを隠すため置かない。起票先は #6231 (T-SH-163)。旧起票先の #3318・#5749 はどちらも closed。
 - 受入 2 (未解決 0 件) は未達のまま。
-| `uselistorder` 行 (174 行) を emcc が読めない | ci_link.sh は行を除いて回避。ir_normalize の対応が必要 | [T-SH-65] #3318 |
-| IAT 10 種 | 未解決 (リンクエラー) | #5747 |
-| 閉包の取りこぼし (function_1801aef40・function_1801cb600) | 未解決 (リンクエラー) | #5749 |
 
 ## 10. emcc の obj 化と間接 call 2 件の trap 化 (T-SH-65 #3318・部分達成)
 
