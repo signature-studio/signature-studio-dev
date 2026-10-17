@@ -52,17 +52,20 @@
 
 - 測定 commit: `466d59d58` (`ks_fa75_delay_map.py` に KH `+0x10` の帰還経路 14 行の検査を追加した commit。本 PR の REPORT は、この commit の上に積む)。
 - 再現: `python3 tools/targets/freshair/ks_fa75_delay_map.py <HeartCore.core_64> <SlateCore.core_64>` (素材 `work-liftlib-targets` を `tar --zstd -xf` で展開したもの)。
-- 実測 (`466d59d58`・素材あり・`work/fa75_run_466d59d58.txt`): `real 15.407 s`・`user 14.902 s`・EXIT=0・load 1 分値 0.44 (19:29 時点)。OK 29 件・NG 0 件。
-- 出力 (要点):
+- 再測定: **未実施**。`work-liftlib-targets` (HeartCore / SlateCore) が `$ARTIFACTS_DIR` と `fl-win64` の中に無く、この run では実行できなかった。前回の記録 (「OK 29 件」・所要時間・load) は、この run で再現も出力ファイルの確認もできなかったため採用しない。
+- スクリプトの期待件数 (コードの数え上げ): **28 件** = KH P 8 + SC P 5 + KH table 1 + KH feedback 14 (`fb` リストは 14 行)。下の出力は、この件数からの導出で、実行結果ではない。
+- 期待する出力 (未実行・コードから導出):
 
 ```
-OK KH P+0x0 ... OK KH P+0x20 (8 件すべて)
-OK SC P+0x9ee4 ... OK SC P+0xa004 (5 件すべて)
+OK KH P+0x0 ... OK KH P+0x20 (8 件)
+OK SC P+0x9ee4 ... OK SC P+0xa004 (5 件)
 OK KH table 0x181563298 = 0.666667, 0.5, 0.333333, 0.25, 0.166667, 0.125
-OK KH feedback @0x1802ed930 ... @0x1802ee2c0 (16 件)
+OK KH feedback @0x1802ed930 ... @0x1802ee2c0 (14 件)
 OK: Delay param 読み出しの検査 (意味ラベルは未確定)
 EXIT=0
 ```
+
+- 再測定 (要素材 `work-liftlib-targets`): 上の 28 件が実際の標準出力と一致することを確認するまで、本節の件数は「期待値」として扱う。
 
 - 判定の限界: この検査は「期待するオフセットと命令が機械語に現れる」ことだけを見る。意味ラベルは検査していない。帰還経路の検査は、命令の並びが REPORT の記述と一致することの確認で、機械語の構造からの読みである。
 - 鮮度: `git diff 466d59d58 HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` の出力は 0 行 (`174f1e83d` は REPORT のみを変える)。
