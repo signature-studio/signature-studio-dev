@@ -151,15 +151,15 @@ Index 別の実測 (`hs_store_cov.py`・基準 `base.json` 対比・`HS_DISP_RET
 
 受入 2 の判定: **1/11** (0x132206e のみ。範囲は上記のとおり、供給元の真値は未確定で、非 0 の仮値 `2.0` を xmm0 に与えて格納の実行を確認したもの)。残り 10 行は未実測。
 
-#### 5.1.3 0x13221be の到達条件 (#5623)
-
-結論: 到達条件は確定 (Index=11・`call 0x40fe90` の戻り値 ≠ 0)。受入 2 は **1/11 のまま** (格納値は stub 由来で供給元の真値ではない)。詳細・実測表は `REPORT_DISPATCHER_APPENDIX_5623.md` (測定 commit `a2718eca0`)。
-
 測定 commit: `6d46d9bcd` (`hs_disp_emu.py` に `VA:x<値>` を追加した commit)。素材 `fl-win64` の `extracted/block00031_PE.bin` を `$RUNNER_TEMP/fl` に `tar --zstd -xf` で当該 1 件展開。Python venv: `unicorn 2.1.4`・`pefile`・`capstone 5.0.7`。
 
 - 基準 `HS_DISP_PATH=1` (既定・全 256 ID): real 42.36 秒、rc=0、終了時 load 1.30 (`uptime` の 1 分平均)。`distinct (rax, path) = 109`・unmapped 61 (main と一致)。
 - 変更 `HS_DISP_INDEX=6 HS_DISP_RET_SPEC=0x40fe90:one,0x40ae70:x2.0`: real 39.38 秒、終了時 load 1.11。`distinct = 109`。
 - Index 0〜9 の走査は各 run を 4 並列で実施し、全 10 件の完了を確認 (個別の real は未計測。終了時 load 最大 2.84)。
+
+#### 5.1.3 0x13221be の到達条件 (#5623)
+
+結論: 到達条件は確定 (Index=11・`call 0x40fe90` の戻り値 ≠ 0)。受入 2 は **1/11 のまま** (格納値は stub 由来で供給元の真値ではない)。詳細・実測表は `REPORT_DISPATCHER_APPENDIX_5623.md` (測定 commit `a2718eca0`)。
 
 ### 5.2 #5421 (PLG-P0b-58) — call 戻り値経路の 5 行
 
