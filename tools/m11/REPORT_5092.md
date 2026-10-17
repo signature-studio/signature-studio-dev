@@ -40,4 +40,4 @@ unit 144 (`0x25c540`) の trace 行 (`[survey][trace144]`):
 
 - `0x6c` が `412d60` の `dest` に届く経路の特定 (起票先: #5092 の次 run)。
 - IR sha が基準 `597757f4…` と異なる件 (本 run は `b202c157…`)。main の進行による差の可能性。未切り分け (起票先: #5092 の次 run)。
-- 修正後 HEAD (`errs.slice(errN0)` への変更) での survey 再測定は**未実施**。素材 (fl-win64) は展開できたが、IR 生成に lift 中間物 `work/boot*.lift.ll` (RetDec 路線) と emsdk が要り、本 run の上限内に収まらなかった (`m11_gen_ir2.sh` は中間物不在で rc=1)。修正後の挙動は `node --check` のみで確認 (起票先: #5092 の次 run)。
+- 修正後 HEAD (`errs.slice(errN0)` への変更、head `00d75e83a` 以降) での survey 再測定は**未実施**。`$ARTIFACTS_DIR` に `fl-win64.tar.zst` のみがあり、`work-m11`・`toolchain-retdec`・`toolchain-emsdk` が無い (`m11_gen_ir2.sh` は lift 中間物 `work/boot*.lift.ll` が無いと動かず、`/opt/retdec`・`/opt/emsdk` も runner に無い)。修正後の挙動は `node --check` のみで確認。次 run は PR 本文の `oc_artifacts: fl-win64 work-m11 toolchain-retdec toolchain-emsdk` で再測定する (起票先: #5092 の次 run)。
