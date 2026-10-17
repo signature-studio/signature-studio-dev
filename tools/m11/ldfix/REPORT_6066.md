@@ -2,7 +2,7 @@
 
 **判定: 「B 先頭への load 挿入」は採らない (不可と判定)。修復 0 組・コード差分 0 行 (`ldfix.py` 無変更)。** 6 組はいずれも `fix_f3c_use` の門 (rep-not-dominated) で止まる状態を維持する。代替の修復方式は未決で、§4 に未解決として書く。受入条件の「方式を決める」は部分達成。
 
-測定 commit: 本 PR の HEAD (base は `origin/main` `50e2f813b`)。
+測定したコード: `ldfix/design_6066.py` (blob `ebf9e16c`) と `ldfix.py` (blob `232f3cd`、`origin/main` `50e2f813b` と同一)。base は `origin/main` `50e2f813b`。
 
 ## 1. 受入条件
 
@@ -48,3 +48,4 @@
 - `cd tools/m11 && python3 ldfix/design_6066.py work/extracted/block00031_PE.bin`
 - 入力: `work-m11` を `tools/m11/work/` に展開 (`tar --zstd -xf $ARTIFACTS_DIR/work-m11.tar.zst`・内部パスは `tools/m11/work/` の下) と `fl-win64` の `extracted/block00031_PE.bin`。
 - `ldfix.py` の差分: `git diff origin/main HEAD -- tools/m11/ldfix/ldfix.py` は 0 行。
+- 再測定の記録: fix run (2026-10-17) では `work-m11` が `$ARTIFACTS_DIR` に無く、`work/boot_final3.ll` が読めないため再実行していない。上記 §2 の数値は測定時の値で、この run では再現していない。
