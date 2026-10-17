@@ -111,6 +111,7 @@
 | `tools/liftlib/REPORT_APPENDIX_D.md` | ~214 | liftlib §22 全文 (LIFTLIB-9 #668: RetDec raw lift 出力の非決定性 = uselistorder・ASLR 依存、A7 後は決定的、回帰 gate `lift_determinism_e2e.sh`)。§23 (LIFTLIB-10/11 #695・#887: k80 の alloca 並び = `canon_alloca_order` で決定化、gate 組込み)。本体 §22 は要約のみ |
 | `tools/flelift/REPORT.md` | ~155 | x64c を FLEngine 向けに汎用化 |
 | `tools/flelift/boot/REPORT.md` | ~350 | FLE-2〜FLE-5・FLE-10 (§10): x64c lift による FLEngine boot 連鎖・IPP 停止 mode・既定経路の no-op |
+| `tools/flelift/boot/REPORT_APPENDIX_5216.md` | ~45 | PY-379 の gate フラグ `0x16baff0`・`0x16baff1` の実行時値を shim boot で測った結果 (監視 slot 追加・unit 209 まで全 0・測定 commit `c7361691a`)。REPORT §未解決の該当行の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_2700.md` | ~80 | FLE-8 (#2698) の詳細 (E-1 工程の実測・E-2 検証)・FLE-9 (#2700) の全文 (§9 から分割移動: shard 化の工程の実測・起動指標の前後・未解決)。REPORT §9 は結論 1 行 |
 | `tools/flelift/boot/REPORT_APPENDIX_5013.md` | ~45 | FLE-39 (#5013): `FLE_BOOT_LOG_CAP` 超過で `boot.threw` が `log_cap` にならない測定 (cap 有無で units 895・`exit`)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4855.md` | ~40 | #4855: boot_e2e の shard 別 clang peak RSS・秒 (cap 5,000MB/shard)・4 variant の link と boot の結果表 (測定 commit `96723a2ed`)。測定値の正本 |
