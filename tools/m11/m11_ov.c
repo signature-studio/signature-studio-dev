@@ -1348,6 +1348,25 @@ void m11_e3ef60_obs(unsigned long long a) {
 }
 #endif
 
+/* #5358 計測専用 (M11_INSTR_414C70=1 のときだけ有効): function_414c70 の入口で arg1 (&s16)・arg2・arg3 と、
+ * arg2 が文字列ポインタのときの [arg2-4] (長さ) と先頭 8 バイトを stderr に出す。線形メモリ外は読まない。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_414C70
+#define M11_INSTR_414C70 0
+#endif
+#if M11_INSTR_414C70
+static int g_414c70_n;
+void m11_414c70_obs(unsigned long long a1, unsigned long long a2, unsigned long long a3) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned int len = 0;
+    unsigned long long w0 = 0;
+    if (a2 >= 4 && a2 + 8 <= heap) len = *(volatile unsigned int*)(uintptr_t)(a2 - 4);
+    if (a2 >= 8 && a2 + 8 <= heap) w0 = *(volatile unsigned long long*)(uintptr_t)a2;
+    if (g_414c70_n++ < 64)
+        fprintf(stderr, "[m11][414c70] #%d arg1=0x%llx arg2=0x%llx arg3=0x%llx [arg2-4]=%u [arg2]=0x%llx\n",
+                g_414c70_n, a1, a2, a3, len, w0);
+}
+#endif
+
 /* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
  * 8cc190 (Add) は FComparer = TEqualityComparer<K>.Default (53df80 → 479b40 _LookupVtableInfo) の GetHashCode/Equals を使う.
  *   479b40  `movzx rcx,byte [rbx]` (TypeInfo.Kind) の deref 脱落 (D4) で Kind=0 固定, `test cl,2; call rax` (getter 呼出し) 脱落 (D15)
