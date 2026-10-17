@@ -200,6 +200,14 @@ Index 別の実測 (`hs_store_cov.py`・基準 `base.json` 対比・`HS_DISP_RET
 - 受入 2 (実測) は未実施。供給元の値が確定していないため、与える値が決まらない。
 - 次の作業: (a) `[rbp+0x111c]` の書込み元 (`0x13217c3` の直前の経路) を確定し、0x1321966 の比較入力を決める。(b) 0x1313220 の `call rax` の関数ポインタ源を追い、戻り値 `al` の意味を決める。(c) 0xfdd2c0 の `[rbp+0x4c]` の 12 書込み箇所のうち、0x1321b6c・0x132257d の経路に入るものを特定する。
 
+#### 5.3.1 (a) の結果 (`hs_store_111c.py`・機械語のみ・再測定なし)
+
+- 0x1321966 の比較入力 `[rbp+0x111c]` の値は `([rbp+0x1878] >> 16) & 0xffff` (`0x13217b4`〜`0x13217c3`)。`[rbp+0x1878]` は Dispatcher の第 4 引数 `r9` (Index) を `0x1318729` で保存した値で、範囲内の実書込みはこの 1 箇所だけ。
+- `0x132178c` (その値を作る分岐の入口) への飛び込みは `0x1318abf: jmp 0x132178c` の 1 箇所だけ (走査 `0x1200000..0x1321000`。全域 `0x1000000..0x1400000` の jcc/jmp/call 走査でも同じ 3 命令)。
+- `0xf5b190` は `[rsi]` (= `[rbp+0x111c]`) へ直接書かない。`mov rsi, r8` の後、`call 0x11d06e0` の引数 `r8` として渡し、`0x11d06e0` が `word ptr [rbx]` へ直接書く値は `0` だけ (`0x11d0710`・`0x11d0730`。ただし `0x11d06e0` が呼ぶ `0x11cf880`・`0x11c8ba0`・`0x11829e0` の書込みは未追跡)。
+- 結論: 0x1321966 の比較入力は、Index の上位 16 bit (0 に潰される場合を含む)。基準 run は `r9=0` 固定のため入力は 0 になり、この格納を通る経路は実測 0/256 だった (0 になることの機械語上の確認は本節の範囲外)。受入 1 の『供給元の値』は Index の値域で決まる。Index の作り (呼出側) は未追跡。
+- 限界: 直接の mov 形式だけを数える。間接書込み・`0x1200000` より前からの書込みは含まない。
+
 ## 6. コード差分
 
 - `git diff 31208b4c8 HEAD -- tools/plugins/framework/hostshim/` は `hs_store_src27.py` の新規追加と、本 REPORT の新規追加だけ。`hs_disp_emu.py`・`hostshim.c`・`hs_store_cov.py` は変更なし。
@@ -214,6 +222,7 @@ FL_WIN64_DIR=<展開先> PYTHONPATH=<unicorn,pefile,capstone> python3 hs_store_b
 FL_WIN64_DIR=<展開先> HS_DISP_PATH=1 HS_DISP_OUT=base.json python3 hs_disp_emu.py
 FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_cov.py base.json
 FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_src11.py
+FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_111c.py
 FL_WIN64_DIR=<展開先> HS_DISP_PATH=1 HS_DISP_INDEX=6 HS_DISP_RET_SPEC=0x40fe90:one,0x40ae70:x2.0 HS_DISP_OUT=h_x6.json python3 hs_disp_emu.py
 FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_cov.py h_base.json h_x6.json
 ```
