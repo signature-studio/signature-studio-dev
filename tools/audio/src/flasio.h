@@ -87,5 +87,8 @@ typedef struct {
     uint32_t seg_max_us[4];               /* do_buffer 区間の最大 µs: [0] in_read [1] memset [2] bufferSwitch 本体 (cb_max_us と同区間) [3] out_write */
 } flasio_stats_t;
 void flasio_get_stats(flasio_stats_t *s);
+/* 診断用 (判定に使わない): producer 周期の時系列。行 7 double = [notify_ms(worklet Date.now), fill, underruns, wake, cb0, cb1, wr] (epoch ms) */
+double *flasio_tl_ptr(void);
+uint32_t flasio_tl_count(void);
 void flasio_configure(uint32_t depth, uint32_t latency_hint);   /* create_buffers 前のみ */
 #endif

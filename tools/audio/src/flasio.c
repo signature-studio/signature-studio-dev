@@ -181,9 +181,19 @@ static void seg_note(int k, double us) {
     if (u > A.seg_max_us[k]) A.seg_max_us[k] = u;
 }
 
+/* 診断 (判定に使わない): producer の周期記録。行 = [notify (worklet の Date.now 下位32bit), fill, underruns, wake, cb0, cb1, wr]。
+ * wake/cb0/cb1/wr は fla_now_ms (performance.timeOrigin + now、epoch ms)。fla_ctl_t の外に置く (共有 SAB の layout を変えない)。 */
+#define FLASIO_TL_N 2048
+static double g_tl[FLASIO_TL_N][7];
+static uint32_t g_tl_n;
+static double g_cb0, g_cb1;
+double *flasio_tl_ptr(void) { return &g_tl[0][0]; }
+uint32_t flasio_tl_count(void) { return g_tl_n; }
+
 static void do_buffer(int idx) {
     fla_ctl_t *c = fla_ctl();
     double ta = emscripten_get_now();
+    g_cb0 = fla_now_ms();
     if (A.nIn) fla_in_read(A.ibuf[idx], A.B);       /* 入力 buffers[idx] を更新してからコールバック */
     double tb = emscripten_get_now();
     for (int ch = 0; ch < A.nOut; ch++) memset(A.obuf[idx][ch], 0, A.B * sizeof(float));
@@ -206,6 +216,7 @@ static void do_buffer(int idx) {
         A.cb.bufferSwitch(idx, 1);
     }
     double t1 = emscripten_get_now();
+    g_cb1 = fla_now_ms();
     double us = (t1 - t0) * 1000.0;
     uint32_t u = (uint32_t)us;
     c->cb_count++;
@@ -265,8 +276,14 @@ static void *thread_fn(void *arg) {
         c->fill_sum_lo += fill; c->fill_samples++;
         if (fill < FLA_QUANTUM) c->cb_late++;
         uint32_t w0 = c->out_write, k = (c->pw_n % FLA_PW_N) * 4;
+        double tl_wake = fla_now_ms();
         do_buffer(idx); idx ^= 1;
         double td = fla_now_ms();
+        if (g_tl_n < FLASIO_TL_N) {
+            double *r = g_tl[g_tl_n++];
+            r[0] = (double)LD(c->notify_ms); r[1] = fill; r[2] = LD(c->underruns);
+            r[3] = tl_wake; r[4] = g_cb0; r[5] = g_cb1; r[6] = td;
+        }
         c->pw_trace[k] = w0; c->pw_trace[k + 1] = fill;
         c->pw_trace[k + 2] = (uint32_t)(uint64_t)(tw * 1000.0); c->pw_trace[k + 3] = (uint32_t)(uint64_t)(td * 1000.0);
         c->pw_n++;
@@ -281,6 +298,7 @@ ASIOError flasio_start(void) {
     fla_halt();
     fla_reset_indexes();
     A.stop = 0; A.ready = 0;
+    g_tl_n = 0;
     A.grows = 0; A.shrinks = 0; A.T0 = A.T_max = A.depth * A.B;
     if (pthread_create(&A.th, NULL, thread_fn, NULL) != 0) return ASE_HWMalfunction;
     while (!__atomic_load_n(&A.ready, __ATOMIC_SEQ_CST))

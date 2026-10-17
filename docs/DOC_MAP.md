@@ -682,6 +682,7 @@
 | `tools/audio/asio/REPORT_APPENDIX_998.md` | ~23 | asio REPORT §12-2 全文 (#998 負荷下の再現試験 L1〜L3)。250 行上限のため無変更で分割移動 |
 | `tools/audio/asio/REPORT_APPENDIX_2934.md` | ~125 | asio #2934 (AU-26): 初期目標充填 T の下限 (`FLA_F_T_FLOOR`) の baseline・同一 HEAD 20 回連続・lat_out 前後・親 e2e 実測・need→増分の式・B=128 の 5 回と基点 5 回の比較 |
 | `tools/audio/asio/REPORT_APPENDIX_4593.md` | ~70 | asio #4593 (AU-47): flasio `do_buffer` の 4 区間の最大 µs 計装と 20 回測定の付録。結論は付録 §2-1・§3 |
+| `tools/audio/asio/REPORT_APPENDIX_6037.md` | ~67 | asio #6037 (AU-50): producer/worklet/main の時系列計装 (epoch ms)・負荷下の停止の切り分け。結論は付録 §3・§4 |
 | `tools/audio/asio/REPORT_APPENDIX_3757.md` | ~45 | asio #3757 (AU-40): com_ramp_b256_d2 の producer 停止の計装 (write 時系列 pw を結果 JSON に出す)・同一 HEAD 計測 (cold 10・warm 6・負荷下 4・再測定 3)。直接経路は未特定。測定値の正本 |
 | `tools/audio/asio/REPORT_APPENDIX_2777.md` | ~150 | asio #2777 (#998 残件): 初期目標充填 T (burst probe 由来の depth 4/6) と com_ramp_b256_d2 underrun の実測 16 回・全 e2e (測定 commit `e137c4a8`)。対処 (床) は #2934 ([AU-26]) で main 済み。§7: 床の適用後の再測定 15 回 (測定 commit `c0fb6e074`)。測定値の正本。直接経路は [AU-40] #3757 |
 | `tools/audio/wl/REPORT.md` | ~75 | AU-8 (#194): ring 方式 vs worklet 直走行の遅延比較 (テスト音ミキサ代役) + FLEngine スレッド/待機面の静的見積り |
