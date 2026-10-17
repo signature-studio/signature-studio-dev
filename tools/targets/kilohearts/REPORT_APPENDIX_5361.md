@@ -6,7 +6,7 @@ issue #5361 の受入条件の測定正本。親 #4839 の分割 (残り 5 行 F
 
 - 基点 commit: `origin/main` (`4eaf8315c`)。測定 commit: `b3cdbcebc` (round 3 時点の head。`git diff b3cdbcebc HEAD -- tools/targets/kilohearts/ghidra_route/` は差分 0)。
 - 生成フラグ: `--fix bitcast,intload,stackpair,assoc,concat,gtype` (`--fix` を付けない生成は main 側の規則 (#4889 の `FUN_180fbc1f4` 戻り値規則が `concat` 前提) で assert 停止する。基点でも同じ)。
-- 素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/*` → `HeartCore.core_64`。すべて repo 外で展開し、`work/winpkg` へは repo 外への symlink のみ。
+- 素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/*` → `HeartCore.core_64`。すべて repo 外で展開 (`/tmp/opencode/kh153`)。`work/winpkg` は repo 外への symlink。
 - Ghidra 12.1.4 (`ghidra_12.1.4_PUBLIC_20260921.zip`・sha256 `ddac49f9…4db`・[GHIDRA])、JDK 21 (`temurin-21`)、emcc 6.0.12 (`emsdk install/activate 6.0.12`・[EMSDK])。
 - decompile: `DecompEach.java` で delay の 139 関数、gain/haas/gate の 10 関数 (`run_all.sh` [2] と同じ VA) を すべて `OK` (summary.tsv の status 集計 = OK 139 / 10・失敗 0)。
 
