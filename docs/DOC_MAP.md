@@ -231,6 +231,7 @@
 | `tools/liftdiff/tests/ld158_ret_probe.py` | ~110 | LD-158 (#3470) の動的プローブ: i128 戻り関数を 11 pattern × xfill {1,0} で native 実行し、戻り後 rax / rdx / xmm0 の書換えを記録 (`work/ld158_probe.json`)。`--names` で陰性対照の関数を指定できる |
 | `tools/liftdiff/tests/ld158_summarize.py` | ~70 | LD-158 (#3470) の集計: 動的分類・静的 dsm 判定 (窓 3 / 8) の件数と、`ret_override` と動的 xmm0 のみ集合の一致を出す (`work/ld158_table.tsv`) |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
+| `tools/icall/REPORT_APPENDIX_6205.md` | ~70 | icall #6205 (ICALL-128, 親 #6052): 関数 `0xc589b0` の `0x353`・`0x364`・`0x360`・`0x3b6`・`0x41b` の書込み元と表 `0x15e0ab0` (miss 時の追記のみ・`.data` ポインタ・初期化は本関数の外)・`0x390` (定数 `0x425c4587`) の静的追跡。実行による検証は未実施 |
 | `tools/icall/REPORT_APPENDIX_3940.md` | ~50 | icall #3940 (ICALL-91): 直接 entry の heap 引数指定 (`slot_trace.c`)。受入 2 は未達 (mode==2 の枝まで)。`1810806a0` の SIGSEGV の原因は未確認。PR 本文から移送した実測は未再測定 |
 | `tools/icall/REPORT_APPENDIX_5843.md` | ~60 | icall #5843 (ICALL-119): slot 関数の r13 保存分類 (`tools/icall/ret_r13_check.py`・件数は付録)。間接 `180cbba21`・`180cbba36` の具象型は未特定 (部分達成・残件は #5843) |
 | `tools/icall/REPORT_APPENDIX_5044.md` | ~50 | icall #5044 (ICALL-108): 180cbb930 の直接呼出し 2 件 (`180cbcd90`・`180cb9890`) が `r13` を書かないことの機械判定 (`tools/icall/r13_callee_check.sh`)。間接呼出し `180cbba21`・`180cbba36` の具象型は未特定 (部分達成・残件は #5044) |
