@@ -212,3 +212,29 @@ JSON は `${FL_WIN64_DIR}` プレースホルダとし、e2e が `render_target.
 注意 (置換とは無関係): 比較基点を `5984f7e^` 全体にすると、その間の他 PR の `ldfix.py` 変更で F3c が 0 → 26 と変わる。比較は置換対象以外が同一の tree で行うこと。
 
 既存欠陥 (#757 で修正・下記は実測): 修正前は stage4 が到達せず (`m11_simd.c: '../msimd11_core.h' file not found`・boot `missing function: __asm_movapd__112`)、base / fix とも survey ok 0・units_run 0 でも `judge_e2e.py` が PASS と判定していた。原因は `stage4.sh` が header を `work/stage4/` に置かず、simd.o が link されていなかったこと。`stage4.sh` で header を配置 (`cp "$M11/msimd11_core.h" "$S4/msimd11_core.h"`) し、`judge_e2e.py` に「stage4 到達 (>=4) と survey ok >=1」の前提を入れた。確認できた事実: `__asm_movapd__112` は `tools/m11/shimx_link/results/classes_boot_final3.json` に含まれる (件数の実測なし)。修正後の `ldfix_e2e.sh` 実測 (測定 run https://github.com/signature-studio/signature-studio-dev/actions/runs/38483922151 attempt 1・headSha `7a246871`・測定 commit `f8b90732` = origin/main・素材 fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk / toolchain-retdec 展開・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・foreground 1 回・`timeout 1500 bash tools/m11/ldfix/ldfix_e2e.sh > $RUNNER_TEMP/ldfix_e2e.out 2>&1`): rc 0・64 秒・load 1.06 (開始) / 1.09 (終了)。出力全文 (26 行) の sha256 `e564fb6b5c7644960cdb35a3ecea89a150011115cf0041b767bbfd6431fa169a` (先頭 16 桁は作成時の記録と一致)。ログ全文と `work/stage4_{base,fix}.log` の `grep -c` 件数は、`missing function` 0/0/0・`__asm_movapd__112` 0/0/0・`file not found` 0/0/0 (出力/base/fix)。`undefined symbol` は summary 行 `signature mismatch: 0, undefined symbol: 0` の 1/1 件のみで、エラーは 0。`STAGE4_JUDGE {"pass": true, "stage_base": 4, "stage_fix": 4, "survey_ok_base": 136, "survey_ok_fix": 136}`。stage4 base / fix とも getmem 16・units_run 17/942・icall_ok 24・survey ok 136・trap 9 (同一)。修正件数の実測 (同 run・`tools/m11/ldfix/work/ldfix_report.json`): F1=0 / F2=0 / F3a=2 / F3b=0 / F3c=33 (7,421 関数)。**§1〜2 の 955 関数 (F1 902) とは一致しない**。原因は未切り分け。§1 の A/B 表 (一致 3,161 等) は本 run では再測定していない (`--batch` は未実行)。threw `memory access out of bounds` の切り分けは #942 (CI-22) に分割。
+
+### 現行 HEAD での再測定 (#6053)
+
+#4521・#4522 (1e2/1e3 の修復) の close 後に、現行 main で `ldfix_e2e.sh` を 1 回実測した。
+**測定 commit `ff41e8aae`** (origin/main = PR #6051 取り込み後。worktree `ws-6053`・branch `6053-ldfix-remeasure`)。測定は worktree 上の foreground 実行で、対応する GitHub Actions run の URL は記録していない (未記録)。
+素材は fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk を `docs/WORKFLOW.md` §11 の手順で展開。
+`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP timeout 1500 bash tools/m11/ldfix/ldfix_e2e.sh` を foreground で 1 回。
+rc 0・74 秒・load 1.32 (開始) / 1.83 (終了)。出力 (43 行) の sha256 `d35a5237b2cb574cd6b07f3dbffa638b3c01f1af6dfff79120c0d51a821136d5`。
+
+| 項目 | base (修復前) | fix (修復後) | 判定 |
+|---|---|---|---|
+| stage4 到達 | 4 | 4 | OK |
+| getmem / freemem / FastMM_GetMem | 16 / 6 / 17 | 17 / 6 / 18 | OK |
+| units_run / units_total | 17 / 942 | 17 / 942 | OK |
+| init_count / icall_ok | 18 / 24 | 18 / 24 | OK |
+| survey ok / trap | 136 / 9 | 136 / 9 | OK |
+
+- `STAGE4_JUDGE {"pass": true, "stage_base": 4, "stage_fix": 4, "survey_ok_base": 136, "survey_ok_fix": 136}`
+- エラー件数 (ログ全文・`work/stage4_{base,fix}.log`): `missing function` 0/0/0・`__asm_movapd__112` 0/0/0・`file not found` 0/0/0・`FAILED` 0/0/0。`undefined symbol` は summary 行の `undefined symbol: 0` のみ (base/fix の各ログには `undefined symbol: 1` の 1 行が出るが、エラーではない)。
+- 修復件数 (`work/ldfix_report.json`): F1=0 / F2=0 / F3a=2 / F3b=0 / F3c=42 / F4=10 (7,421 関数)。
+  前回 (f8b90732) の F3c=33 から変わった (F4=10 は前回の記録に無い項目)。増えた理由は未切り分け (commit 間の差分か測定条件かは確認していない)。
+- 前回測定 (f8b90732) との比較: stage4 の getmem・survey ok (136)・units_run (17) は同じ。F3c の件数だけが増えた。
+- `--batch` (liftdiff closure A/B) は本測定では未実行。§1 の A/B 表は更新していない。
+
+**測定 commit 以降のコード差分 (`git diff ff41e8aae HEAD -- tools/m11/ldfix`)**: 本測定は HEAD = `ff41e8aae` で行った。
+この REPORT の追記以外に `tools/m11/ldfix` のコードは変えていないため、コード差分は 0 (REPORT.md のみ)。
