@@ -107,7 +107,7 @@ DEFECTS.md 行案 (編集は PM 判断):
 
 - **p1 の処理 (`tools/liftlib/liftlib/passes/p1.py`)**:
   - `shr` reg,imm の handler (line 1455-1466) は値だけ更新し `st["fl"] = None` にする。`shr rax,cl` (レジスタ shift) は handler に入らず、フラグは前段の状態のまま残る。
-  - `bsr` は p1 に handler が無く (grep で一致なし)、ZF を追跡しない。
+  - (LIFTLIB-26 / #4350 で更新) `bsr r,r` の handler を追加し、ZF を flag 種別 `bsrzf` に載せる。`bsr` の直後に読めるのは e/ne/z/nz のみ。CF・SF・OF を読む cc は Unsupported。`shr reg,cl` の CF・`adc`・`cmp rcx,0` の SF/ZF/CF は未実装 (子 issue へ)。4 分岐の `icmp` 再結線も未実施。
   - `flag_consumers` (line 73) は `defs_before(va,"flags") == {A}` (comis 起点) の jcc だけを拾う。したがって `jae` / `jne` / `jl` / `je` はいずれも comis 由来ではないため、分岐の再構成 (dropped/folded 経路) の対象外になっている。
 - **IR との対応 (VA 順からの推定・未検証)**: `dec_label_pc_1801ba9c8` の `br i1 true` が `jae 0x1801baa70` に、`dec_label_pc_1801baa70` の `br i1 false` が `jne 0x1801baab0` に、`dec_label_pc_1801baab0` の `br i1 false` が `jl 0x1801baae0` に、`dec_label_pc_1801baabd` の `br i1 undef` が `je 0x1801bab00` に当たると読める。どの値が畳まれたかは IR の `%` 定義を追うまで確定しない。
 - **修正の方向 (案)**: p1 に整数 flag 生成 (`shr` reg,cl の CF / `bsr` の ZF / `cmp rcx,0` の SF・ZF) を追加し、上の 4 分岐を `icmp` で再結線する。これは comis 起点の `p1` 経路とは別の経路になる。実装と測定は子 issue に分ける。
@@ -152,3 +152,73 @@ DEFECTS.md 行案 (編集は PM 判断):
 - 整数 flag の復元 (機械語 `0x1801baa3a`〜`0x1801bab26` の `shr cl` / `bsr` / `adc` / `cmp rcx,0` の CF/ZF/SF を p1 に追加し、RetDec raw で畳まれた 4 分岐を `icmp` で再結線する) → #1948 (LIFTLIB-20・親 #1709)。
 - 受入条件 (tanf wide 40/40・SVF `--n 40` 再測定・`liftlib_e2e.sh` ALL PASS) → #1948 で扱う。
 - 親 #1709 は #1948 完了まで open のまま (本 PR は `Refs #1709` のみ。`Closes` は付けない)。
+
+### 23.15 LIFTLIB-26 (#4350) — bsr の flag 種別の修正と測定の扱い (review 1)
+- **変更**: `bsr` の flag 状態を `("int", ...)` から専用種別 `("bsrzf", (src, bits))` に変更。ZF (`e`/`ne`/`z`/`nz`) だけを `icmp eq/ne src,0` で読み、CF・SF・OF を読む cc (`b`/`l`/`s`/`a` ほか) と CF 参照は `Unsupported`。T32 に `e` の IR 固定と `b`/`l`/`s`/`a` の Unsupported を追加。修正 commit: `c56bbafd9`。
+- **単体テスト (この run・実測)**: `tools/liftlib/tests/test_unit.py` の T22・T28・T29・T32 を個別に実行し ALL PASS。**全件 (T1〜T32) は未実行**: `tools/liftlib/work` と `tools/m6/work` が無く、T1〜T9・T26 が FileNotFoundError (素材 `work-liftlib`・`work-m6-ott` 未展開)。
+- **leafspec / e2e の再測定: 未実施**。素材が無く `targets/ott_leaf.json --n 40` を回せない。下の数値は前 commit `4fde610dc` の測定 (PR #6077 の初版で取った値) で、HEAD の値ではない。
+  - 測定 commit: `4fde610dc` (exp 40/0/0/0, tan 40/0/0/0, tanf 40/0/0/0, log 32/0/8/0, cvt 17/0/23/0, svf 2/30/8/1)。
+  - `git diff 4fde610dc HEAD -- tools/liftlib/liftlib` の出力 (p1.py の flag 種別の変更。bsr の flag を読む consumer の IR だけが変わる見込み・未測定):
+    ```diff
+diff --git a/tools/liftlib/liftlib/passes/p1.py b/tools/liftlib/liftlib/passes/p1.py
+index f66f69b4d..289a1e6c1 100644
+--- a/tools/liftlib/liftlib/passes/p1.py
++++ b/tools/liftlib/liftlib/passes/p1.py
+@@ -1090,6 +1090,10 @@ class Region:
+         if fl[0] == "rcrcf":
+             _cf, _bits, prev = fl[1]
+             return self._flag_zf_i1({**st, "fl": prev}, out, va, tag)
++        if fl[0] == "bsrzf":
++            src, bits = fl[1]
++            out.append("  %s = icmp eq i%d %s, 0%s" % (n, bits, src, tag))
++            return n
+         a, b, is_test, bits = fl[1]
+         if is_test:
+             t = self.nm(va, "ta")
+@@ -1104,6 +1108,14 @@ class Region:
+         fl = st.get("fl")
+         if fl is None:
+             raise Unsupported("flag state cleared")
++        if fl[0] == "bsrzf":
++            if cc not in ("e", "z", "ne", "nz"):
++                raise Unsupported("bsr flag: cc %s は ZF 以外 (CF/SF/OF 未定義) @%x" % (cc, va))
++            src, bits = fl[1]
++            pred = "eq" if cc in ("e", "z") else "ne"
++            n = self.nm(va, "fc")
++            out.append("  %s = icmp %s i%d %s, 0%s" % (n, pred, bits, src, tag))
++            return n
+         if fl[0] != "rcrcf":
+             return None                          # 通常経路 (comis/int) は各 handler で処理
+         cf, bits, prev = fl[1]
+@@ -1136,6 +1148,8 @@ class Region:
+             raise Unsupported("flag state cleared")
+         if fl[0] == "rcrcf":
+             return fl[1][0]
++        if fl[0] == "bsrzf":
++            raise Unsupported("bsr flag: CF は未定義 @%x" % va)
+         n = self.nm(va, "cf")
+         if fl[0] in ("comis", "site"):
+             fa, fb, ty = self._cmp_operands(fl, out, va, tag)
+@@ -1465,8 +1479,7 @@ class Region:
+             self.used("shift")
+             return True
+         # --- bsr r, r (LIFTLIB-26): ZF = (src==0)。src==0 のとき dst は前値を保つ (Intel 未定義・実装依存の扱いを固定)。
+-        #     flag 状態は ("int", (src, 0)) とし ZF を icmp eq src,0 で読む。CF/SF は bsr で未定義のため、
+-        #     機械語側では直後の jne (ZF) だけが消費する (REPORT_APPENDIX_E §23.10 の表)。
++        #     flag 状態は専用種別 "bsrzf" (ZF だけを読める)。CF/SF/OF は bsr で未定義のため、e/ne/z/nz 以外の cc は Unsupported。
+         if m == "bsr" and len(ops) == 2 and ops[0][0] == "reg" and ops[1][0] == "reg" and not mem:
+             bits = it._ci.operands[0].size * 8
+             if bits not in (32, 64):
+@@ -1488,7 +1501,7 @@ class Region:
+             out.append("  %s = select i1 %s, %s %s, %s %s%s" % (n, cz, ity, old, ity, ix, tag))
+             st[dst] = (n, ity if bits < 64 else "i64")
+             st["__w"].add(dst)
+-            st["fl"] = ("int", (src, "0", False, bits))
++            st["fl"] = ("bsrzf", (src, bits))
+             self.used("bsr")
+             return True
+         # --- cmp / test (整数フラグ生成。値は flag 状態に記録)
+    ```
+  - 既定 build の統計に `vocab_bsr` は出ない (前測定)。よって既定経路の出力は変わらない見込みだが、**HEAD での再測定をしていないため、不変の確認は未了**。
+- §23.10 の「bsr は ZF を追跡しない」は、上の §23.10 の箇条で更新済み。
+- 未解決 (起票先): HEAD での leafspec 再測定と全 unit test → #4350 (次 run)。`shr cl`・`adc`・`cmp rcx,0` → 子 issue。
