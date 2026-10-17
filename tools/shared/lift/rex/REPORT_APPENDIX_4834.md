@@ -56,4 +56,4 @@ setarch x86_64 -R bash tools/shared/lift/rex/lift_x64c.sh dllmain               
 `<fl-win64 展開先>` は `extracted/` を含むディレクトリ。生成物は `tools/shared/work/lift/rex/` (gitignore)。
 
 ### 13.7 測定後のコード差分 (差分 0 の証跡)
-`git diff 0403e1a49 HEAD -- tools/shared/lift/rex` の出力: 行数 0 (本 fix の commit で `tools/shared/lift/rex` を変えた場合は、その差分を次行に書く)。
+`git diff 0403e1a49 HEAD -- tools/shared/lift/rex ':(exclude)*.md'` の出力: 行数 0 (コード差分なし。md の変更は REPORT.md の 1 行参照と本付録のみ)。
