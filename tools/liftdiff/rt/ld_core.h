@@ -98,8 +98,10 @@ static int ld_dst_ok(u64 p, u64 n) {
 #define LD_FAKEPROC_SZ   32
 /* LD-48 (#1398): fvm の VMT slot 専用の仮 proc index 域。GetProcAddress 側 (0..LD_VMT_IDX0-1) と重ならせ、
  * ld_nfakeproc を増やさない (増やすと以後の GetProcAddress 応答の index がずれる)。 */
-#define LD_VMT_SLOTS     8
-static const char* ld_vmslot_names[LD_VMT_SLOTS] = {"?vmslot0", "?vmslot1", "?vmslot2", "?vmslot3", "?vmslot4", "?vmslot5", "?vmslot6", "?vmslot7"};
+#define LD_VMT_SLOTS     24   /* LD-238 (#4423): 784520 が [this の VMT + 0xb8] (slot 23) を呼ぶため 8 → 24 */
+static const char* ld_vmslot_names[LD_VMT_SLOTS] = {"?vmslot0", "?vmslot1", "?vmslot2", "?vmslot3", "?vmslot4", "?vmslot5", "?vmslot6", "?vmslot7",
+  "?vmslot8", "?vmslot9", "?vmslot10", "?vmslot11", "?vmslot12", "?vmslot13", "?vmslot14", "?vmslot15",
+  "?vmslot16", "?vmslot17", "?vmslot18", "?vmslot19", "?vmslot20", "?vmslot21", "?vmslot22", "?vmslot23"};
 
 static u64 ld_fake_ptr(u64 i);      /* プラットフォーム固有 (ld_native.c = 実行可能 thunk / wasm = 値のみ) */
 static int ld_fakeproc_valid(u64 i) { return i < (u64)ld_nfakeproc || (i >= LD_VMT_IDX0 && i < LD_VMT_IDX0 + LD_VMT_SLOTS); }

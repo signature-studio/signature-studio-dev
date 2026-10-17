@@ -29,7 +29,7 @@ def make_blob(seed, size=BLOB_SIZE, pfrac=0.30):
 BLOBS = {'r1': (101, 0.30), 'r2': (202, 0.30), 'r3': (303, 0.30), 'r4': (404, 0.85)}
 
 
-VMT_SLOTS = 8
+VMT_SLOTS = 24  # rt/ld_core.h LD_VMT_SLOTS と一致させる (LD-238: 784520 の slot 23 まで)
 LD_VMT_IDX0 = 1024  # rt/ld_core.h LD_VMT_IDX0 (GetProcAddress の index 0..1023 と別域)
 LD_FAKEPROC_BASE = 0x50010000
 LD_FAKEPROC_SZ = 32
