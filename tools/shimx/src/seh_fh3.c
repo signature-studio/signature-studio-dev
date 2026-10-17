@@ -55,7 +55,7 @@ int shimx_fh3_funclets(const uint8_t* img, uint32_t img_size, uint32_t fi_rva,
     return (int)n;
 }
 
-/* FH3 の try map と IP-to-state map から ShxSehScope 表を作る (MX-45 #4928 次の一手 2)。
+/* FH3 の try map と IP-to-state map から ShxSehScope 表を作る (MX-57 #4928)。
  * IP map は {Ip RVA, State} の 8 byte 昇順。entry i の状態は [ip[i], ip[i+1]) (最後は func_end) に効く。
  * try t の [tryLow, tryHigh] に入る状態の範囲ごとに、handler を 1 件ずつ scope にする:
  *   pType == 0 → catch-all (kind 2)、それ以外 → typed (kind = pType の RVA)。target = dispOfHandler。
