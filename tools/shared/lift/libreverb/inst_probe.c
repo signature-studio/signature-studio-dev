@@ -65,7 +65,7 @@ static void on_trap(int sig, siginfo_t *si, void *ucv) {
   if (pend_idx >= 0) memcpy(&ws[pend_idx].val, (void *)ws[pend_idx].addr, 8);
   if (emit_obj && pend_idx >= 0 && ws[pend_idx].addr >= emit_base && ws[pend_idx].addr < emit_base + OBJ) {
     char b[192];
-    uint64_t hi = 0; memcpy(&hi, (void *)(ws[pend_idx].addr + 8), 8);
+    uint64_t hi = 0; if (ws[pend_idx].addr + 16 <= emit_base + OBJ) memcpy(&hi, (void *)(ws[pend_idx].addr + 8), 8);
     int n = snprintf(b, sizeof b, "EMIT off=%#lx rip_rva=%#lx val=%#lx hi=%#lx\n", (unsigned long)(ws[pend_idx].addr - emit_base),
                      (unsigned long)(ws[pend_idx].rip - emit_img), (unsigned long)ws[pend_idx].val, (unsigned long)hi);
     if (n > 0) write(1, b, n);
