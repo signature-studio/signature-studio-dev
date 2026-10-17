@@ -35,8 +35,8 @@ flags は `flapi_table.json` の kwsig.flags と一致する。
 - `0xfdd1e0`: `[0x605ccd] → [+0x7e8]` の object に対し、`edx ≥ 2` なら `0x7cbd30`、それ未満なら `0x7cbd80` を呼ぶ (引数は `ecx`)。
 
 **未確認 (推測で埋めない)**:
-- `[0x603f6b]`・`[0x60421b]` の意味 (モードのフラグか、再生状態のフラグか)。
-- `0x1180d40` (speed を受けて dl=1 を取る経路)・`0x7cbd30`・`0x7cbd80` の中身。`speed << 4` の単位 (tick・pixel・ppq の別) も未確定。
+- `[0x603f6b]`・`[0x60421b]` の意味 (モードのフラグか、再生状態のフラグか)。§4.2 で指す先の byte までは確定。
+- `0x1180d40` の `dl` 引数の意味。`speed << 4` の単位 (tick・pixel・ppq の別) も未確定。`0x1180d40` の呼出し先 (`0x11e79d0`・`0x11f3450`) と呼出し元 4 件は §4.2 で確定。
 - `startStop` の値 (0・1・2 以上) が何を意味するか。`edx==1` で止める分岐と `edx≥2` の分岐の対応は PE 上の形だけ確定し、API 名との対応は未確定。
 
 ## 3. markerJumpJog・markerSelJog (PE 確定の部分)
@@ -54,11 +54,12 @@ flags は `flapi_table.json` の kwsig.flags と一致する。
 
 - 両 op とも、`0xfdeaf0` と `0x728f50` の両方に `rcx = op` (0x23 または 0x24) を渡す。
 - `0xfde3e7` の `0x1180ef0(ecx = [rbp+0x3c], dl = [rbp+0x43])` で `dl` が **op 0x23 は 0、op 0x24 は 1**。`markerJumpJog` と `markerSelJog` の作用の違いはこの `dl` にあると読めるが、`0x1180ef0` の中身は未読。
-- `0xfdeaf0` は `0x617920` を呼んだ後 `0x425210(obj, [edx], r8 = op, r9 = arg)` を呼ぶ (引数の形まで確定、`0x425210` の中身は未読)。
-- `0x728f50` は `[rip+0xecd1fc]` が 0 なら 0 を返し、非 0 なら `0x72afa0(obj, op, arg)` を呼ぶ (`0x72afa0` は未読)。
+- `0xfdeaf0` は `0x617920` を呼んだ後 `0x425210(obj, [edx], r8 = op, r9 = arg)` を呼ぶ (`0x425210` は PostMessageW の thunk。§4.2)。
+- `0x728f50` は `[rip+0xecd1fc]` が 0 なら 0 を返し、非 0 なら `0x72afa0(obj, op, arg)` を呼ぶ (`0x72afa0` の分岐と呼出し元は §4.2)。
 
 **未確認 (推測で埋めない)**:
-- `0x1180ef0` の dl 分岐の意味 (jump と select の違い)、`0x425210`・`0x72afa0` の作用先。
+- `0x1180ef0` の dl 分岐の意味 (jump と select の違い)。
+- `0x72b320` 以下の作用 (`op` と marker 状態の対応は §4.2 の未確定点)。
 - `0xfdd270` の mode の値 (bit 1 が立つ条件) と、`arg`・`mode` が 0 以外のときの分岐。
 - `markerJumpJog`・`markerSelJog` が状態のどこを変えるか (マーカー位置・選択範囲のどれか)。`value` の単位 (tick・bar・marker 番号) と `flags` (`midi.GT_All` の既定) の効果も未確定。
 
