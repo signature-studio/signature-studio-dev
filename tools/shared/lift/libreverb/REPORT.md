@@ -170,3 +170,35 @@ ildsp の規模測定 (命令数・call 数・export closure 表) と未解決�
 - 揺れの原因: 完走数の揺れは ASLR 由来。ASLR 有効では、ポインタ値に依存する一部の関数 (例 RVA `0xaca4`・`0x25c4c`) の完走・SIGSEGV の結果が実行ごとに変わる。ASLR を切ると 2 回とも同じ結果になる。14 本への書き込み命令の RIP 集合 (9 箇所) と、14 スロット向け emit の件数 (128 件) は、ASLR 有効 3 回・無効 1 回で一致した。
 - 読み: 掃引で完走した関数の範囲では、14 本への qword ポインタ書き込みは無い。ただし 1056〜1067 関数は zero 初期化の object で途中 SIGSEGV しており、その先の書き込みは観測していない。14 本を埋める entry は、この掃引では見つからなかった (未特定)。
 - 観測の限界: 観測は確保領域内だけ。掃引は ctor 直後の 1 状態 (引数 NULL・zero 初期化) で、各関数に同じ `in`/`out` を渡すだけ。SIGSEGV で止まる関数は、途中の書き込みを残して打ち切られる。
+
+### 1056〜1067 関数の先の書き込み (T-SH-147 / #6158)
+
+測定 commit: `5dd6321e1` (`sweepfull` の内訳を 3 回実測・EMIT の `hi` 読み取りを object 内に限定)。sweep の 1 行目・2 行目は `59c665488` で取得 (`inst_probe.c` に SIGSEGV 時の fault RIP ログ (`FAULT`)・`sweepfull` モード・EMIT の `hi` を追加)。`git diff 5dd6321e1 HEAD -- tools/shared/lift/libreverb ':!tools/shared/lift/libreverb/REPORT.md'` の出力は空。
+手順: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/libreverb/inst_probe.sh` (既定の検査・PASS) と、`inst_probe image.bin 3fa0 1240 sweep` (全 1515 関数)。
+
+| 掃引 | 完走 (exit 0) | SIGSEGV | SIGALRM | SIGBUS | 14 本への qword 書き込み | 備考 |
+|---|---|---|---|---|---|---|
+| `sweep` (run 1・59c665488) | 456 | 1057 | 1 | 1 | 0 | `final_sweep.out` |
+| `sweep` (run 2・同 commit) | 444 | 1069 | 1 | 1 | 0 | `rerun.out` (所要 2 分 05 秒) |
+| `sweepfull` (run 1・e1425d302 の検査コードと同一) | 449 | 1062 | 3 | 1 | 未判定 (EMIT の 14 本宛 128 件・幅未分離) | `tools/shared/work/lift/libreverb/inst/sweepfull.out`。値が 0 の 8 B 位置を 64 KB の確保領域で埋めてから掃引 |
+| `sweepfull` (run 2・同上) | 465 | 1046 | 3 | 1 | 未判定 (同 128 件) | `sweepfull_rerun.out` (所要 2 分 09 秒) |
+| `sweepfull` (run 3・測定 commit `5dd6321e1`) | 448 | 1054 | 12 | 1 | 未判定 (同 128 件) | `sweepfull_head.out` (所要 2 分 35 秒・開始時 load 2.67。SIGALRM 12 は負荷による打ち切り) |
+
+- 旧 `sweepfull` 行 (442 / 1058 / 0 / 0) は合計 1500 で 15 件が欠けていた。元の出力ファイルが残っていないため、その内訳は検証できない。上の 3 行は各回で合計 1515 (`SWEEP_END` 1515 行・`SWEEP_FUNCTIONS=1515`) を確認した値で、旧行を差し替える。
+- 14 本の位置 (`off` 0xbc〜0x10b の 8 B 間隔) に当たる EMIT 行は `sweepfull_head.out` (run 3) で 128 件。RIP 別: `0x13e6b` 14 件・`0x4c8e7` 28 件・`0x51aba` 42 件・`0x520f6` 14 件・`0x52e9` 14 件・`0x41ea0` 12 件・`0x41ec5` 2 件・`0x3e49b` 1 件・`0x3e59b` 1 件。
+- 注意: EMIT の `val` は store 後に `addr` から読んだ 8 B で、1 B・2 B・4 B の store では隣接バイトを含む。そのため `val` が `0x7f…` 系かどうかは、ポインタ代入の証拠にならない。上の 128 件が qword の 14 本書き込みかは、EMIT では判定できない。上の命令分類 (幅の判定) を正とする。
+- 旧 sweep 行の「14 本への qword 書き込み 0」は、この表の判定方法を REPORT・コードから再現できない (`sweep` モードは書き込み幅を解析しない)。今回の 128 件が幅の判定と矛盾しないかは未確認。
+
+- 結果 (受入条件は未達): SIGSEGV で止まった関数の先は観測できていない。SIGSEGV 関数の数は 1046〜1069 で、ASLR と負荷で揺れる (受入の 1056〜1067 と同じ層)。
+- fault の内訳 (run 1): SIGSEGV 1057 関数のうち、image 内の RIP で落ちた fault は 274 件・image 外 (libc の memcpy/memset など) は 495 件。fault アドレスの多くは `0`・`0x4`・`0x28`・`0x30` など小さい値で、zero 初期化の object の NULL 構造体を読んでいる形。
+- 状態を変えても進まない: 14 本の slot を確保領域で埋める版 (`sweepfill`・試行のみ・コミットせず) は完走 451 件・SIGSEGV 1062 件で、掃引全体の結果は変わらなかった。値が 0 の 8 B 位置を全部埋める `sweepfull` も SIGSEGV 1046〜1062 件 (3 回) で、NULL 読みは残る。
+- 16 B の store の確認: `0x4a804` (RVA) は `movups` の 16 B store で offset `0x110` (範囲 0x110〜0x11f) に当たり、14 本のうち slot 11 (0x114〜0x11b) と slot 12 (0x11c〜) に重なる。store の値は下位 8 B が `0x55b90d262706`・上位 8 B が 0 で、ヒープ領域 (mmap 0x7f…) を指すポインタではない。書き込み元の関数 `0x4a77c` は SIGSEGV 関数なので、この store は ptr 代入ではないと判定する。
+- 他の store 候補 (`0x5300` 群の `movups`・`0x3e49b`・`0x3e59b` の 16 bit・`0x41ea0`・`0x41ec5` の byte・`0x51aba`・`0x520f6` の dword・`0x52e9`・`0x13e6b` の `rep stos/movs`・`0x4c8e7` の byte swap) は、値が `0x9090…` (padding) か小さい整数で、ポインタ代入ではない。
+- 読み: 掃引の範囲では、14 本への qword ポインタ書き込みは観測されない。ただし 1057 関数は途中 (NULL 読みの前) で止まるため、その先の書き込みは未観測のまま。14 本を埋める entry は未特定。
+- 次の一手 (未着手): 1057 関数が NULL 構造体を読む原因の特定 (ctor より前の状態・ホストが先に埋める構造体の値)。これは受入の範囲外の状態設計 (#5356 の範囲寄り) になり得るため、担当は PM 判断。
+
+## 未解決 (T-SH-147)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 1057〜1069 の SIGSEGV 関数の先の 14 本 (`this+0xbc+8i`) 書き込みが未観測 | 14 本を埋める entry が未特定。受入条件は未達 | 本 issue #6158 (部分達成・`Refs`) |
+| 掃引の NULL 読みを避ける入力状態 (ctor より前の構造体の値) が未特定 | 掃引で先に進めない | 本 issue #6158 の次 run。範囲外なら PM 判断 |

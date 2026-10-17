@@ -35,12 +35,20 @@ static int find_reg(uint64_t a) {
   for (int i = 0; i < nreg; i++) if (a >= (uint64_t)regs[i].base && a < (uint64_t)regs[i].base + regs[i].len) return i;
   return -1;
 }
+static uint64_t fault_img;
 static void on_segv(int sig, siginfo_t *si, void *ucv) {
   (void)sig;
   ucontext_t *uc = ucv;
   uint64_t a = (uint64_t)si->si_addr;
   int r = tracing && !pend ? find_reg(a) : -1;
-  if (r < 0) { signal(SIGSEGV, SIG_DFL); return; }
+  if (r < 0) {
+    if (tracing) {
+      char b[128];
+      int n = snprintf(b, sizeof b, "FAULT addr=%#lx rip=%#lx img=%#lx\n", (unsigned long)a, (unsigned long)uc->uc_mcontext.gregs[REG_RIP], (unsigned long)fault_img);
+      if (n > 0) write(1, b, n);
+    }
+    signal(SIGSEGV, SIG_DFL); return;
+  }
   if (nw < MAXW) { ws[nw].rip = uc->uc_mcontext.gregs[REG_RIP]; ws[nw].addr = a; pend_idx = nw; nw++; }
   else pend_idx = -1;
   pend_page = (uint8_t *)(a & ~(PG - 1));
@@ -56,9 +64,10 @@ static void on_trap(int sig, siginfo_t *si, void *ucv) {
   pend = 0;
   if (pend_idx >= 0) memcpy(&ws[pend_idx].val, (void *)ws[pend_idx].addr, 8);
   if (emit_obj && pend_idx >= 0 && ws[pend_idx].addr >= emit_base && ws[pend_idx].addr < emit_base + OBJ) {
-    char b[160];
-    int n = snprintf(b, sizeof b, "EMIT off=%#lx rip_rva=%#lx val=%#lx\n", (unsigned long)(ws[pend_idx].addr - emit_base),
-                     (unsigned long)(ws[pend_idx].rip - emit_img), (unsigned long)ws[pend_idx].val);
+    char b[192];
+    uint64_t hi = 0; if (ws[pend_idx].addr + 16 <= emit_base + OBJ) memcpy(&hi, (void *)(ws[pend_idx].addr + 8), 8);
+    int n = snprintf(b, sizeof b, "EMIT off=%#lx rip_rva=%#lx val=%#lx hi=%#lx\n", (unsigned long)(ws[pend_idx].addr - emit_base),
+                     (unsigned long)(ws[pend_idx].rip - emit_img), (unsigned long)ws[pend_idx].val, (unsigned long)hi);
     if (n > 0) write(1, b, n);
   }
   mprotect(pend_page, PG, PROT_READ);
@@ -88,7 +97,8 @@ int main(int argc, char **argv) {
   sa.sa_sigaction = on_trap; sigaction(SIGTRAP, &sa, NULL);
   tracing = 1;
   uint8_t *obj;
-  if (!strcmp(mode, "ctor") || !strcmp(mode, "vt") || !strcmp(mode, "fruity") || !strcmp(mode, "sweep")) obj = ((CRI)(img + strtoul(argv[2], 0, 16)))(NULL);
+  fault_img = (uint64_t)img;
+  if (!strcmp(mode, "ctor") || !strcmp(mode, "vt") || !strcmp(mode, "fruity") || !strcmp(mode, "sweep") || !strcmp(mode, "sweepfull")) obj = ((CRI)(img + strtoul(argv[2], 0, 16)))(NULL);
   else {
     obj = my_HeapAlloc(NULL, 0, OBJ);
     if (!strcmp(mode, "selftest"))
@@ -200,7 +210,16 @@ int main(int argc, char **argv) {
     else printf("FRUITY_TRACE_EXIT=%d\n", WEXITSTATUS(fst));
     return 0;
   }
-  if (!strcmp(mode, "sweep")) {
+  if (!strcmp(mode, "sweep") || !strcmp(mode, "sweepfull")) {
+    if (!strcmp(mode, "sweepfull")) {
+      for (int i = 0; i < nreg; i++) mprotect(regs[i].base, regs[i].len, PROT_READ | PROT_WRITE);
+      for (int off = 0; off + 8 <= OBJ; off += 8) {
+        uint64_t v; memcpy(&v, obj + off, 8);
+        if (v) continue;
+        uint8_t *q = my_HeapAlloc(NULL, 0, 65536);
+        memcpy(obj + off, &q, 8);
+      }
+    }
     uint32_t pe = *(uint32_t *)(img + 0x3c);
     uint16_t nsec = *(uint16_t *)(img + pe + 6), optsz = *(uint16_t *)(img + pe + 20);
     uint32_t pd_rva = 0, pd_sz = 0;
