@@ -77,7 +77,26 @@ if missing:
     print(f"[census] FAIL: 範囲の関数が define されていない: {missing}")
     rc = 1
 orphan = sorted(set(extra) - set(extra_ref))
-if orphan:
+if len(sys.argv) > 4:
+    # 計算ジャンプ表の経路を戻した IR (ci_restore_jump_table.py の出力) を検査する。
+    # 修復前の orphan (表の飛び先 9 件) は、この IR で case に吸収されて消えるべきもの。
+    rj = open(sys.argv[4]).read()
+    jdefs = set(re.findall(r"^define [^@]*@([A-Za-z0-9_.]+)\(", rj, re.M))
+    jextra = sorted(jdefs - want)
+    jref = set(re.findall(r"call [^@\n]*@([A-Za-z0-9_.]+)\(", rj))
+    jorphan = sorted(set(jextra) - jref)
+    labels = [k for k in range(1, 17) if re.search(r"^ci_jt_%d:" % k, rj, re.M)]
+    print(f"[census] 計算ジャンプ表の経路 (復元後 IR): 範囲外の define {len(jextra)} 件・orphan {len(jorphan)} 件・case ラベル {len(labels)}/16")
+    if want - jdefs:
+        print(f"[census] FAIL: 復元後 IR で範囲の関数が define されていない: {sorted(want - jdefs)}")
+        rc = 1
+    if jorphan:
+        print(f"[census] FAIL: 復元後 IR に orphan の define が残る (計算ジャンプ表の経路の欠落の疑い・REPORT_CI §2-2 (b)): {jorphan}")
+        rc = 1
+    if len(labels) != 16 or "switch i64 %arg3" not in rj:
+        print(f"[census] FAIL: 計算ジャンプ表の case が復元されていない (ラベル {len(labels)}/16)")
+        rc = 1
+elif orphan:
     print(f"[census] FAIL: 範囲外の define が IR のどの call からも参照されない (計算ジャンプ表の経路の欠落の疑い・REPORT_CI §2-2 (b)): {orphan}")
     rc = 1
 
