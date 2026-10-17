@@ -9,7 +9,7 @@
 - **項目 2 (段別 A/B・達成)**: 元の 9 件のうち 53・87・138 は **qstore だけで消える** (ldfix の後に qstore だけを足すと 9→6)。158 は **qstore と alloca の両方が要る** (qstore だけ (c4) も、qstore を外した prod fix (l_no_qstore・alloca あり) も残る)。17 は alloca、56 は guard699 で消える。**ld108・ld115・src412770 は 9 件の集合も本番順の 22 件の集合も変えない** (累積 A/B と leave-one-out の両方で確認。unit 番号の照合は §1-3)。
 - **項目 3 (r8b を含む本番順の判定・達成)**: r8b (`fix_r8b815050.py`・main の `m11_gen_ir2.sh` の既定) を含めても、件数 (survey ok/miss/trap) は r8b 無しと同じ。fix・base とも 872/47/22。fix と base の差は unit 895 (OOB → halt0) の 1 件だけ。r8b は unit 280・659 の trap を消さない (最内 frame は同じ callee `function_6cefb0`。呼出し位置の offset だけが変わる)。
 - **項目 4 (F3c 33→43 の出所・達成)**: commit `f63b5953d` (`fix(ldfix): repair first-deref-not-entry uses dominated by the deref block (refs #1325)`) で F3c 関数が 33 → 43 に増えた。同じ入力 `boot_final3.ll` で、親 (`f63b5953d^`) は 33、この commit は 43 (§4)。
-- **項目 1 (trap 144・149・114 の引き金・部分達成)**: unit 別の最内 frame と段ごとの変化 (§1〜§3)。§8 で commit 済みスクリプトによる引数採取を行った。144 の a1 の書込み元 (`function_653660` 219682 行 ← `function_439550` が `dsp_ippv2.dll` を小文字化) まで特定。149 は `[0x10aa1418]` の書込み元 (`function_4136a0` 119304 行) まで。114 は halt0 の呼出し鎖まで採取 (最内 `function_412770`・呼出し元 `function_4128b0__lifted`。call site は未確定。採取値は §8-3 の注の通り本 run では未再現)。PR は `Refs #3608`。
+- **項目 1 (trap 144・149・114 の引き金・部分達成)**: unit 別の最内 frame と段ごとの変化 (§1〜§3)。§8 で commit 済みスクリプトによる引数採取を行った。144 の a1 の書込み元 (`function_653660` 219682 行 ← `function_439550` が `dsp_ippv2.dll` を小文字化) まで特定。149 は `[0x10aa1418]` の書込み元 (`function_4136a0` 119304 行) まで。114 は halt0 の呼出し鎖まで採取 (最内 `function_412770`・呼出し元 `function_4128b0__lifted`。call site B (`function_412770(18787456)`) を確定し、A (`18787752`) は 0 回 (§8-5)。B の分岐条件 (`18787504` の i8) は未確定)。PR は `Refs #3608`。
 
 ## 1. 測定 (測定 commit `e6c940834`・HEAD 再測定済み・`87208313b` と一致 (§6))
 
@@ -132,7 +132,7 @@
 |---|---|---|
 | 144: `function_6539e0` が `dsp_ippv2.dll` (0x2572dc) を選ぶ条件 (呼出し元の分岐) | 項目 1 (受入 1 の残り) | #3608 |
 | 149: `function_412c20` の戻り値 0 の由来・`Blend2D.dll` (0x264208) を渡す上流 | 項目 1 (受入 1 の残り) | #3608 |
-| 114 ほか halt0 の 7 件: call site B の分岐 `18787504` の i8 の trap 時の値 (B 直前の `dec_label_pc_4129be`) と、A が他 unit で走るか | 項目 1 (受入 1 の残り) | #3608 |
+| 114 ほか halt0 の 7 件: call site B の分岐 `18787504` の i8 の trap 時の値 (B 直前の `dec_label_pc_4129be`) と、A が他 unit で走るか | 項目 1 (受入 1 の残り) | #5280 |
 | ldfix の F3a 2・F3c 43 のうち件数に反映されなかった修復 (反映は unit 895 の 1 件) の理由 | 項目 3 の理由 | #3608 |
 | `stage4.sh` が `llvm-nm` を PATH から引けず、`defined_c.txt` が空になる (`emsdk_env.sh` は `upstream/bin` を PATH に入れない)。空だと `m11_winstubs.c` と `win.o` の定義が重複し wasm-ld が落ちる | 再現環境の stage4 (§8 の採取手順 4) | #3608 |
 
@@ -228,4 +228,4 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 
 - 149: `function_412c20` の戻り値 (0) の由来、`0x264208` (`Blend2D.dll`) を `function_6539e0` に渡す上流の呼出し元。
 - 144: `function_6539e0` が `0x2572dc` (`dsp_ippv2.dll`) を選ぶ条件 (呼出し元の分岐)。
-- 114: `function_4128b0__lifted` の 2 つの call site のどちらが 114 を引くか (分岐条件の trap 時の値)。受入 1 の残り。reader の halt0 枝は `77ead008e` で入ったが、本 run では再採取していない (§8-3)。
+- 114: call site B (`function_412770(18787456)`) を確定 (A は 0 回・§8-5)。B の分岐条件 (`18787504` の i8 の trap 時の値) は未確定。受入 1 の残り。
