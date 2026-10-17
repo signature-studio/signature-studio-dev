@@ -19,8 +19,8 @@
 | HEAD `d931ff801` (本 PR) | 273 | 41 | 67 | 165 |
 
 - 差分: 引数数不一致 57 → 41 (-16)。基点の `FUN_180fc6870 ... expected 4, have 1` 16 件 (`auVar50._N_4_` を引数に渡す呼出し) が消えた。
-- 基点と HEAD の emcc ログ差分 (エラー本文ごとの件数): 上の 2 行 (lane 166 → 165 と引数数不一致 16 件の消滅) と、`FUN_180fc6870` の 0 引数呼出し 2 件 → 1 件 (同じ `too few arguments` 系で本文が `single argument 'fParam' was not specified` に変わった 1 件)。他の行は完全一致。`FUN_180fc6d70` の行は基点と HEAD で同一 (16 件のまま・未変更)。
-- 0 引数呼出し 1 件 (`delay.c:935` `fVar23 = (float)FUN_180fc6870();`) は残る。呼出元 934 行は `FUN_1802ed7f0` 内で xmm7 を `mulss` (定数 `0x181563038`) した値を xmm0 に入れて呼ぶ。C の上で xmm0 の源をどう表すかは未確定 (issue #6210 の残件)。
+- 基点と HEAD の emcc ログ差分 (エラー本文ごとの件数): `expected 4, have 1` (`FUN_180fc6870` の 1 引数呼出し) 16 件が消えた。`undefined1[64]` の member 参照 (`in_ZMM0._0_4_` の読みの除去) が 106 → 105。`expected 4, have 0` は 2 → 1 件だが、これは 935 行 (`FUN_180fc6870`) のメッセージが `single argument 'fParam' was not specified` に変わった分。基点 5111 行 (HEAD では 5115 行) の呼出しは `FUN_180fe3310()` (`expected 4` は別 callee の宣言) で、本規則とは無関係に残る。他の行は完全一致。`FUN_180fc6d70` の行は基点と HEAD で同一 (16 件のまま・未変更)。
+- 0 引数呼出し `delay.c:935` `fVar23 = (float)FUN_180fc6870();` は残る (エラー本文は `single argument 'fParam' was not specified` に変わった)。呼出元 934 行は `FUN_1802ed7f0` 内で xmm7 を `mulss` (定数 `0x181563038`) した値を xmm0 に入れて呼ぶ。C の上で xmm0 の源をどう表すかは未確定 (issue #6210 の残件)。
 - 本規則で件数が増えた行は無い (emcc error 行は 290 → 273 で単調減少)。
 
 ## 3. 既存規則への波及 (3594・3653・FUN_180fc6d70)
