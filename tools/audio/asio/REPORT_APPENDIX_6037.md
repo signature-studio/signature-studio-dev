@@ -113,3 +113,25 @@ L9 では producer の wake 間隔 62.5 ms に加えて、-139.9 ms の 41.7 ms 
   - 負荷下の失敗頻度は母数が小さく、確定しない。HEAD `570f76617` では 2/5 で再現している (§3-3)。§2-1 の計装途中版の 3/12 とは別集計。
   - JS 側 bufferSwitchTimeInfo の独立した呼出しログは追加していない (§3-2)。
   - 床の値 (`FLA_F_T_FLOOR`) は変えていない (PM 判断)。
+
+## 5. 待ち記録の計装と本 run の再測定 (run 3・受入 1 の残件・受入 2)
+
+計装: `fla_out_wait_fill_le` の wait32 1 回ごとに [開始 ms, 終了 ms, rc, 待ち入り時の fill, max_fill] を `flasio_wt_*` で記録 (判定に使わない)。rc: 0=通知、1=値変化で即戻り、2=timeout。commit: `9d9305f20` (記録) → `c525b67cb` (fill 記録。計装の最後)。
+
+測定: `yes` × 4 (PID 指定で停止)・`run_com.mjs --quick --only com_ramp_b256_d2`。
+
+| 試行 | 結果 | 備考 |
+|---|---|---|
+| r9_1 (`9d9305f20`) | FAIL: underruns=1 silence=5760 | 停止の時間帯 [-130, +113] ms。wait は [-130, -30] で rc=0 (通知) が続く。producer の書き込みは -29.7 ms、次の書き込みは +113.5 ms。`cb_max_us` 30 µs・seg 最大は数十 µs。-29.7〜+113.5 の 143 ms の大半は callback の外 (wait の記録も無い区間) |
+| r9_2・r9_4 (`9d9305f20`) | PASS ×2 | — |
+| r9_3 (`9d9305f20`) | FAIL: underruns=1 | `wait_timeouts=1`。producer の書き込みは -53.9 ms で止まり、wait [-53.9, -2.8] は rc=2 (timeout 50 ms ちょうど)。worklet の `rd` は underrun 直前まで進み続け (wl=2)、producer 側の通知は届いていない |
+| r10_1〜8 (`c525b67cb`・fill 記録版) | 8/8 PASS | underrun 0 |
+| r11_1 (`c525b67cb`) | PASS | hook の時刻取得を条件付きにした版 (計装は同じ判定) |
+| e2e `--quick` (`c525b67cb`) | exit 0・3/3 PASS・73 秒 | — |
+
+読み:
+
+- r9_3 は「producer が通知を受けずに 50 ms の timeout まで寝た」形。worklet は `out_read` を進め続けており、通知の条件 (`out_read >= wake_target` で `Atomics.notify`) が満たされていなかった、もしくは通知が届かなかった。`fill` の記録は r10 以降の版からのため、r9_3 では待ち入り時の fill は未記録。
+- r9_1 は通知で戻る wait が続いた後の 143 ms の空白。wait の記録が無いため、この空白が producer の wait 外か、wait 後の実行待ちかは区別できない。
+- 記録版 (r10) では 8 回中 0 回の失敗。HEAD `c525b67cb` での頻度は確定できない。
+- 直接経路 (producer の preempt か、wait 返りの遅れか、通知の欠落か) は特定できなかった。
