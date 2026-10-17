@@ -147,3 +147,20 @@ rl_1〜8 は `work/load_trial.cjs 8` で取った (`yes` × 4 を全 8 試行の
 - `52b5a68d1` (実装どおりに fill を記録する版) で、無負荷 e2e 1 回の underrun と、負荷下 8 回中 2 回の underrun を再現した。`c525b67cb` の 8/8 PASS (r10) は、ビルド不可の commit での測定のため根拠にならない。
 - 失敗時の wait 記録は、待ち入り時 fill が max_fill を上回ったまま 50 ms の timeout に入った形。producer の通知が届かない (out_read が wake_target に達しても notify されない) か、worklet が追いつく前に producer が寝た形のどちらとも、この記録だけでは区別できない。
 - 直接経路 (producer の preempt か、wait 返りの遅れか、通知の欠落か) は特定できなかった。
+
+## 6. run 4: wait の返り時 fill の記録と負荷下の再測定 (受入 2)
+
+計装: `wt` に返り時 fill (`fill1` = `w - out_read` after wait32) の列を追加 (判定に使わない)。宣言・定義・呼出し・harness の列を同時に揃えた (`fla_wait_trace_hook` の型不一致を再発させないため)。
+
+測定 commit: `602a274e5` (本計装を入れた最後の commit。基底は `2b64a163b`)。`yes` × 4 (PID 指定で停止)・`run_com.mjs --quick --only com_ramp_b256_d2`。
+
+| 試行 | 結果 | 備考 |
+|---|---|---|
+| r4_1 | FAIL: underruns=1 silence=3840 | ramp 114688/143616。結果 JSON は r4_2 で上書きされる前に解析した (解析値は本節のとおり。ファイルのコピーは無い) |
+| r4_2〜r4_9 | 8/8 PASS | underruns 0 |
+
+- 負荷下 FAIL は 9 回中 1 回 (r4_1)。母数が小さく、頻度は確定しない。
+- r4_1 の停止の時間帯 (underrun = 0 ms 基準): producer の row107 は `wake` = `tb` = -29.9 ms、`t0` (memset 直後) = +77.2 ms。区間 [-29.9, +77.2] (約 107 ms) は `tb`→`t0` の間で、この区間の仕事は memset のみ (数 µs)。
+- 同区間の `wait32` の記録は無い。最後の wait (開始 -39.8・終了 -29.9 ms、rc 0) が返った時刻と row107 の wake (-29.9 ms) は一致し、次の wait の開始は +77.4 ms。つまり producer は wait が返った直後から `tb`→`t0` (memset 区間) の中で約 107 ms 戻らなかった。
+- 読み: 区間の仕事は memset だけ (数 µs) なので、この空白はスレッドが実行されなかった時間として読める。「memset 中に preempt された」か「`tb` 記録の後に実行を得られなかった」かは、`tb`・`t0` の 2 点しか無いため区別できない。wait の返り時刻 (-29.9 ms) が notify に対して遅れたかは、row107 の notify 時刻を照合していないため未確定。
+- 受入 2 (直接経路の特定): 特定できなかった。切り分けの範囲は「producer thread が wait の返りの直後、memset 区間で約 107 ms 実行されなかった」まで。OS の preempt かホスト側の thread 停止かは、wasm 側の計装では分けられない。
