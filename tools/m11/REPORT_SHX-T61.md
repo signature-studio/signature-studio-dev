@@ -92,17 +92,22 @@ $ git diff b07e20aaf HEAD -- tools/m11/ldfix/fix_shx_t61.py tools/m11/shimx_link
 ## 6b. 親の外側 loop 入口の計装 (`fix_shx_t61b`・本 run・既定 OFF)
 
 - 計装: `M11_FIX_SHX_T61B=1` のときだけ親 `function_448490` の外側 loop 入口 `dec_label_pc_4484f4` に入る。入口の通過回数・上限 `%9` (下位 32 bit)・添字 `-32.0`・`-32.2` を `@fx61b_buf` へ書き、回数が `FX61B_LIMIT` (既定 100000) を超えたら trap。記録の load・store だけで分岐は変えない。
-- 既定 OFF: `ir_sha256` 先頭 `b202c157a80807f2`・`shx_t61b=not-applied`・実 boot `units_run=17`・`dllmain_done=true`・`va_calls=2`・`icall_ok=24`・`icall_miss=1`・`boot_rc="1"`・`longjmp_hit=1`。このうち `units_run`・`dllmain_done`・`icall_ok`・`icall_miss`・`longjmp_hit`・`boot_rc` は REPORT_SHX-T28 §7 と一致する。`va_calls` は REPORT_SHX-T28 §7 に記載が無い (`va_calls=2` の既存の記録は REPORT_SHX-T44 §2 の baseline のみ)。
-- ON (`M11_FIX_SHX_T40=1 M11_FIX_SHX_T61B=1`・既定 LIMIT): IR 生成 rc 0 (`fx61b` 14 行)・build rc 0・trace build rc 0 (`mismatch=0 undefined=0 duplicate=0`)。実 boot は trap で終わり、0.5 s 未満。
+- 既定 OFF (測定 commit `524e9b710`・`M11_FIX_SHX_T40`・`M11_FIX_SHX_T61B` を付けない): `ir_sha256` 先頭 `b202c157a80807f2`・`shx_t40=not-applied`・`shx_t61b=not-applied`。実 boot (`run_trace.mjs`・0.32 s) は `units_run=17`・`dllmain_done=true`・`va_calls=2`・`icall_ok=24`・`icall_miss=1`・`boot_rc="1"`・`longjmp_hit=1`・`fx61b=null`。`units_run`・`dllmain_done`・`icall_ok`・`icall_miss`・`longjmp_hit`・`boot_rc` は REPORT_SHX-T28 §7 と一致する。`va_calls=2` は REPORT_SHX-T28 §7 に記載が無く、既存の記録は REPORT_SHX-T44 §2 の baseline のみ (本 run でも 2 を再現した)。
+- ON (`M11_FIX_SHX_T40=1 M11_FIX_SHX_T61B=1`・測定 commit `524e9b710`): IR 生成 rc 0 (`fx61b` 17 行)・build rc 0 (`mismatch=0 undefined=0`)・trace build rc 0 (`mismatch=0 undefined=0 duplicate=0`)。実 boot は trap (`threw="unreachable"`) で終わり、0.70 s 以下。
 
-| LIMIT | 入口の通過回数 `count` | `lim` (%9) | `idx` (-32.0) | `idx2` (-32.2) | 所要 |
-|---|---|---|---|---|---|
-| 3 | 4 (trap) | 10 | 1 | 未読取 (この run では読み出していない。`fx61b_buf[3]` は記録されている) | 0.52 s |
-| 100000 (既定) | 100001 (trap) | 10 | 1 | 1 | 0.52 s |
+| LIMIT | `ir_sha256` 先頭 | 入口の通過回数 `count` | `lim` (%9) | `idx` (-32.0) | `idx2` (-32.2) | 所要 |
+|---|---|---|---|---|---|---|
+| 3 | `d86b4645` | 4 (trap) | 10 | 1 | 1 | 0.38 s |
+| 100000 (既定) | `507b403c` | 100001 (trap) | 10 | 1 | 1 | 0.70 s |
 
 - 読み取り: 入口は上限 10 の下で 100001 回通過し、添字 `-32.0`・`-32.2` は 1 のまま変わらない。
-- 続行判定 (未確定): `dec_label_pc_448731` の `%106 = icmp slt i64 %9, %105` は `%9 < %105` を意味する。`%9`=10 を入れると `10 < 1` で偽になり、式どおりなら続行しない。続行の向きは、`%106` で分岐する `br` の true / false の行き先で決まる。この run では IR を読んでいない (素材 `work-m11` が無く、IR を生成できなかった)。`%105` が `-32.2` の sext であることも未確認。したがって「loop が続く」とは書かない。
-- 分かったこと: 外側 loop の添字 (`-32.0` / `-32.2`) が 1 から進まないことが、入口の記録で確かめられた。ただし、添字が進まない分岐 (`dec_label_pc_448681`・`448669`・`44870f` のどれを通るか) は未記録のため、hang の分岐は未確定。
+- 続行判定 (IR で確定): `dec_label_pc_448731` (`tools/m11` の work 内 `boot_final.ll` 148931 行の `function_448490` 内・行 149247 付近) の引用:
+  - `%stack_var_-32.2.reload = load i32, ptr %stack_var_-32.2.reg2mem`
+  - `%105 = sext i32 %stack_var_-32.2.reload to i64`
+  - `%106 = icmp slt i64 %9, %105`
+  - `br i1 %106, label %dec_label_pc_44873a, label %dec_label_pc_4484f4`
+  - よって `%106` が真なら loop 脱出 (`44873a`)、偽なら loop 続行 (`4484f4`)。`%9`=10・`%105`=1 では `10 < 1` が偽なので、loop は続行する。round 1 の「`-32.2`=1 < `%9`=10 で真になり loop が続く」は誤りで、正しくは「`%9 < %105` が偽 (`%9 >= %105`)」である。
+- 分かったこと: 外側 loop の添字 (`-32.0` / `-32.2`) が 1 から進まないことが、入口の記録で確かめられた。上限 `%9` (10) が添字 `%105` (1) より大きいため、続行判定は脱出側に進まない。ただし、添字が進まない分岐 (`dec_label_pc_448681`・`448669`・`44870f` のどれを通るか) は未記録のため、hang の分岐は未確定。
 - 注意 (計装の作り方): `m11_build.sh` は `FX61B_LIMIT` を stamp に含めない。LIMIT を変えたら `work/boot_final3.ll`・`work/shimx_link/boot_hn.ll`・`boot_fixed.ll` を消してから `m11_gen_ir2.sh` → `m11_build.sh` → `build.sh --trace --soft` の順で作り直す (本 run の LIMIT=3 と 100000 の実測はこの手順)。
 
 ## 7. 未解決
