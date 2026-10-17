@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""trap144_gate_w_probe_5280.py: global 18787504 (0x11EACB0・call site B の分岐値) へ書く store を採る IR 変種を作る (#5280 受入 1・診断用)。
+"""trap144_gate_w_probe_5280.py: gate 18825440 (0x11F40E0・カウンタ) と 18825448 (0x11F40E8・ゲート) を含む窓 [G-7, G+7] (G = 18825444・0x11F40E4) へ書く store を採る IR 変種を作る (#5280 受入 2・診断用)。
   使い方: python3 trap144_gate_w_probe_5280.py <in.ll> <out.ll> <sites.json>
   in.ll は prod fix の IR (prod_order_3608.sh h_nor8b fix ... が作る work/p3608/h_nor8b/prod.ll) を想定する。
-  記録: 全 store の宛先が [G-7, G+7] に入ったら、CNT を +1 し、RING[(cnt & 63)] に
+  記録: 全 store の宛先が [G-7, G+7] = [18825437, 18825451] に入ったら、CNT を +1 し、RING[(cnt & 63)] に
     +0 site id・+8 宛先アドレス・+16 格納値 (i64 化)・+24 宛先の幅に依らず 1 (予備) を書く。
     一致しない store は SCRATCH へ書く (select で宛先を切替。元の分岐・phi は変えない)。
-  読み方は trap114_w_read_5280.mjs。記録領域は guest 線形メモリの 0x11FFA000 以降 (既存 probe の 0x11FF8000〜0x11FFF000 と重ならない)。
+  読み方は trap144_gate_w_read_5280.mjs。記録領域は guest 線形メモリの 0x11FFA000 以降 (既存 probe の 0x11FF8000〜0x11FFF000 と重ならない)。
+  制限: IR の `store <ty> <val>, ptr <addr>` の形だけを拾う (STORE_RE)。store volatile・atomicrmw・cmpxchg・llvm.mem* は対象外。
   制限: 宛先の先頭アドレスだけで判定する (G-7〜G+7 に始まる store の全てを拾う。幅の大きい store は範囲内に始まれば拾う)。"""
 import json, re, sys
 

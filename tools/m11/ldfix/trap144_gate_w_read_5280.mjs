@@ -1,4 +1,4 @@
-// trap144_gate_w_read_5280.mjs: trap114_w_probe_5280.py の計装版 stage4 で、global 18787504 (0x11F40E0 (G=18825444 窓)) への書込みを読む (#5280 受入 1・診断用)。
+// trap144_gate_w_read_5280.mjs: trap144_gate_w_probe_5280.py の計装版 stage4 で、gate 18825440 (0x11F40E0)・18825448 (0x11F40E8) を含む窓 [18825437, 18825451] (G=18825444) への書込みを読む (#5280 受入 2・診断用)。
 // boot 中の書込み回数と直近 64 件 (site id・宛先・格納値)、各 unit の書込み回数の増分と、増分のあった unit の直近記録を出す。
 // 使い方: S4_NAME=t144gw S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap144_gate_w_read_5280.mjs
 import fs from 'fs';

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # trap144_gate_watch_5280.sh (#5280 受入 1 の残り・診断): global 18787504 (0x11F40E0) への C 側の書込みを監視する.
 #   m11_ov.c の M11_WATCH_C5695 (m11_cwatch) を、監視範囲 [0x11F40E0, 0x11F40F0) で有効にして prod fix の stage4 を 1 回流す.
-#   IR store 側の監視 (trap114_w_probe_5280.py) は 0 件だった (REPORT_APPENDIX_3608 §8-8) ため、C 側の直接 store を見る.
+#   IR store 側の監視 (trap144_gate_w_probe_5280.py) は窓への書込み 1 件 (unit 144 の 65c540) だった (REPORT_APPENDIX_3608 §8-12) ため、C 側の直接 store を見る.
+#   注: stage4 は units_run 17 (IR 側は 109 unit) なので、この監視が覆うのは 17 unit のみ。
 #   監視は読取りのみ (IR の値・分岐は不変). 出力は work/stage4/c144/e2e_full.err の `[a1c] line=<m11_ov.c の行> addr= n= hit=`.
 #   前提: work/ldfix_fixed.ll (ldfix_e2e.sh の 1/5 の生成物)・FL_WIN64_DIR・[EMSDK] (docs/REFERENCES.md §4).
 #   usage: bash tools/m11/ldfix/trap144_gate_watch_5280.sh
