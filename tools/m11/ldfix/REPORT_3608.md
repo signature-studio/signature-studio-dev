@@ -186,7 +186,7 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 
 - 144: `function_44aeb0` の a1 は `dsp_ippv2.dll` (0x2572dc) を `function_439550` が小文字化したもの。選択元は未追跡。
 - 149: `[0x10aa1418]` の書込みは `function_412c20` の戻り値 0。0 の由来は未追跡。
-- 114: halt0 8 件はすべて call site B (`function_412770(18787456)`) を 1 回通り、分岐値 `18787504` = 0x100000002 (i8 = 2) で Halt へ進む。値の書込み元は IR store では捕まらず、未特定 (§8-8 の負の結果)。
+- 114: halt0 8 件はすべて call site B (`function_412770(18787456)`) を 1 回通り、分岐値 `18787504` = 0x100000002 (i8 = 2) で Halt へ進む。値の書込み元は C 側の `m11_InitLib` (`m11_ov.c` 353 行 `B(r13+0x30) = reason+1`・348 行 `D(r13+0x34)`) で、boot 時に書かれる (§8-9)。
 
 ### 8-4 未解決 (起票先 #3608)
 
