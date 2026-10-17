@@ -1,5 +1,7 @@
 # #6246 (CI-258): function_f552a0 の間接 call `[rsi+0x18]` の写し落としと脱出後 call の第 1 引数 (親 #5995)
 
+既知類型との関係: D15 (メモリ間接 call の欠落。f55396 について)
+
 ## 1. 結論
 
 - **受入 1 (間接 call `f55396`)**: IR に写っていない。本 run では写さない。callee は実行時の vtable (`*arg1` の `[+0x18]`) で決まり、静的に関数 VA へ解決していないため。写すには callee の解決が要る (lift 側の別 PR・§4)。
@@ -41,12 +43,12 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `f55396` の callee (`*arg1` の vtable slot `+0x18`) の解決と間接 call の写し | 書込みを持つ callee が落ちると結果が変わる候補 | #5995 (親・lift 側の別 PR) |
-| 修正 `fix_f552a0.py` の既定 ON の判断と e2e 効果 | 本 run では IR を変えず未測定 | #5999 |
+| `f55396` の callee (`*arg1` の vtable slot `+0x18`) の解決と間接 call の写し | 書込みを持つ callee が落ちると結果が変わる候補 | #6252 (CI-259・`親: #5995` の子・lift 側の別 PR) |
+| 修正 `fix_f552a0.py` の既定 ON の判断と e2e 効果 | 本 run では IR を変えず未測定 | #6253 (CI-260・`親: #5995` の子。#5999 は CLOSED のため使わない) |
 
 ## 6. 測定
 
 - 測定コマンド: `python3 ldfix/probe_f552a0_6246.py work/boot3.drc.dsm work/boot_final3.ll` (rc 0)、同 `work/boot_final.ll`、同 修正後の IR (rc 0)。
-- 測定 commit: 本 PR の最後のコード commit (`probe_f552a0_6246.py` を含む)。
+- 測定 commit: `fc6b9368e` (コードを変えた最後の commit。PR 本文と同じ)。
 - e2e は未実行。IR 生成・lift のコードを変えていないため (KPI は起動に関わらないので書かない)。
 - 素材: `work-m11` のみ展開 (`tools/m11/work/`、展開 2.4 秒)。`fl-win64` は取得済みだが展開していない (本 run の probe は `work/boot3.drc.dsm` を使うため不要)。

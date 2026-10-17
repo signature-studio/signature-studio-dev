@@ -5,7 +5,8 @@
   M1: 機械語 f5538d〜f5539c は `this = [arg1]`・vtable `[this]`・`call [vtable+0x18]` (this = rcx)・
       その後 `rcx = [arg1]` で `call 0x12df760` (第 1 引数 = *arg1)。
   M2: IR の脱出ブロック dec_label_pc_f5538c に間接 call が無く、直接 call @function_12df760 の第 1 引数だけがある。
-  M3: IR の第 1 引数の値 (loop-carry の reload) の出所。
+  M3: IR の第 1 引数の値 (loop-carry の reload) の表示のみ。判定には含めない (終了コードに影響しない)。
+      出所の機械確認は judge_arg1_5999.py が行う。
 
 終了コード: M1 と M2 が機械語・IR の記述どおりなら 0 (= 間接 call の欠落がまだ残っている)。
 想定と違えば 1 (fail-closed。修正が入った、または素材が違う)。
