@@ -212,21 +212,23 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
   - `@0` (`__unnamed_1`) は**今回は敷設せず、shim の仮置きのまま**。実測: 3 箇所の `ret i64 ptrtoint (@0)` は、`RaiseException` (`function_1801aedc0`) の後、および `EnterCriticalSection` / `LeaveCriticalSection` への末尾 `jmp` (`function_1801bb414` / `bb468`) の後に残る `rax` の値。
   - `@0` の値は `function_1801bb468` の戻り値 → `function_1801b82ec` / `function_1801b836c` の戻り値 → `function_1801b8414` の入力へ流れる (IR 上で USED)。よって値の意味は未決。wasm 側の仮置き (shim の `__unnamed_1`) は、この範囲で値を固定するだけになる。値の意味は #3320 で確認する。
   - 実装 (`ci_link.sh` に実装。`ir_normalize.py` は他の lift と共有のため触っていない): `ci_link.sh` が `@global_var_1803f6610` の宣言を外し、参照 2 箇所 (`icmp`・`load`) を `inttoptr (i64 0x303f6610 to ptr)` に置き換える。shim は `__unnamed_1` のみ。`__unnamed_1` は shim に残す (意味は #3320)。
-  - 実測 (素材 fl-win64 / toolchain-retdec / toolchain-emsdk を展開して測定。測定 commit は PR 本文に記す): `ci_link.sh` rc 0・wasm-ld rc 1・未解決は期待集合のみ。`@global_var_1803f6610` の参照を絶対アドレスに置いた IR (`ci.ll`) と置く前の IR の差分は参照 2 行のみ。未解決の総行数は 149 (変更前 153)。差 4 行 (GetLastError 2・HeapFree 2) の原因は未確認。絶対アドレス化で emcc の最適化結果が変わったことが考えられるが、この run では確かめていない。
+  - 実測 (素材 fl-win64 / toolchain-retdec / toolchain-emsdk を展開して測定。測定 commit は PR 本文に記す): `ci_link.sh` rc 0・wasm-ld rc 1・未解決は期待集合のみ。`@global_var_1803f6610` の参照を絶対アドレスに置いた IR (`ci.ll`) と置く前の IR の差分は参照 2 行のみ。未解決の総行数は 149 (変更前 153・測定は本記述を入れた commit `1a929dfbd` 時点の記録。現 head の値は §9-4)。差 4 行 (GetLastError 2・HeapFree 2) の原因は未確認。絶対アドレス化で emcc の最適化結果が変わったことが考えられるが、この run では確かめていない。
 - 仮置きの効果: shim は cell を 0 初期化 (`global_var_1803f6610` は 0)。したがって仮置きのままでは `icmp eq` の比較対象が変わる。**リンクが通ることと、意味が正しいことは別**。意味の確認 (native との差分) は #3320 の範囲。
 
 ### 9-3. 残り (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 外部グローバル: `global_var_1803f6610` は絶対アドレス化済み (§9-2・ci_link.sh)。`@0` (`__unnamed_1`) は shim の仮置きのまま (画像に敷設しない方式を決定、§9-2) | リンクは通るが、仮置きの値で意味が変わりうる | 意味の確認は #3320 |
-| `uselistorder` 行 (174 行) を emcc が読めない | ci_link.sh は行を除いて回避 (リンクは通る)。ir_normalize の対応は未起票 | 未起票 (PR 本文の未解決表に記載) |
+| `uselistorder` 行 (174 行) を emcc が読めない | ci_link.sh は行を除いて回避 (リンクは通る)。ir_normalize で扱う対応 | #6235 (T-SH-164) |
 | 直接 jcc 先 `function_1801aef40` (閉包の誤モデル・§8-1) | 未解決 (リンクエラー・1 件) | #6231 (T-SH-163) |
 
 ### 9-4. 再測定 (T-SH-152 #5748・受入 2)
 - 測定 commit: `f46916860` (`ci_link.sh` に `ci_iat.o`・`ci_traps.o` を追加した commit)。以後の変更は `ci_link.sh` の出力文言とヘッダコメントのみで、リンクの入力・期待集合・終了条件は変えていない。`git diff f46916860 HEAD -- tools/shared/lift/ildsp` は `ci_link.sh` の文言・コメントと本 REPORT の差分だけ。
-- 素材: `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を `$RUNNER_TEMP/art` に展開。
-- `ci_lift.sh` → rc 0 (ALL OK。census FAIL は #6184 で解消済み)。
-- `ci_link.sh` → rc 0 (wasm-ld rc 1)。未解決は **`function_1801aef40` の 1 件のみ** (想定外 0 件)。
+- 実測の記録 (測定 commit `f46916860` 時点。この記録は、その commit で素材 `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を展開して実行した結果である):
+  - `ci_lift.sh` → rc 0 (ALL OK。census FAIL は #6184 で解消済み)。
+  - `ci_link.sh` → rc 0 (wasm-ld rc 1)。未解決は **`function_1801aef40` の 1 件のみ** (想定外 0 件)。
+- 後続 fix (`f179908b5` 以前の文言修正) の run では `toolchain-retdec`・`toolchain-emsdk` が取得されず、`ci_lift.sh`・`ci_link.sh` は再実行していない。この head での再実行結果ではない。
+- `uselistorder` 行の起票先は #6235 (T-SH-164)。
 - 前回 §9-1 の 153 行のうち IAT 10 種 (147 行) と `function_1801cb600` (5 行) は消えた。原因: `ci_link.sh` が `ci_iat.o` (#5747) と `ci_traps.o` (#3318 の trap 化) をリンクしていなかった。残りは 153 − 147 − 5 = 1 行 (`function_1801aef40`)。
 - 残り `function_1801aef40`: 閉包の jcc 誤モデル (§8-1)。stub で埋めると意味の誤りを隠すため置かない。起票先は #6231 (T-SH-163)。旧起票先の #3318・#5749 はどちらも closed。
 - 受入 2 (未解決 0 件) は未達のまま。
