@@ -223,8 +223,15 @@ test("STOPPED_INTAKE_PER_H: 既定は 48 (停止行の 1 時間の上限。#5722
   assert.equal(loadConfig({ STOPPED_INTAKE_PER_H: "12" }, {}).stoppedIntakePerH, 12);
   assert.equal(loadConfig({ STOPPED_INTAKE_PER_H: "0" }, {}).stoppedIntakePerH, 0, "0 は停止行の受け渡しを止める");
   assert.equal(loadConfig({ STOPPED_INTAKE_PER_H: "abc" }, {}).stoppedIntakePerH, 48, "非数は既定に戻す");
+  // wake (CI-250) の既定と上書き。wrangler.toml も同じ値。
+  assert.equal(loadConfig({}, {}).wakePerH, 24);
+  assert.equal(loadConfig({}, {}).wakeRefDayMax, 2);
+  assert.equal(loadConfig({ WAKE_PER_H: "6", WAKE_REF_DAY_MAX: "1" }, {}).wakePerH, 6);
+  assert.equal(loadConfig({ WAKE_PER_H: "0" }, {}).wakePerH, 0, "0 は wake を止める");
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
   assert.match(toml, /^STOPPED_INTAKE_PER_H = "48"$/m);
+  assert.match(toml, /^WAKE_PER_H = "24"$/m);
+  assert.match(toml, /^WAKE_REF_DAY_MAX = "2"$/m);
 });
 
 test("active: 未完了の opencode.yaml の run を区分別に数える。合計は all と一致し、対応の取れない run は normal (#2721)", () => {

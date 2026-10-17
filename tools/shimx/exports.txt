@@ -626,6 +626,8 @@ shimx_cbtrans_slots
 shimx_drag_accepts
 shimx_drop_invoke
 shimx_fh3_funclets
+shimx_fh3_scopes
+shimx_fh3_unwind_scopes
 shimx_get_callback_translator
 shimx_get_drop_target
 shimx_get_intptr_limit

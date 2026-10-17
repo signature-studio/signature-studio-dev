@@ -242,4 +242,5 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - 突合 (測定 commit: `6f5da495e`。素材 `plugins-kilohearts` 展開・`HeartCore.core_64` sha256 `d55ce8b4c0ad7ebe` 一致): `native_ref kclp 200 1` rc=0 → `compare.mjs --path-flags` **200/200 bit-exact (200 calls)**・ネガコン (`--neg-ctrl`) **0/200**・フラグ無し (`compare.mjs` 既定) 200/200。
 - 解釈: フラグ切替後も突合が一致し、ネガコンで FAIL するため比較は機能している。ただし `find32` は両経路で同じ結果を返すため、経路の違い自体は突合で検出していない。ymm 経路に入った証拠 (分岐カウント) は未取得。
 - wasm: `licK/mod.wasm` 29,276 B・`undefined_imports` 空・`sha256 445ad93b6258bdf3…`。
-- 未実施: 関数 B (0x180fb6124) の scenario と突合、`modules.F.lift` 追加、`excluded_i256` 除去、`lic_build --module F`・`kh249_check.mjs` 回帰。
+- 関数 B (0x180fb6124) 突合 (測定 commit `b2c212831`・素材展開 sha256 `d55ce8b4c0ad7ebe` 一致): `harness/scen_kclp_b.h` (kclpb・trial 毎に flag 0x5 ymm / 0x1 SSE / 0x0 scalar を循環)。`native_ref kclpb 200 1` rc=0・0.022 s・出力 50,447 B・不一致 0。`compare.mjs --path-flags-b` **200/200 bit-exact (200 calls)**・ネガコン `--neg-ctrl` **0/200**。wasm は `lic_build --module K` (29,276 B・`undefined_imports` 空)。
+- 未達: `lic_build --module F` は `kh_lower.py` が rdata 生 VA (許可外) で止まる (`1813a3a80` ほか多数・#4257 / D11)。2 関数を F に入れるには許可リストの判断が要る。F への追加は本 PR では行わず、`excluded_i256` は据え置き。

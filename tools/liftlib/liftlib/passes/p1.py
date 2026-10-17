@@ -1465,6 +1465,31 @@ class Region:
             st["fl"] = None                    # フラグは再定義される (消費する jcc は未対応)
             self.used("gpr_alu")
             return True
+        # --- adc r, imm (LIFTLIB-31): dst = dst + imm + CF。入力 CF は flag 状態から読む (CF を作れない経路は Unsupported)。
+        if m == "adc" and len(ops) == 2 and ops[0][0] == "reg" and ops[1][0] == "imm" and not mem:
+            dst = ops[0][1]
+            if dst == "rsp" or not dst.startswith("r"):
+                raise Unsupported("adc dst %s" % dst)
+            bits = it._ci.operands[0].size * 8
+            ity = "i%d" % bits
+            a = self._gpr_val(st, dst, va, out, bits=bits)
+            imm = ops[1][1]
+            if bits < 64:
+                imm &= (1 << bits) - 1
+            elif imm >= (1 << 63):
+                imm -= (1 << 64)
+            cf = self._flag_cf_i1(st, out, va, tag)
+            cz = self.nm(va, "ac")
+            out.append("  %s = zext i1 %s to %s%s" % (cz, cf, ity, tag))
+            s1 = self.nm(va, "as")
+            out.append("  %s = add %s %s, %s%s" % (s1, ity, a, imm, tag))
+            n = self.nm(va, "al")
+            out.append("  %s = add %s %s, %s%s" % (n, ity, s1, cz, tag))
+            st[dst] = (n, ity if bits < 64 else "i64")
+            st["__w"].add(dst)
+            st["fl"] = None                    # adc は全フラグを再定義する (後続 jcc は未対応)
+            self.used("adc")
+            return True
         # --- shift (shr/sar/shl r, imm) — 値のみ (flag は未追跡)
         if m in ("shr", "sar", "shl") and len(ops) == 2 and ops[0][0] == "reg" and ops[1][0] == "imm" and not mem:
             dst = ops[0][1]

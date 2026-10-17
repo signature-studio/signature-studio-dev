@@ -92,3 +92,35 @@ A	tools/flelift/boot/rsi_zero_variant.sh
 ```
 
 `fle6_measure.sh`・`fle_boot.mjs`・`rt/`・`x64c.py`・`rsi_4080a2_probe.sh` は差分 0。
+
+## 9. 読出し元の特定 (既定経路・mode 3・FLE_RWATCH)
+
+測定 commit: `fe48dca85` (origin/main。このPR で変えたのは本ファイルだけ)。
+条件: `FLE_BOOT_RUNS=default FLE_EXTRA_ROOTS= FLE_EXTRA_CCF="-DFLE_RWATCH -DFLE_RWATCH_LO=0x12d777e8ull -DFLE_RWATCH_HI=0x12d777f8ull" bash tools/flelift/boot/fle6_measure.sh`。
+ビルドだけ読出し監視を入れ、経路 (mode 3) は §3 と同じ。
+
+- 結果: rc 0・units 895・stopped_at 895・exit・GetMem 3680・FreeMem 1499・IPP mode 3 ok (§3 と一致)。
+- 所要: 3 分 51 秒 (fle6_measure.sh 全体)。boot のみ 10 秒。
+- 残骸範囲 [0x12d777e8, 0x12d777f8) (= dst+0x18〜+0x27) に重なる読出しは 42 件。
+
+| 読出し元 (lift 生成 C の行 → guest VA) | 関数 | 読出し | 件数 |
+|---|---|---|---|
+| fle_lifted_s7.c:47128 (0x475bae) | f_475ba0 | `movzx r8, byte [rcx]` (8 bit) | 12 |
+| fle_lifted_s7.c:42093 (0x44f601) | f_44f5d0 | `movzx rdx, word [rcx]` (16 bit) | 4 |
+| fle_lifted_s4.c:36673 (0x439512) | f_4394e0 | `movzx r8, word [rdx]` (16 bit) | 4 |
+| fle_lifted_s6.c:38313 (0x43c4f5) | f_43c4c0 | `cmp word [rax+rcx*2], 0x2e` (16 bit) | 1 |
+| fle_lifted_s3.c:31030 (0x409ca7) | f_409c80 | `mov r9, [rcx+rax-8]` (64 bit) | 1 |
+| fle_lifted_s6.c:33493 (0x412d68) | f_412d60 | `mov rax, [rbx]` (64 bit) | 1 |
+| `fle_cpu.h:92` (読出しヘルパ・16 バイト読出し) | 呼出し元は未特定 | 16 バイト (n=16) | 19 |
+
+- `fle_cpu.h:92` の 19 件は 16 バイト読出し (16 バイト単位の copy)。読出しヘルパの行が出るため、呼出し元の関数は特定していない。`rsp_val` は 0x4080a7 (0x4080a2 の `call` の戻り番地) と 0x4130a2 が出る。
+- `rsp_val` は読出し時の `[rsp]` であり、読出し元の戻り番地ではない (§6-b と同じ注意)。
+
+### 判定の状況
+
+- 残骸の読出し元は 6 関数 + 16 バイト copy (呼出し元未特定) に絞れた。
+- f_44f5d0 は読んだ文字を bitmap (`bt`) の添字に使い、f_43c4c0 は `'.'` (0x2e) と比べて分岐する。残骸の値が分岐条件に入るのはこの 2 箇所 (計 5 件)。
+- この分岐の結果が出力 (`image_writable`) に届くかは未確認。出力の書込みまで追う必要がある。
+- zero 変種の GetMem 3680 → 3681 (§5) の因果も未確認のまま。
+
+**受入 1 は未達** (部分達成)。

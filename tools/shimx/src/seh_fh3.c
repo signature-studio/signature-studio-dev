@@ -55,6 +55,50 @@ int shimx_fh3_funclets(const uint8_t* img, uint32_t img_size, uint32_t fi_rva,
     return (int)n;
 }
 
+/* FH3 の unwind map と IP-to-state map から kind 0 (cleanup action) の ShxSehScope 表を作る (MX-57 #4928)。
+ * unwind map の entry s は {toState(prev), action RVA} の 8 byte。IP 範囲 [ip[i], ip[i+1]) の state s から
+ * prev を辿り、action を持つ state をすべて内側から順に同じ範囲で出す (seh_run_pads は表順に pc を含む scope を実行する)。
+ * 戻り値は件数 (超過も真の件数)。FuncInfo 不正は -1。 */
+int shimx_fh3_unwind_scopes(const uint8_t* img, uint32_t img_size, uint32_t fi_rva, uint32_t func_end_rva,
+                            ShxSehScope* out, uint32_t out_cap) {
+    if (!img || (uint64_t)fi_rva + 36 > img_size) return -1;
+    uint32_t magic = fh3_rd32(img, img_size, fi_rva);
+    if (magic != 0x19930520u && magic != 0x19930521u && magic != 0x19930522u) return -1;
+    uint32_t max_state = fh3_rd32(img, img_size, fi_rva + 4);
+    uint32_t disp_unwind = fh3_rd32(img, img_size, fi_rva + 8);
+    uint32_t n_ip = fh3_rd32(img, img_size, fi_rva + 20);
+    uint32_t disp_ip = fh3_rd32(img, img_size, fi_rva + 24);
+    if (max_state > SHX_FH3_CAP_STATE || n_ip > SHX_FH3_CAP_STATE) return -1;
+    for (uint32_t i = 1; i < n_ip; i++)
+        if (fh3_rd32(img, img_size, disp_ip + 8u * i) < fh3_rd32(img, img_size, disp_ip + 8u * (i - 1)))
+            return -1;
+
+    uint32_t n = 0;
+    for (uint32_t i = 0; i < n_ip; i++) {
+        int32_t state = (int32_t)fh3_rd32(img, img_size, disp_ip + 8u * i + 4);
+        uint32_t begin = fh3_rd32(img, img_size, disp_ip + 8u * i);
+        uint32_t end = (i + 1 < n_ip) ? fh3_rd32(img, img_size, disp_ip + 8u * (i + 1)) : func_end_rva;
+        if (end <= begin) continue;
+        for (int32_t cur = state; cur >= 0 && (uint32_t)cur < max_state;) {
+            uint32_t ub = disp_unwind + 8u * (uint32_t)cur;
+            uint32_t act = fh3_rd32(img, img_size, ub + 4);
+            if (act) {
+                if (n < out_cap) {
+                    out[n].begin = begin;
+                    out[n].end = end;
+                    out[n].kind = 0;
+                    out[n].target = act;
+                }
+                n++;
+            }
+            int32_t prev = (int32_t)fh3_rd32(img, img_size, ub);
+            if (prev >= cur) break;
+            cur = prev;
+        }
+    }
+    return (int)n;
+}
+
 /* FH3 の try map と IP-to-state map から ShxSehScope 表を作る (MX-57 #4928)。
  * IP map は {Ip RVA, State} の 8 byte 昇順。entry i の状態は [ip[i], ip[i+1]) (最後は func_end) に効く。
  * try t の [tryLow, tryHigh] に入る状態の範囲ごとに、handler を 1 件ずつ scope にする:

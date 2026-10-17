@@ -102,7 +102,46 @@ static void t_scopes(void) {
     CHECK(shimx_fh3_scopes(img, sizeof img, 0x100, 0x400, s, 8) == -1);
 }
 
+/* 合成 FuncInfo → kind 0 scope: unwind map state0={-1,0x400} state1={0,0x410} state2={1,0} (action 0 は除外)。
+ * IP map {0x100→state2, 0x200→state1, 0x300→state-1}、func_end=0x400。
+ * [0x100,0x200) は state2 → 1 → 0 の順に辿るので 0x410 → 0x400 (内側から)。[0x200,0x300) は 0x410 → 0x400。
+ * [0x300,0x400) は state なし (-1) なので出ない。 */
+static void t_unwind_scopes(void) {
+    static uint8_t img[0x1000];
+    memset(img, 0, sizeof img);
+    put32(img, 0x100, 0x19930520u); put32(img, 0x104, 3);
+    put32(img, 0x108, 0x200);                         /* maxState=3 dispUnwind=0x200 */
+    put32(img, 0x114, 3); put32(img, 0x118, 0x300);   /* nIP=3 dispIP=0x300 */
+    put32(img, 0x200, 0xFFFFFFFFu); put32(img, 0x204, 0x400);
+    put32(img, 0x208, 0);           put32(img, 0x20C, 0x410);
+    put32(img, 0x210, 1);           put32(img, 0x214, 0);
+    put32(img, 0x300, 0x100); put32(img, 0x304, 2);
+    put32(img, 0x308, 0x200); put32(img, 0x30C, 1);
+    put32(img, 0x310, 0x300); put32(img, 0x314, 0xFFFFFFFFu);
+
+    ShxSehScope s[8];
+    int n = shimx_fh3_unwind_scopes(img, sizeof img, 0x100, 0x400, s, 8);
+    CHECK(n == 4);
+    CHECK(s[0].begin == 0x100 && s[0].end == 0x200 && s[0].kind == 0 && s[0].target == 0x410);
+    CHECK(s[1].begin == 0x100 && s[1].end == 0x200 && s[1].kind == 0 && s[1].target == 0x400);
+    CHECK(s[2].begin == 0x200 && s[2].end == 0x300 && s[2].kind == 0 && s[2].target == 0x410);
+    CHECK(s[3].begin == 0x200 && s[3].end == 0x300 && s[3].kind == 0 && s[3].target == 0x400);
+
+    /* out_cap 超過: 件数は真の件数 (4) */
+    CHECK(shimx_fh3_unwind_scopes(img, sizeof img, 0x100, 0x400, s, 1) == 4);
+
+    /* prev が自分以上の循環は途中で止める (無限ループしない)。state 2 → 2 で止まるので件数は 2 (range ごとに 1 件) */
+    put32(img, 0x210, 2);
+    CHECK(shimx_fh3_unwind_scopes(img, sizeof img, 0x100, 0x400, s, 8) == 2);
+    put32(img, 0x210, 1);
+
+    /* magic 不一致は棄却 */
+    put32(img, 0x100, 0x19930523u);
+    CHECK(shimx_fh3_unwind_scopes(img, sizeof img, 0x100, 0x400, s, 8) == -1);
+}
+
 void run_fh3_tests(void) {
     t_walk();
     t_scopes();
+    t_unwind_scopes();
 }

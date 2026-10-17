@@ -45,6 +45,10 @@ const hex = (n) => '0x' + n.toString(16);
  * 値は wasm 側 setter (kh_set_flag_a/b) で .data へ書く。KH-98 専用 */
 const pfIdx = args.indexOf('--path-flags');
 const pathFlags = pfIdx >= 0;
+/* --path-flags-b: 関数 B (0x180fb6124) 用。trial ごとに 3 経路を循環 (t%3: 0x5 ymm / 0x1 SSE / 0x0 scalar)。scen_kclp_b.h と同規則 (KH-98) */
+const pfbIdx = args.indexOf('--path-flags-b');
+const pathFlagsB = pfbIdx >= 0;
+const FLAGS_B = [0x5, 0x1, 0x0];
 const negCtrl = args.includes('--neg-ctrl');   /* ネガコン: 合否を反転し、全 trial が FAIL になることを確かめる (KH-98) */
 
 for (let t = 0; t < ntrials; t++) {
@@ -52,6 +56,10 @@ for (let t = 0; t < ntrials; t++) {
   if (pathFlags) {
     if (!M._kh_set_flag_a) throw new Error('--path-flags: kh_set_flag_a 未 export (lic_build --module K の flag_setters を確認)');
     M._kh_set_flag_a((t & 1) ? 0x2 : 0x20);
+  }
+  if (pathFlagsB) {
+    if (!M._kh_set_flag_b) throw new Error('--path-flags-b: kh_set_flag_b 未 export (lic_build --module K の flag_setters を確認)');
+    M._kh_set_flag_b(FLAGS_B[t % 3]);
   }
   H8().fill(0, ARENA, ARENA + 0x10000);   /* trial 冒頭の zero 化は固定窓 (native_ref.c の ARENA_CLEAR と同一: mgr slot 0x0400F020 を含む) */
   if (KH_BASE) H8().fill(0, Number(KH_BASE + KH_SIZE - 0x48n - 0x300n), Number(KH_BASE + KH_SIZE - 0x48n + 0x40n));   /* callee フレーム窓を 0 確定 (native の clone offset パッチと対) */
@@ -99,7 +107,7 @@ for (let t = 0; t < ntrials; t++) {
   if (!failed) stat.trialsOk++;
   else {
     let where = '';
-    if (failed.first !== undefined && failed.first >= 0) {
+    if (failed.first !== undefined && failed.first >= 0 && failed.post && failed.first + 4 <= failed.plen) {
       const r = regs.find((g) => failed.first >= g.off && failed.first < g.off + g.len);
       const w = failed.first & ~3;
       const want = Buffer.from(failed.post.subarray(w, w + 4)).readUInt32LE(0), got = Buffer.from(failed.mem.subarray(w, w + 4)).readUInt32LE(0);
