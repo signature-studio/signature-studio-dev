@@ -60,7 +60,7 @@ khsk18:
 
 - 後続の `br label %khsk18` は、領域の末尾が既に terminator (`br`) で終わるブロックに `fn.after[i1]` を足すために生じる。
 - `final.ll` は `%arg3` の箇所 (4918 行) で emcc が止まるため、この欠陥は今の run では見えない。`%arg3` を直した後の `clang -x ir` で `expected instruction opcode` (5228 行) として初めて出る。
-- 実測: `final.ll` の 4876 行の定義だけを `(... , i64 %arg3, i64 %arg4)` に置き換えた試験コピーは、`5228:1: error: expected instruction opcode` で止まった (`%arg3` の報告は消えた)。
+- 実測: `final.ll` の 4876 行の定義だけを `(... , i64 %arg3, i64 %arg4)` に置き換えた試験コピーは、`llvm-as` (LLVM 18) で `5228:1: error: expected instruction opcode` で止まった (`%arg3` の報告は消えた)。`clang -x ir` は同じ形を検出しないので使わない (§7.4)。
 
 ## 5. 修正の方向 (未実施・#4689 の受入)
 
@@ -76,59 +76,60 @@ khsk18:
 | `pass_branches` の二重 terminator (§4) | 署名修正後に emcc が止まる | #4689 (KH-111) の範囲に追記 |
 | 6 関数の本体の動作一致 (`--no-compare` を外した比較) | 未測定 | #4689 (KH-111) |
 
-## 7. 二重 terminator 修正 (`f8f37b452`) の検証状態
+## 7. 二重 terminator 修正 (`f8f37b452`) の検証 (実測)
 
-- 修正の commit: `f8f37b452` (`tools/targets/kilohearts/snapins/lift/kh_passes.py` の `pass_branches`。13 行追加・1 行削除)。
-- 測定 commit = HEAD = `f8f37b452`。HEAD の差分は 0 行:
-  `git diff f8f37b452 HEAD -- tools/targets/kilohearts/snapins/lift/` → 出力 0 行。
+- 修正の commit: `f8f37b452` (`snapins/lift/kh_passes.py` の `pass_branches`。13 行追加・1 行削除)。
+- 測定 commit = `672af0466` の `lift/` 差分は `f8f37b452` と同一 (`git diff f8f37b452 672af0466 -- tools/targets/kilohearts/snapins/lift/` は 0 行)。
+- 測定環境: 4 vCPU・素材は `plugins-kilohearts` (HeartCore.core_64 76,642,304 B・sha256 先頭 16 hex `d55ce8b4c0ad7ebe`)・`toolchain-emsdk` (emcc 6.0.12)・`toolchain-retdec` (RetDec v5.0)。いずれも `$ARTIFACTS_DIR` から展開。測定時の load average は 0.4〜1.3 (`uptime`、実行前後に取得)。
 
-### 7.1 この run で再測定できたもの
+### 7.1 `build.py ladder` の実測 (HEAD `672af0466`)
 
-なし。素材が無かったため、どの値も測り直していない。
+| 実行 | rc | 結果 | 所要 (wall) | peak RSS |
+|---|--:|---|--:|--:|
+| `python3 build.py ladder --no-compare` (既定 `--path a`) | 1 | `final.ll:4918:36: error: use of undefined value '%arg3'` → emcc 失敗 | 45.3 s | 636 MB |
+| `python3 build.py ladder --no-compare --skip f2` | 1 | emcc 段で `wasm-ld: undefined symbol: rax` / `r8` / `rcx` (stubs.o)。IR 構文エラーは出ない | 3.9 s | 137 MB |
+| `python3 build.py ladder --path s0 --no-compare --tag s0` | 0 | `wasm_bytes` **574,264**・`undefined_imports []`・`emcc_peak_rss_mb` 156 | 15.9 s | 635 MB |
 
-- `$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ。`plugins-kilohearts` (HeartCore.core_64) と `toolchain-emsdk`・`toolchain-retdec` は未展開。
-- [EMSDK]・[RETDEC] の展開先は存在しない。`emcc`・`retdec-decompiler`・`wasm-ld` は PATH に無い。`clang` のみ在る。
-- 従って `work/` の `final.ll` も生成していない。以下の数値は測定値ではない。
+- 再現: `cd tools/targets/kilohearts/snapins/lift` → 上の 3 コマンドを順に実行 (`TMPDIR=$RUNNER_TEMP`・`/usr/bin/time -v` 付き)。`--tag s0` は実際に通ることを確認済み (minor 指摘への回答)。
+- 並列 1 プロセス (`build.py` は直列)。load average は実行前後で 1.1〜1.3。
+- 既定 `--path a` と `--skip f2` は `work/ladder/main/` を上書きする (`--tag` を付けていない run のため)。`--path s0 --tag s0` は `work/ladder/s0/` に出る。
 
-### 7.2 PR 本文の申告値 (未検証)
+### 7.2 修正前 `fe48dca85` の同コマンド (対照)
 
-前 run (PR 本文の検証節) が申告した値。この run では再現していないので、実測として扱わない。
+修正前は `f8f37b452~1` の worktree (`fe48dca85`) で同じ手順を実行。
 
-| 項目 | 申告値 | 状態 |
-|---|---|---|
-| `build.py ladder --no-compare` (既定 `--path a`) | rc=1、`final.ll:4918:36: undefined value '%arg3'` (修正前と同じ) | 未検証 |
-| `--skip f2` | IR 構文エラー (修正前 `final.ll:5227`) は消えた。その後 wasm-ld で `rax`/`r8` 未定義 | 未検証 |
-| `--path s0 --no-compare` | rc=0、`wasm_bytes` 574,264、`undefined_imports []` | 未検証 |
-| 修正前 `fe48dca85` の同コマンド | `wasm_bytes` 574,264 | 未検証 |
-| 所要秒・load average・並列数 | 申告なし | 未測定 |
+| 実行 | rc | 結果 | 所要 (wall) | peak RSS |
+|---|--:|---|--:|--:|
+| `python3 build.py ladder --no-compare` (既定 `--path a`) | 1 | `final.ll:4918:36: error: use of undefined value '%arg3'` (修正後と同一) | 43.9 s | 635 MB |
+| `python3 build.py ladder --path s0 --no-compare --tag s0` | 0 | `wasm_bytes` **574,264**・`undefined_imports []` | 15.5 s | 635 MB |
 
-- 574,270 B (issue 本文・`REPORT_APPENDIX_780.md` の `--path s0` 記録) と 574,264 B (申告) の差: 差の原因 (commit 差か環境差か素材差か) を示すデータは、この run には無い。原因は未確定。
-- 二重 terminator の解消の数え方 (`khbd17` の terminator 数: 修正前 2 / 修正後 1)、`clang -x ir` の rc と先頭エラーは、この run では未測定。
+- `--path s0` の `wasm_bytes` は修正前後で同じ 574,264 (修正の影響なし)。
 
-### 7.3 再測定の手順 (素材を展開できる run で実施)
+### 7.3 二重 terminator の解消 (修正前後の IR を比べた結果)
 
-PR 本文に `oc_artifacts: plugins-kilohearts toolchain-emsdk toolchain-retdec` を入れて、次を同じ worktree で順に実行する。
+数え方: `final.ll` を基本ブロック (ラベル行・`<label>:N` 行で区切る) ごとに、terminator (`br`・`ret`・`switch`・`unreachable`・`invoke` 等) の行数を数え、2 以上のブロックの数を出す。スクリプトは `work/` 外の一時ファイルで、repo には入れていない。
 
-```
-cd tools/targets/kilohearts/snapins/lift
-# 既定経路 (--path a)
-python3 build.py ladder --no-compare; echo rc=$?
-# ablation
-python3 build.py ladder --no-compare --skip f2; echo rc=$?
-# 基準 (s0)
-python3 build.py ladder --path s0 --no-compare --tag s0; echo rc=$?
-# 修正前後の terminator 数 (khbd17 付近)
-grep -n -A3 '^khbd17:' work/ladder/final.ll
-# clang -x ir の検査
-clang -x ir -fsyntax-only work/ladder/final.ll; echo rc=$?
-```
+| 対象 | 二重 terminator ブロック数 | 例 (修正前) |
+|---|--:|---|
+| 修正前 `fe48dca85` の `final.ll` (`--path a`) | **5** | `khbd17:5218` (2 terminator)・`khbd20:5332`・`khbd23:5431`・`khbd30:7021`・`khbd40:13161` |
+| 修正後 `672af0466` の `final.ll` (`--path a`) | **0** | — |
+| ネガティブコントロール (`fe48dca85` の `final.ll` を数えたもの) | 5 (上の行と同じ) | — |
 
-- 所要秒と load average は `/usr/bin/time -v` と `uptime` で同時に取る。
-- 修正前の対照は `git worktree add` で `f8f37b452~1` を別 dir に取り、同じ手順で `final.ll` を作る。
-- 受入 2 の基準 (574,270 B) との差は、§7.2 の差と同じ方法で原因を書く。
+- `final.ll` は `%arg3` のエラーで emcc が止まるため、`clang`・`llvm-as` で見られるのは修正前後の IR 全体の先頭エラーだけ。
+- 修正前の `khbd17` 付近 (5218〜5228 行): `br label %dec_label_pc_...` の直後に `br label %khsk18` があり、`khsk18:` は命令を持たない。
+- 修正後の `final.ll` には `khbd17` という名前は無い (ラベル番号は生成ごとに変わるため、番号では比べない。本表は「ブロック数」で比べる)。
 
-### 7.4 状態
+### 7.4 検査の方法
 
-- 受入 1 (既定 `--path a` が exit 0): 未達 (`%arg3` の署名問題は #4689 の次 run)。
-- 受入 2 (`--path s0` の `wasm_bytes` 不変): 未検証。
-- 二重 terminator の解消: コード上は `pass_branches` で terminator 直後の `br` を `fn.after` に足さないことで対応。実行による確認は未了。
+- `clang -x ir -fsyntax-only` と `clang -x ir -c` は、二重 terminator を含む最小例 (`bad_term.ll`) を rc=0 で通すため、この検査には使えない (本節では採用しない)。
+- `/usr/lib/llvm-18/bin/llvm-as` は verifier 付きで、修正前の `khbd17` と同形の最小例 (空の `khsk` を伴う 2 つの `br`) を `expected instruction opcode` で拒否し、正しい形は通す。
+- 修正前後の `final.ll` は `%arg3` で先に止まるため、`llvm-as` の出力は両方とも `4918:36: use of undefined value '%arg3'` (同一)。
+- `%arg3` を `function_180bac490` の定義でだけ直した試験コピー (`/tmp` のみ):
+  - 修正前: `5228:1: error: expected instruction opcode` (REPORT §4 の記述と一致)。
+  - 修正後: `5025:42: use of undefined value '%arg1'` (`function_180bacef0` の別の未定義。§3 の表の対象で本 issue の範囲外)。空ブロック由来の構文エラーは出ない。
+
+### 7.5 状態
+
+- 受入 1 (既定 `--path a` が exit 0): **未達**。`%arg3` (`pass_f2` の署名) は #4689 の次 run。
+- 受入 2 (`--path s0` の `wasm_bytes` 不変): 修正前後で 574,264 (一致)。issue・`REPORT_APPENDIX_780.md` の 574,270 B とは 6 B 差。差は本 PR の修正ではない (修正前から 574,264)。`f9da4f150` 以降の `lift/` の差分 (`941777d89` の `GetLastError` shim 削除・`11a17671d` の `snapins.json` の carveproc 追加) が候補だが、`f9da4f150` で同素材を測り直していないので原因は未確定。
+- 二重 terminator の解消: **実測で確認** (修正前 5 → 修正後 0)。
