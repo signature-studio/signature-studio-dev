@@ -101,3 +101,43 @@
 - 6-3 の「FAIL と PASS で範囲が重なる」は HEAD の 3 回では言えない (FAIL の 512 は PASS 側に無い)。ただし FAIL 1 回・PASS 2 回で母数が少なく、depth の振り分けは未確定。
 - r1 の FAIL は min_fill 0。`result.pw` の時系列解析は本節では未実施 (次の計測の課題)。
 - 全 e2e (`bash tools/audio/asio/e2e.sh`) は本 run では未実行。
+
+## 7. 床適用後の同一 HEAD 連続測定と probed_burst の表 (#6038)
+
+- 測定 commit: `19c2eb49e` (origin/main。コードは変えていない)。worktree `ws-6038` (branch `6038-asio-com-floor-freq`)。
+- 手順: `bash tools/audio/asio/build.sh` (emsdk は既定の `EMSDK_ENV` を使用・build OK) の後、`node harness/run_com.mjs --quick --only com_ramp_b256_d2 --out work/meas/<n>.json` を 1 回ずつ foreground で実行。負荷下は `yes` を 4 本起動し、実行後に PID 指定で `kill` (停止を `ps` で確認)。判定基準は変えていない。
+- 実行: 無負荷 6 回 (n1 は build 直後の 1 回目、n2〜n6 は連続)、負荷下 5 回 (l1〜l5)。所要は 1 回約 57 秒。
+- `probed_burst` は結果 JSON の `shim_open` から読んだ。`need` は §2 の式 (B=256) からの計算、初期 depth は `max(need, 2)` を床 6 に上げた値 (式からの推定)、`lat_out` は実測値。
+
+| run | 区分 | 結果 | underrun / silence | probed_burst | need (式) | 初期 depth (式・床後) | 終 lat_out (depth 推定) | ramp 不一致 |
+|---|---|---|---|---|---|---|---|---|
+| n1 | 無負荷・build 直後 | **FAIL** | **1 / 4480** | 512 | 4 | 6 | 3841 (7) | 114560/144256 |
+| n2 | 無負荷・連続 | PASS | 0 / 0 | 1024 | 6 | 6 | 3585 (6) | 0/144768 |
+| n3 | 無負荷・連続 | PASS | 0 / 0 | 896 | 6 | 6 | 3585 (6) | 0/144896 |
+| n4 | 無負荷・連続 | PASS | 0 / 0 | 1024 | 6 | 6 | 3585 (6) | 0/144768 |
+| n5 | 無負荷・連続 | PASS | 0 / 0 | 1024 | 6 | 6 | 3585 (6) | 0/144768 |
+| n6 | 無負荷・連続 | PASS | 0 / 0 | 1024 | 6 | 6 | 3585 (6) | 0/144768 |
+| l1 | 負荷下 yes×4 | PASS | 0 / 0 | 1024 | 6 | 6 | 3585 (6) | 0/144256 |
+| l2 | 負荷下 yes×4 | **FAIL** | **1 / 1024** | 896 | 6 | 6 | 5121 (12) | 34688/144768 |
+| l3 | 負荷下 yes×4 | PASS | 0 / 0 | 1920 | 11 | 11 | 4865 (11) | 0/144384 |
+| l4 | 負荷下 yes×4 | PASS | 0 / 0 | 1024 | 6 | 6 | 3585 (6) | 0/141952 |
+| l5 | 負荷下 yes×4 | PASS | 0 / 0 | 512 | 4 | 6 | 4097 (8) | 0/142464 |
+
+- 頻度 (本 HEAD): 11 回中 2 FAIL。無負荷 6 回中 1 FAIL (n1・build 直後)、負荷下 5 回中 1 FAIL (l2)。累計の母数は §7 の上の節 (`REPORT_APPENDIX_2777.md` §7・`REPORT_APPENDIX_2934.md` §6-6-2) を正本とし、ここでは重ねて数えない。
+- 判定基準 (underrun 0・silence 0・ramp bit-exact) は変えていない。両 FAIL とも ramp 不一致が初回 underrun 以降に出ている。
+
+### 7-1. 読み
+
+1. **cold 仮説は判定できない**: 無負荷の n1 (build 直後) も FAIL しており、cold の FAIL は確認されている。一方 l2 は負荷下の FAIL で、この 11 回では各条件 1 FAIL しかなく、cold の有無は判定できない。
+2. **probed_burst と FAIL は対応しない**: FAIL の probed は 512 (n1) と 896 (l2)。PASS にも 512 (l5) と 896 (n3) がある。床の下では、probed は失敗の振り分けに効いていない。
+3. **lat_out と depth の対応**: 観測した 5 値 (3585・3841・4097・4865・5121) は、式 `depth × 256 + 2049` に一致した (depth 6・7・8・11・12)。depth 推定の根拠はこの式。
+4. **depth 4/6 の振り分けは床の下で初期 T に現れない**: probed 512 (need 4) は床で 6 に上がる (l5 の初期 T は 1536 のはず)。床の下で depth 4 を直接観測することはできないため、§2 の式と床の組合せは、この表の範囲では確認できていない (depth 6 と 11 の振り分けは一致)。
+5. **FAIL 後の T は上がる**: n1 は 1536 → 1792 (終 lat_out 3841・depth 7)、l2 は 1536 → 終 lat_out 5121 (depth 12) まで上がった。`flasio.c` L240–245 の `Tn = max(need, T0) + esc` では、esc は underrun 1 回で +B (256 frames = depth +1) しか増えない。n1 の depth 7 は esc で説明できる。l2 の depth 12 は esc (最大 +1) では説明できず、worklet が観測した burst (`need`) の増加が効いたと推定される。ただし `burst_obs` の系列は本 run の JSON に残っておらず未確認。l2 の増加の原因は未解決 (表 §7-2)。
+6. **停止の直接経路は未特定のまま**: 本節は頻度と probed の記録。`pw` の時系列 (`result.pw`) は未解析。
+
+### 7-2. 未解決 (本節)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| l2 の T が depth 6 → 12 に上がった原因 (`burst_obs` 系列が未確認。esc では説明できない) | 床後の T 上昇の見積もりが不確か | #3757 |
+| 床の下で depth 4 の初期 T を直接観測できない | depth 4/6 の振り分けは部分達成 | #3757 |
