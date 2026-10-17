@@ -62,13 +62,19 @@
 | g1 の dword (0x14f852c) を指す 8 バイトポインタ (素材全体) | 1 件。`.data` の **0x15e14a8** (= g1 スロット) |
 | g1 スロットを rip 相対で読む関数 | 15 関数 |
 | 即値 0x7fffffff の dword 書込み (`mov dword ptr [...], 0x7fffffff`) | 264 件 (前節の 269 件は書式が広い数え方。どちらも g1 に絞れていない点は同じ) |
-| うち g1 スロット読取関数の内側 | 2 件。0x11c3e2b (`[rax+0x3500]`・0x11c2d80 内) と 0x121d9e3 (`[rbp+0x4280]`・0x121d7e0 内)。直前の基底は別オブジェクトの構造体 (`[rbp+0x280]` の値・`[rbp+0x4280]`)。g1 そのものへの書込みではないと判断 |
-| g1 への書込み (スロット経由・`mov dword [reg], eax`) | 2 件。0x10c9bf9 (0x10c7cd0 内・直前の call 0x10c7850 の戻り値) と 0x10d3a5f (0x10d3a30 内) |
+| うち g1 スロット読取関数の内側 | 2 件。0x11c3e2b (`[rax+0x3500]`・0x11c2d80 内) と 0x121d9e3 (`[rbp+0x4280]`・0x121d7e0 内)。下の検証で g1 を指すと確認できた値ではなく、**g1 以外と断定はしない (未確認)** |
+| g1 への書込み (スロット経由・直後 1 命令の `mov dword [reg], eax`) | 2 件。0x10c9bf9 (0x10c7cd0 内・直前の call 0x10c7850 の戻り値) と 0x10d3a5f (0x10d3a30 内) |
+| g1 への書込み (レジスタの由来を線形に追う・`probe_3725_taint.py`) | 2 件。上と同じ 2 件。起点は g1 スロット読取 15 関数の 42 箇所 (`lea` による &g1 は 0 件)。呼び先へ &g1 を渡す call は 0 件 |
 
-- 結論: g1 への書込みは 0x10c7850 の戻り値を格納する 0x10c9bf9 と、0x10d3a30 の g3 格納 0x10d3a5f の 2 箇所だけ。
-  g1 スロット経由の書込みは 2 件のみで、0x7fffffff はその 0x10c9bf9 から入る (0x10c7850 の sentinel 戻り値 (§2))。
-  即値 0x7fffffff を書く 264 件のうち g1 スロットを読む関数の内側にあるものは g1 以外への書込みだった (上表)。
-- 残る未確定: sentinel の意味 (期限なし・未設定 など) の確定。書込み元は 0x10c7850 の戻り値に限られたので、確定に要るのは 0x8e7e10 の戻り値 (v88・v90) の意味。これは受入 1 の残件。
+- 検出条件 (下限): 上の 2 件は「直線走査で見える範囲」の列挙であり、g1 への書込みの全件ではない。
+  - `probe_3725_narrow.py`: スロットを読んだ直後 1 命令の `mov dword ptr [...], eax` のみ。
+  - `probe_3725_taint.py`: 関数内を命令順に 1 本で走査し、&g1 を保持するレジスタを `mov`/`movzx`/`movsxd` のコピーでだけ伝播する。分岐の合流 (CFG) は見ず、`add`/`sub` で &g1+k になったものと、呼び先の中の格納は追わない。0 件でも「g1 に書かれない」の証明にはならない。
+  - よって「g1 への書込みは 2 件のみ」「書込み元は 0x10c7850 の戻り値に限られた」とは書けない。書けるのは「直線走査の範囲で、&g1 を基底にする格納は 2 件見つかった」まで。
+- 264 件のうち 2 件の基底の由来 (静的に確認した事実):
+  - 0x121d9e3 の基底 `rbp` は、0x121d7e0 の中で `mov rbp, rsp` (0x121d800) で設定されるだけで、再代入が無い。よって `[rbp+0x4280]` はスタック上の局所で、.data の g1 (0x14f852c) とは別のアドレス空間。**g1 ではないと確認**。
+  - 0x11c3e2b の基底は `[rbp+0x280]` (`rax` に読んだ後の `[rax+0x3500]`)。0x11c2d80 の中で `[rbp+0x280]` へ入るのは入口の `mov qword ptr [rbp + 0x280], rcx` (0x11c2e56) だけ。すなわち第 1 引数 `rcx` の保存値で、その実体がどの呼び出し元の値かは静的には未確定。**g1 かどうかは未確認・推定** (g1 は .data のアドレスなので、`rcx` が g1 を指すなら 0x11c3e2b は g1 への書込みになる)。
+- 結論 (修正後): g1 への書込みは、直線走査で見える範囲では 0x10c9bf9 (0x10c7850 の戻り値を格納) と 0x10d3a5f (0x10d3a30 の g3 格納) の 2 箇所。0x11c3e2b は未確認として残す。
+- 残る未確定: sentinel の意味 (期限なし・未設定 など) の確定。0x10c7850 の戻り値 (v88・v90 の意味) と、0x11c3e2b の `rcx` の由来が要る。これは受入 1 の残件。
 
 ## 5. 検証 (測定 commit: `4cc98d49e` = コードを変えた最後の commit)
 
@@ -76,7 +82,11 @@
 |---|---|
 | `probe_3725_retformula.py` (11 ケース・HEAD 4cc98d49e) | 61.1 秒・load average 1 分値 0.00 開始・rc 0・`all_match True` |
 | `probe_3725_observe.py` (6 入力・HEAD 4cc98d49e) | 33.8 秒・load average 1 分値 0.79 開始・rc 0 |
-| `probe_3725_narrow.py --write` (測定 commit bb996253d・HEAD 同一) | 5.6 秒・load average 1 分値 0.41 開始・rc 0・g1 スロット 0x15e14a8・g1 書込み 2 件 |
+| `probe_3725_narrow.py --write` (HEAD 再測定) | 6.9 秒・rc 0・g1 スロット 0x15e14a8・g1 書込み候補 2 件 (REPORT_786_APPENDIX_3725 §4a と一致) |
+| `probe_3725_taint.py --write` (HEAD 再測定・新規) | 7.8 秒・rc 0・slot 読取 15 関数・source 42 箇所・g1 格納 2 件・&g1 引数 call 0 件 |
 
-- 測定 commit から HEAD までのコード差分 (`git diff 4cc98d49e HEAD -- tools/startup/license_obs`) は 0 行。
-- 既存コードの変更は 0 件 (新規ファイル 2 本と結果 JSON 2 件のみ)。
+- 測定 commit (コードを変えた最後の commit): `25c029478` (`probe_3725_taint.py` の追加と `probe_3725_narrow.py` の注・末尾改行)。
+- `probe_3725_narrow.py` と `probe_3725_taint.py` の再測定は HEAD `25c029478` で行い、上の表の値はその実測。
+- 実行コードの差分: `bb996253d..25c029478 -- tools/startup/license_obs` は、`probe_3725_narrow.py` (docstring の注と末尾改行) と新規 `probe_3725_taint.py` と結果 JSON 2 件。`peidx.py` と `tools/shared/*` は差分 0。`probe_3725_narrow.py` の挙動 (JSON 内容) は不変。
+- `probe_3725_retformula.py`・`probe_3725_observe.py` が import する `probe_1414.py`・`run_cases.py`・`emu_reg.py`・`peidx.py` は、`4cc98d49e..25c029478` で差分 0 (本 PR で追加した範囲でも差分 0)。
+- `4cc98d49e..25c029478` の license_obs 全体の差分は 9 ファイル (`REPORT_786_APPENDIX_1414.md`・`probe_1027.py`・`probe_1414_callers.py`・`probe_4764_widen.py` など。別件の probe と REPORT を含む)。本付録の数値の根拠ではない。
