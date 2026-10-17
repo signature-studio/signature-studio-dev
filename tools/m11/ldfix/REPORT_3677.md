@@ -54,7 +54,7 @@
 | remap の実装 (`pass_m2r_fn1046a30` の拡張) | IR は未変更。`1046a30` の load 値は本 PR の前後で変わらない | #4498 (LD-221) |
 | `audit_lsf_ssa_e2e.sh` 7/7・unit e2e (本番 build) | 未実施。remap していないため差分 0 | #4498 (LD-221) |
 | 0x104ccd0〜0x104cfxx 系の解釈 | §8 で DATA (定数プール) と確定。関数ポインタ 0 件 | 解消 (#4498 受入 3) |
-| unit e2e 前後比較 (`m11_gen_ir2.sh` → `m11_build.sh`)・`M11_M2R=1` の有効化判断 | 未実施。既定 OFF のままなので本番 IR は不変 | #4498 (LD-221・受入 5) |
+| `M11_M2R=1` の既定 ON 化 | 未実施 (PM 判断)。unit 前後比較 (§受入 5) で unit 結果は不変。既定 OFF のままなので本番 IR は不変 | PM 判断 (#4498 コメント) |
 
 ## 6. 段数の判定 (#4498 受入 1・規則による判定)
 
@@ -108,7 +108,16 @@
 - **未実施 (実 IR)**: 実 IR (`boot_allfx.ll`) での `cmp` (既定) と行数差 (`M11_M2R=1`) は未測定。入力の `work/boot_allfx.ll` は本 run の runner に無い (`fl-win64` のみ展開可能)。`work-m11` 素材は `oc_artifacts` 指定が要り、その素材の IR が現 main の生成手順と一致するかは `docs/WORKFLOW.md` §11 の注記どおり `[未確認]`。
 - 既定 OFF の理由: 本番 IR (`m11_gen_ir2.sh`) を変えるため、unit e2e で前後比較するまで既定にしない (M2s・M2v と同じ扱い)。
 
-### 未実施 (受入 5)
+### 受入 5: unit e2e 前後比較 (#4498 LD-221)
 
-- 受入 5 (`m11_gen_ir2.sh` → `m11_build.sh` → unit e2e 前後比較): 未実施。`M11_M2R=1` の unit 結果は未測定。
+- 入口: `bash tools/m11/ldfix/unit_before_after_4498.sh` (既定と `M11_M2R=1` で `m11_gen_ir2.sh` → `m11_build.sh` → `m11_run.mjs` / `m11_survey.mjs` / `m11_tolerant.mjs`。出力は `work/unit_4498/`・commit しない)。
+- IR: 既定 `b202c157a80807f2`、`M11_M2R=1` `325b086322a29aee`。IR 差分は 24 行 (`diff` の変更行 48 = 両側)。build はどちらも rc 0 (wasm 6,033,657 B)。
+- unit 結果 (既定 = `M11_M2R=1`): 通常起動 units_run 109・skipped 5・icall_ok 435・icall_miss 7・init_count 111・boot_stage 1、survey ok 873、寛容起動 ok 871・icall_ok 2131。`image_va_words_new` は run 69721・survey 70977・寛容 72042 で両条件とも同じ。
+- 観測: 同じ `M11_M2R=1` の build を手動で走らせた 1 回だけ survey 70979・寛容 72044 (+2) が出た。その後の 4 回 (スクリプト 1 回・手動 3 回) は 70977 / 72042 で、再現しなかった。原因は未確定。
+- 結論: `M11_M2R=1` で unit の結果は変わらない。既定は OFF のまま (本番 IR を変えるのは PM 判断)。
+- 注: `m11_e2e.sh` 全体は回していない。`lift_pe.sha256` が素材に無く、全再生成 (Ghidra + RetDec) に入るため。
+
+### 未実施
+
+- なし (受入 1〜5 は本節・§6〜§9 で実測)。`M11_M2R` の既定 ON 化だけは PM 判断として残す。
 - 受入 3 は次節 §8 で確定。受入 4 は §9 で確認 (audit 8 段完走・spill178 差分 0)。
