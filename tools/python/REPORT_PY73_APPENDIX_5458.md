@@ -44,6 +44,6 @@
 
 ## 5. 測定 commit と差分
 
-- 測定 commit: `db5d64e54` (ハーネス `pe_emu_entry_5458.py` と本付録を同じ commit で入れた。コードを変えた最後の commit)。
-- 測定の再現: §2 の再実行は HEAD (`db5d64e54` 以降) で同じ結果 (19,956 命令・0.02 秒・`reader hits=0`)。
-- 差分 0 の証跡: `git diff db5d64e54 HEAD -- tools/python/analysis/flapi/pe_emu_entry_5458.py` の出力は 0 行 (PR 本文に記載)。
+- 測定 commit: `4f8678ceb` (ハーネス `pe_emu_entry_5458.py` の最後の変更を含む。コードを変えた最後の commit)。
+- 測定: `4f8678ceb` の HEAD で §2 のコマンドを再実行 → 19,956 命令・0.02 秒・`reader hits=0`・実時間 4.9 秒 (`time` 実測。load average 0.29)。
+- 差分 0 の証跡: `git diff 4f8678ceb HEAD -- tools/python/analysis/flapi/pe_emu_entry_5458.py` の出力は 0 行。
