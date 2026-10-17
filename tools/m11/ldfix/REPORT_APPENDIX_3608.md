@@ -66,6 +66,7 @@
 
 ### 8-8 `18787504` の書込み元: IR store では捕まらない (#5280・受入 1 の残り・負の結果)
 
+- 測定 commit: **`21900a6ab`** (8-8 の計装 `trap114_w_*` を初めて commit した commit)。8-7 の測定 commit `a90515146` とは別。`21900a6ab` 以降で測定経路 (`tools/m11/ldfix/`・`qstore`・`alloca`・`guard699`・`guard4fa210`) のコードは変えていない (`git diff 21900a6ab HEAD -- <測定経路>` は `REPORT_3608.md` と `REPORT_APPENDIX_3608.md` の 2 ファイルのみ・コード差分 0 行)。再測定は不要。
 - 計装: `trap114_w_probe_5280.py` (prod fix の全 54,043 store に、宛先が `[G-7, G+7]` (G = 18787504) に入ったら回数と格納値を記録する判定を入れる)・`trap114_w_read_5280.mjs` (boot 中と各 unit の前後で回数を読む)。stage4 は `work/stage4/t114w` で rc 0・units_run 109・dllmain_done True・threw なし。
 - 実測: boot 後の G は `0x100000002` (計装なしと同じ) だが、計装の回数 (`0x11FFA000`) は boot 前後・全 unit で 0。計装の SCRATCH 側には `0x336e` が入っており、判定の経路は走っている。つまり **G へ書く IR の store は 1 件も無い**。
 - IR 上の確認: `prod.ll` には `atomicrmw`・`cmpxchg`・`llvm.mem*`・vector store が 0 件。G を直接指す store は 0 件 (G の読みは 4 箇所: 117921・117975・118011・118033 行)。
