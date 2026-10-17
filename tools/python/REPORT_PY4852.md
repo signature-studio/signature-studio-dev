@@ -72,7 +72,7 @@ flags は `flapi_table.json` の kwsig.flags と一致する。
 
 | VA | 確定した内容 (PE 上の事実) | 根拠 |
 |---|---|---|
-| `0x1180ef0` | 引数を `[rbp+0x3c]` (ecx) と `[rbp+0x43]` (dl) に保存する。`dl` で分岐し、`dl=0` (jump 側) は `0x1181075` 以降 (`[rsi+0xd78] ≥ 0` のとき、`[rbp+0x3c]` を符号 (−1・0・+1) に置き換えてから `[rdi]` 配列を走査する)、`dl=1` (select 側) は `0x1180ffd` 以降で `0xe43d30(rcx=rsi, edx=r13d, r8d=eax, r9b=1)` を呼ぶ。 | `pe_disasm.py 1180ef0` (0x1180ff4 の `test al,al` / `je 0x1181075`・0x1181006 の `call 0xe43d30`) |
+| `0x1180ef0` | 引数を `[rbp+0x3c]` (ecx) と `[rbp+0x43]` (dl) に保存する。`dl` で分岐し、`dl=0` (jump 側) は `0x1181075` 以降 (`[rsi+0xd78] ≥ 0` のとき、`[rbp+0x3c]` を符号 (−1・0・+1) に置き換えてから `[rdi]` 配列を走査する)、`dl=1` (select 側) は `0x1180ffd` 以降で `0xe43d30(rcx=rsi, edx=r13d, r8d=eax, r9b=1)` を呼ぶ。 | `pe_disasm.py 1180ef0` (0x1180ff4 の `test al,al` / `je 0x1181075`・0x118106b の `call 0xe43d30`) |
 | `0xe43d30` | `[rbx+0xd74]` に第 2 引数 (`edx`)、`[rbx+0xd78]` に第 3 引数 (`r8d`) を格納する。格納前の `[rbx+0xd78] ≥ 0` なら `0xe4b3a0` を先に呼ぶ。 | `pe_disasm.py e43d30` (0xe43d63〜0xe43d69) |
 | `0x7cbd30` | `[obj+0x434] = edx` (speed) を格納する。`[obj+0x420]` が 0 か 10 のとき 10 にして、`0x6d9ca0(ecx=0x3c, rdx=&{obj, ...})` を呼ぶ。 | `pe_disasm.py 7cbd30` |
 | `0x7cbd80` | `edx == 0x7fffffff` または `[obj+0x434] == edx` のとき `0x6d9d50` を呼び、`[obj+0x420] = 0` にする。 | `pe_disasm.py 7cbd80` |
