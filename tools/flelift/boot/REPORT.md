@@ -223,7 +223,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 ## 12. #4854: mode 3 の survey が InitTable 0 で測定不能 (補修と jsonl の残し方)
 
 - **結論**: 既定 (mode 3) の survey は補修ありで 942 件を判定 (ok 895 / empty 46 / noproc 1)。補修なしは `InitTable == 0` で不成立。全文 (表・測定 commit `a64aa3aab`) は `REPORT_APPENDIX_4854.md`。
-- 未解決: 補修の判定への影響 → #4901 [FLE-33]。unit 280 / 659 / 895 の補修なし unlifted → #4855 [FLE-32]。
+- 未解決: 補修の判定への影響 → #4901 [FLE-33]。unit 280 / 659 / 895 の補修なし unlifted → #4855 [FLE-32]。InitTable の 0 化の時点は `REPORT_APPENDIX_5415.md`。
 
 ## 13. #4931: 既定経路 (mode 3) の survey で 942 unit を分類し covered=942
 
