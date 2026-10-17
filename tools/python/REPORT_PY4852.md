@@ -68,6 +68,23 @@ flags は `flapi_table.json` の kwsig.flags と一致する。
 - **作用の意味論 (状態のどこを変えるか・単位)** は、§2.1 と §3.1 の未確認点で止まっている。mock (`host/fl_mock.mjs`) と C provider の実装は、これらが確定するまで推測になるため、本 PR では行わない (#5510 の受入 2・3 は未着手のまま)。
 - 次の一手: `0x1180ef0` (dl 分岐) と `0x7cbd30`・`0x7cbd80` (continuous の作用先) を読む子 issue を、親 #5048 の REPORT 記録の後に起票する (本 PR では起票しない)。
 
+## 4.1 追加確定 (#6183・8 箇所のうち 3 箇所 (`0x1180ef0`・`0x7cbd30`・`0x7cbd80`) の入口と呼出し先)
+
+| VA | 確定した内容 (PE 上の事実) | 根拠 |
+|---|---|---|
+| `0x1180ef0` | 引数を `[rbp+0x3c]` (ecx) と `[rbp+0x43]` (dl) に保存する。`dl` で分岐し、`dl=0` (jump 側) は `0x1181075` 以降 (`[rsi+0xd78] ≥ 0` のとき、`[rbp+0x3c]` を符号 (−1・0・+1) に置き換えてから `[rdi]` 配列を走査する)、`dl=1` (select 側) は `0x1180ffd` 以降で `0xe43d30(rcx=rsi, edx=r13d, r8d=eax, r9b=1)` を呼ぶ。 | `pe_disasm.py 1180ef0` (0x1180ff4 の `test al,al` / `je 0x1181075`・0x118106b の `call 0xe43d30`) |
+| `0xe43d30` | `[rbx+0xd74]` に第 2 引数 (`edx`)、`[rbx+0xd78]` に第 3 引数 (`r8d`) を格納する。格納前の `[rbx+0xd78] ≥ 0` なら `0xe4b3a0` を先に呼ぶ。 | `pe_disasm.py e43d30` (0xe43d63〜0xe43d69) |
+| `0x7cbd30` | `[obj+0x434] = edx` (speed) を格納する。`[obj+0x420]` が 0 か 10 のとき 10 にして、`0x6d9ca0(ecx=0x3c, rdx=&{obj, ...})` を呼ぶ。 | `pe_disasm.py 7cbd30` |
+| `0x7cbd80` | `edx == 0x7fffffff` または `[obj+0x434] == edx` のとき `0x6d9d50` を呼び、`[obj+0x420] = 0` にする。 | `pe_disasm.py 7cbd80` |
+
+この 4 箇所の作用先 (`0x6d9ca0`・`0x6d9d50`・`0xe4b3a0`) と、`0xe43d30` が書く `[rbx+0xd74]`・`[rbx+0xd78]` の意味 (マーカー位置か選択範囲か) は**未確認**。推測で埋めない。
+
+**未確認 (本 issue で残った 4 件)**:
+- `0x1180ef0` の jump 側 (`dl=0`) の終端と、`[rsi+0xd74]`・`[rsi+0xd78]` の意味。
+- `0x425210` (op 0x23・0x24 の経路) は間接 jmp thunk で、`pe_thunk_target.py` の結果は飛び先 `0x1572476`。この飛び先は逆アセンブルすると命令境界が不自然 (`jrcxz` 単独) なので、thunk の作用先は**未確認**。
+- `0x72afa0` の op による分岐 (`cmp eax, 0xb` 等) は読めたが、作用先の関数は未読。
+- `0x1180d40`・`[0x603f6b]`・`[0x60421b]` (continuous 系のフラグ) は、§2.1 のまま未確認。
+
 ## 5. 検証
 
 - `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_jog4_va_probe.py` → 4 件を出力・終了 0・所要 0.13 s (load 0.25)。
