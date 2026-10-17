@@ -67,15 +67,35 @@ python3 tools/m11/ldfix/callers_5994.py work/boot_final3.ll 101d180 db6480 dc27c
 
 - 10 対象が survey で到達しない機構は、ここでも確定していない。kind=ok の unit で 1 段目の呼び出し元すら入らないため、到達しない分岐は 2 段目より上にある。
 - 449550 の直接呼び出し元は 449600 と 47a250 の 2 件 (§2 の表)。47a250 は IR に定義 (`define`) が無く `function_47a250__lifted` だけがあるため、入口を計装できなかった。
-- 47a250 の呼び出し元は 42 件 (前回 run の IR (sha256 先頭 16 桁 `010451add5147d37`) で `callers_5994.py` が数えた件数。§2 の表の `caller 47a250 -> callers 42 関数`)。この 42 件は 449550 の直接呼び出し元ではなく、47a250 の呼び出し元。
-- l2 の計装 21 関数 (上記 2 段目) が、449600 の呼び出し元と 47a250 の 42 件のどれに当たるかは未検証。IR を再生成できず (`m11_gen_ir2.sh` は `work/boot0..3.lift.ll` を前提にし、`work-m11` 素材が要る)、42 件の列挙と照合できなかった。そのため 42 件のうち計装したもの・しなかったものの一覧は未測定。
+- 47a250 の呼び出し元は 43 件 (`function_` 形式の定義 41 件・`function_4fa210__lifted`・`m11_tr_function_47a250`)。この数は 449550 の直接呼び出し元ではない。前回 run の「42 件」「47a250 は define が無い」は誤りで、本 run の IR (§5) では `function_47a250` は `define weak` で定義されている。
+- 前回 run の「l2 の計装 21 関数が 42 件のどれに当たるか」は、§5 の run 3 で IR を再生成して照合した (41 件を計装・全件)。
 - 「同梱 obj の古さ」の問題は、HEAD から作り直すと出ない。ただし `_m11_call_unit_at` 等の export は同梱 obj では未定義で、再生成 build では定義がある (`m11_build.sh` の既定で rc 0)。
 
 ## 4. 未実施と残件
 
 | 残件 | 影響 | 起票先 |
 |---|---|---|
-| 2 段目 (50aa70 → 449600 → 449550 の経路) の kind=ok 到達を測り、10 対象の入口に届く経路を特定する | 10 関数の「到達しない理由」の機構が未確定 | #5994 (open・残件を保持) |
-| 47a250 の入口計装 (define が無く `__lifted` だけ) と、47a250 の 42 呼び出し元のうち計装の有無の列挙 (IR 再生成に `work-m11` 素材が要る) | 47a250 の呼び出し元 42 件 (449550 の直接呼び出し元ではない) の計装範囲が未確定。449550 の 1 段目は 449600 と 47a250 の 2 件 | #5994 (open・残件を保持) |
+| 10 対象の到達を妨げる機構の特定 (上位側の分岐・間接 call 経路の kind 別の入口通過)。入口 hit が全 942 unit で 0 のため、呼び出し元の探索を続けるか、対象の入力条件を調べるかの判断が必要 | 10 関数の「到達しない理由」の機構が未確定 | #5994 (open・残件を保持) |
 
 - 子 issue は起票しない。残件は open のままの #5994 に保持する (#3194 には、この残件に対応する受入条件が無い)。
+
+## 5. run 3 の測定 (IR 再生成・同じ build)
+
+- 手順: `FL_WIN64_DIR` に `fl-win64` の `block00031_PE.bin`・`EMSDK_ENV` に `toolchain-emsdk` の `emsdk_env.sh`・`work-m11` を展開 (`tools/m11/work/`)。`m11_gen_ir2.sh` rc 0 (490790 行) → `m11_build.sh` rc 0 (wasm-ld signature mismatch 0・undefined symbol 0) → `reach_509.sh`。
+- 再生成した `work/boot_final3.ll` は 529644 行・sha256 先頭 16 桁 `a69dd5dace9384af` (§3 と同じ。§2 の入力 `010451add5147d37` とは一致しない)。以下はこの IR に対する結果。
+- kind 分布 (全計装セット共通): ok 873・miss 47・oob 15・halt0 6・noproc 1。
+
+| 計装セット | 関数 | 入口に hit した unit | 入口通過 総回数 |
+|---|---|--:|--:|
+| r1 `reach_5994_r3_l1.json` | 10 対象 + 1 段目の呼び出し元 11 | 0 | 0 |
+| r2 `reach_5994_r3_l2.json` | 2 段目 21 関数 (10348b0・de10c0・…・101b780) | 50aa70 のみ unit 275 (kind=oob・3204504 回) | 3204504 |
+| r3 `reach_5994_r3_l3.json` | 10 対象 + 47a250 + 呼び出し元 41 件 (計 52) | 呼び出し元 (4f9f40 ほか) で hit。10 対象と 47a250 は 0 | 対象 0 |
+| r4 `reach_5994_r3_l4.json` | 47a250__lifted・449600・50aa70・50a8c0・50abe0・50ad30・528150 | 50aa70 のみ | 3204504 |
+
+- 47a250 は本体 (`function_47a250__lifted`) も wrapper (`function_47a250`) も入口に hit しない。wrapper は本体が `call` だけのため、`reach_509.sh` の挿入位置 (定義直後の label) が無く、label 行を足したコピー (`work/boot_final3_w2.ll`・`ldfix/reach_5994_entry.py`) で計装した。
+- 449550 の直接呼び出し元は、本体の `function_449600` (IR 152455 行) と `function_47a250__lifted` (176653 行) の 2 件。IR の `m11_tr_function_449550` (506998 行) と `m11_tr_function_449600` (507002 行) は間接経路の trampoline。
+- 結論: 計装した範囲で、10 対象の入口に kind=ok で届く経路は見つからなかった。10 対象の到達を妨げる機構は未確定のまま。
+
+### 5.1 検証
+- `reach_509.sh` の出力は `ldfix/results/reach_5994_r3_l*.json` (942 unit)。
+- 再現: `python3 ldfix/reach_5994_entry.py work/boot_final3.ll work/boot_final3_w2.ll > targets.txt` → `IR=work/boot_final3_w2.ll bash ldfix/reach_509.sh "$(cat targets.txt)" OUT.json`。
