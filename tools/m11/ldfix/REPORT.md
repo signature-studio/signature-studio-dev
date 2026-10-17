@@ -216,8 +216,8 @@ JSON は `${FL_WIN64_DIR}` プレースホルダとし、e2e が `render_target.
 ### 現行 HEAD での再測定 (#6053)
 
 #4521・#4522 (1e2/1e3 の修復) の close 後に、現行 main で `ldfix_e2e.sh` を 1 回実測した。
-**測定 commit `ff41e8aae`** (origin/main = PR #6051 取り込み後。worktree `ws-6053`・branch `6053-ldfix-remeasure`)。
-素材は fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk を `$HOME/artifacts` から展開。
+**測定 commit `ff41e8aae`** (origin/main = PR #6051 取り込み後。worktree `ws-6053`・branch `6053-ldfix-remeasure`)。測定は worktree 上の foreground 実行で、対応する GitHub Actions run の URL は記録していない (未記録)。
+素材は fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk を `docs/WORKFLOW.md` §11 の手順で展開。
 `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP timeout 1500 bash tools/m11/ldfix/ldfix_e2e.sh` を foreground で 1 回。
 rc 0・74 秒・load 1.32 (開始) / 1.83 (終了)。出力 (43 行) の sha256 `d35a5237b2cb574cd6b07f3dbffa638b3c01f1af6dfff79120c0d51a821136d5`。
 
@@ -232,7 +232,7 @@ rc 0・74 秒・load 1.32 (開始) / 1.83 (終了)。出力 (43 行) の sha256 
 - `STAGE4_JUDGE {"pass": true, "stage_base": 4, "stage_fix": 4, "survey_ok_base": 136, "survey_ok_fix": 136}`
 - エラー件数 (ログ全文・`work/stage4_{base,fix}.log`): `missing function` 0/0/0・`__asm_movapd__112` 0/0/0・`file not found` 0/0/0・`FAILED` 0/0/0。`undefined symbol` は summary 行の `undefined symbol: 0` のみ (base/fix の各ログには `undefined symbol: 1` の 1 行が出るが、エラーではない)。
 - 修復件数 (`work/ldfix_report.json`): F1=0 / F2=0 / F3a=2 / F3b=0 / F3c=42 / F4=10 (7,421 関数)。
-  前回 (f8b90732) の F3c=33 から変わった (F4=10 は前回の記録に無い項目)。
+  前回 (f8b90732) の F3c=33 から変わった (F4=10 は前回の記録に無い項目)。増えた理由は未切り分け (commit 間の差分か測定条件かは確認していない)。
 - 前回測定 (f8b90732) との比較: stage4 の getmem・survey ok (136)・units_run (17) は同じ。F3c の件数だけが増えた。
 - `--batch` (liftdiff closure A/B) は本測定では未実行。§1 の A/B 表は更新していない。
 
