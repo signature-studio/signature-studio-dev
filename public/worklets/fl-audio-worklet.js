@@ -238,7 +238,7 @@ class FlShimProcessor extends AudioWorkletProcessor {
           this.trSent++;
           const recs = [];
           for (let j = Math.max(0, this.trN - TR_N); j < this.trN; j++) recs.push(Array.from(this.tr.subarray((j % TR_N) * TR_W, (j % TR_N + 1) * TR_W)));
-          this.port.postMessage({ type: "underrun_trace", p, consumed, rebuf: this.rebuf, recs });
+          this.port.postMessage({ type: "underrun_trace", p, consumed, rebuf: this.rebuf, recs, ms: Date.now() });
         }
         if (this.cap) { const h = this.cap.hdr; if (Atomics.load(h, 6) === 0) { Atomics.store(h, 4, p / Q); Atomics.store(h, 7, (Date.now() * 1000) | 0); } Atomics.store(h, 5, p / Q); Atomics.add(h, 6, 1); }
         Atomics.add(i, x.silence_frames, Q - consumed);
