@@ -124,3 +124,28 @@ A	tools/flelift/boot/rsi_zero_variant.sh
 - zero 変種の GetMem 3680 → 3681 (§5) の因果も未確認のまま。
 
 **受入 1 は未達** (部分達成)。
+
+## 10. 残骸除去 (zero) と既定 (base) の出力メモリ比較 (判定)
+
+測定 commit: `bacdd6034` (origin/main)。分類器 `zero_diff_classify.py` を本 PR で追加 (測定コードは変えていない)。
+工程: `fle6_measure.sh` (既定 lift・plain build) → `rsi_zero_variant.sh` (base / zero の build) → 各 build を
+`FLE_OUTMEM_DUMP` 付きで 3 回 boot (`fle_boot.mjs --boot-only`・全 6 run rc 0・units 895・GetMem は base 3680 / zero 3681 で §5 と一致)。
+既定 boot の所要: `fle6_measure.sh` 2 分 53 秒・`rsi_zero_variant.sh` 2 分 34 秒・dump boot 6 本 約 1 分。
+
+- zero 変種の 0x4080a2 入口で rsi = `0x12d777d0` を記録 (`[RSIZERO] rsi=12d777d0`)。残骸は消える。
+- 既存判定器 `outmem_judge.py` (8 run 由来の NONDET 9 バイト) は、この 6 run では **base 同士でも FAIL** (`0x11f26e8` 系と `0x13e4d59` が揺れる)。マスクが不完全なため、この判定器の PASS/FAIL は今回の比較には使えない。
+- `zero_diff_classify.py` で 4 バイト語ごとに分類 (書込み可能セクション 6,097,426 B):
+  | 分類 | 語数 | 意味 |
+  |---|---|---|
+  | unstable | 4 | base / zero の run 間で値が揺れる (非決定) |
+  | placement | 278 | base と zero の両方が heap 範囲 (`0x11D00000`〜`0x13400000`) のポインタ (配置のずれ) |
+  | content | 1 | `.bss 0x11f6100`: base `0x115cd2d8` → zero `0x115cd2e8` (+0x10) |
+- 分類の定義は heap 範囲 (`0x11D00000`〜`0x13400000`) だけで判定する (`zero_diff_classify.py` の `HEAP_LO`/`HEAP_HI`)。スタック範囲 (base `[0x115d21a0, 0x11dd21a0)`・zero `[0x115d21b0, 0x11dd21b0)`) のうち heap 範囲外の下端部分の差は、placement に入らず content に数えられる。
+- content 1 語 (`0x115cd2d8`) は heap 範囲より下・スタック範囲の下端より下の値。ヒープ域のポインタの 0x10 ずれと読めるが、断定はしていない。
+
+### 判定 (受入 1)
+
+- 残骸を消すと、出力メモリの **内容** の差は 1 語 (+0x10 のポインタずれ) に限られ、残りは配置のずれと非決定位置。
+- 残骸を消した差のうち、内容の差として残るのは 1 語だけ。残骸が出力 (`image_writable`) の内容を変える根拠は、この 6 run では見つからなかった。
+- ただし (a) content 1 語の正体は未確定、(b) 残骸の値が分岐 (f_44f5d0・f_43c4c0・§9) を経て出力に届く経路は未追跡、(c) 配置のずれが後続の分岐を変えた可能性 (GetMem 3680 → 3681 の因果・§5) は区別できていない。よって受入 1 (「影響するか」) は **未達**。
+- 判定は **部分達成**。残りは #4426 に残す。

@@ -232,6 +232,15 @@ def pass_branches(cx, fn, mf):
         if any(re.match(r'^[\w.\-]+:', lines[x]) for x in range(i0, i1 + 1)):
             st['unfixed'].append('%x region spans BB boundary' % ins.addr)
             continue
+        term_end = bool(re.match(r'^\s*(br|ret|switch|unreachable|indirectbr)\b', fn.sub.get(i1, lines[i1])))
+        tl = 'dec_label_pc_%x' % tgt
+        if term_end:
+            nx = i1 + 1
+            while nx <= fn.end and not lines[nx].strip():
+                nx += 1
+            if nx > fn.end or not lines[nx].startswith(tl + ':'):
+                st['unfixed'].append('%x region ends with terminator, target label %s not next' % (ins.addr, tl))
+                continue
         region = set(range(i0, i1 + 1))
         # 副作用の無い純計算 (アドレス計算等) は CSE で領域外から参照されうる → 分岐の前へ hoist
         PURE = re.compile(r'^(\s*)(%[\w.\-]+) = (?:add|sub|mul|shl|lshr|and|or|xor|sext|zext|trunc|inttoptr|ptrtoint|bitcast|icmp|select)\b')
@@ -287,8 +296,11 @@ def pass_branches(cx, fn, mf):
                     dct[kk] = [rn(t_) for t_ in dct[kk]]
         fn.before[i0].append('  br i1 %s, label %%%s, label %%%s' % (cond, skip, body))
         fn.before[i0].append('%s:' % body)
-        fn.after[i1].append('  br label %%%s' % skip)
+        if not term_end:
+            fn.after[i1].append('  br label %%%s' % skip)
         fn.after[i1].append('%s:' % skip)
+        if term_end:
+            fn.after[i1].append('  br label %%%s' % tl)
         if lab:
             for x in range(i1 + 1, fn.end + 1):
                 if 'phi ' in lines[x] and ('%' + lab) in lines[x]:
