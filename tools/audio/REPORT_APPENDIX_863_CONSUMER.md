@@ -92,7 +92,7 @@
 ## §33 underrun 時点の目標充填 T の記録 (#863 未解決 (c))
 
 - 変更: worklet の `underrun_trace` 通知に `T = depth × buffer_frames` を載せ、shim の `ConsumerUnderrun.T` と e2e の判定行 `cw_T=` に出す。SAB レイアウト・wasm は不変。
-- 測定 commit: `a11946b16` (本番向けのコードのみ。`git diff 03627cab5 a11946b16 -- public/worklets src/runtime tools/audio/integration` = 13 行。`03627cab5` は origin/main)。
+- 測定 commit: `a11946b16` (本番向けのコードのみ。`git diff --stat 03627cab5 a11946b16 -- public/worklets src/runtime tools/audio/integration` = 3 files, 7 insertions, 4 deletions。`03627cab5` は origin/main)。
 - 判定 (clean): `e2e.sh` 15/15 PASS・exit 0 (7.8 s)。`prod_target_fill=1536`・underrun 0 件のため `cw_at_underrun=[none]` (`cw_T` は出ない)。
 - 強制 underrun (検証用・本 PR の外) で `cw_T` の出力を確認: 1 フレーム分の `consumed=0` を注入し `underruns=1`・`cw_p=25600 cw_consumed=0 cw_rebuf=256`。`cw_T` は dev 1536 / preview 1792。同 run の `prod_target_fill` は dev 1792 / preview 1792。
 - 読み: `cw_T` は underrun 時点の値、`prod_target_fill` は verify 時点の値。同じ run 内で dev のみ一致しなかった (1536 と 1792)。仮説: T (depth・buffer_frames) が run 途中で変わった。1 run のみの観測で、未検証。
