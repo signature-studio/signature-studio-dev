@@ -10,6 +10,7 @@
 - mode `[obj+0xc4]` を 0 にする store は **`0x40d300`** (`f_40d210` 内の `movaps xmmword [rcx+rdx], xmm0` の 16 byte ループ)。宛先 `0x12d7a150` (obj+0xc0) の 16 byte が 0 を書き、`obj+0xc4` を含む。戻り番地 `0x40fb63` は `f_40fb40` の `call 0x40d210` の直後。
 - `f_40fb40` は `NewInstance` の初期化 (`f_40f960` → getmem `0x409410` → 初期化 `0x40fb40`) の一部で、確保直後・`f_6ba1f0` が obj を確定する (`0x6ba25b`) より前に走る。したがって mode の 0 は、確保した領域を初期化する lifted の 0 埋めが書いたものである。
 - 観測した範囲で、obj+0xc4 に 0 以外の値を書く store は無い。mode は確保時の初期値 0 のまま。
+- 受入の達成範囲: **診断 route (`FLE_EXTRA_ROOTS=`) で達成** (設定元 VA `0x40d300`・戻り `0x40fb63` を特定)。**既定 route は未達**: `f_6ba1f0` の入口 (`[wval-enter]`) に届かず、既定 route の設定元は測れていない (監視は n=1)。既定 route の設定元は #6220 に残す。このため PR 本文は `Refs #6219` (#6219 は merge 後も open のまま)。
 
 ## B. 測定 (工程と実測)
 
