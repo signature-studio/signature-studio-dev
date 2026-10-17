@@ -7,6 +7,8 @@
   .data の raw 値 (`bss` は実行時に埋まる) を表示する。`call qword ptr [rip+X]` は X を直接解決する。
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_mixer_wrappers.py [名前 ...]
+  FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_mixer_wrappers.py --table
+  (--table: 表順 0xd5eef0〜0xd614d0 の行を index・名前・VA と、provider/fl_engine.c の C 実装の有無 (済/未) で出す)
 展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 """
 import os
@@ -61,6 +63,17 @@ def main():
         val = raw_qword(va)
         return f"[{va:#x}]=" + (f"{val:#x}" if val is not None else "bss")
 
+    if "--table" in sys.argv[1:]:
+        src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../provider/fl_engine.c")
+        src = open(src_path, encoding="utf-8").read()
+        for i in range(MIXER_ROWS):
+            nm, fn, _ = struct.unpack_from("<QQI", raw, MIXER_ARRAY_OFF + 32 * i)
+            name = cstr(nm)
+            if name is None or not (0xD5EEF0 <= fn <= 0xD614D0):
+                continue
+            done = "済" if f"FL_H(mixer, {name})" in src else "未"
+            print(f"{i:3d} {name:32s} {fn:#x} C={done}")
+        return
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     for i in range(MIXER_ROWS):
         off = MIXER_ARRAY_OFF + 32 * i
