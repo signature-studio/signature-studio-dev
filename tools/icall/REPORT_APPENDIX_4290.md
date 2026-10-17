@@ -1,7 +1,7 @@
 # icall #4290 (ICALL-97): リーフ 3 関数の abort 原因と route 入力の統合
 
-測定 commit: `328331860` (コードを変えた最後の commit。main `fe48dca85` の上)。
-`git diff 328331860 HEAD -- tools/icall` の出力は 0 行 (本 PR の HEAD で測定した)。
+測定 commit: `8def758ae` (コードを変えた最後の commit。main `fe48dca85` の上)。
+本付録の commit は測定後の docs だけで、`git diff 8def758ae HEAD -- tools/icall` の出力は 0 行。
 
 ## 1. 結論
 
@@ -15,7 +15,7 @@
 | 手順 | 条件 | 結果 | 所要 (real) |
 |---|---|---|---|
 | `roundtrip.sh` | `CHUNKS=4`・`fa_ranges_4271.txt`・`freshair-4290` | rc 0・`lost 6` (非IAT) | 50.7 s |
-| `fa_route_build.sh` (統合) | `FA_RT=tools/icall/work/rt_freshair-4290` | OK・`[merge] chunks 4, defines 164`・table 164 | 9.7 s |
+| `fa_route_build.sh` (統合) | `FA_RT=tools/icall/work/rt_freshair-4290` | OK・`[merge] chunks 4, defines 164`・table 164 | 9.5 s |
 | `fa_cmp.py 181056a4c --n 8` | `FA_MAP=rt_freshair-4290/map.json` | match 8 / mismatch 0 | — |
 | `fa_cmp.py 181056aa0 --n 8` | 同上 | match 8 / mismatch 0 | — |
 | `fa_cmp.py 18105d9fc --n 8` | 同上 | match 0 / mismatch 8 (`ERR:RuntimeError: unreachable`) | — |
