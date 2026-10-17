@@ -83,10 +83,10 @@
 - 方法: §2-2 の probe を、既定経路 (`FLE_IPP` 未指定・`FLE_EXTRA_ROOTS` 既定) で 1 回実行。`FLE_PY106_BIND=1 FLE_BOOT_TAG=py106def FLE_BOOT_RUNS=default bash tools/flelift/boot/fle6_measure.sh`。
 - 測定 commit: **`d7f0200ea`** (origin/main HEAD)。コードを変えた最後の commit。`git diff d7f0200ea HEAD -- tools/flelift tools/python` は本 REPORT と `results/` の JSON だけ。
 - 実測 (load 開始時 `1.90 1.16 0.52`): rc 0・real 3 分 15.3 秒 (lift・clang plain 97 s・boot 10 s)。boot は units 895 / 942 で `exit` (`MessageBoxA` → `exit`、code 0)。IPP 判定 ok (`ptr_15F34A0 = 0x7f10001c`)。`FLE_IPP=3` (#4033) のため §2 の 209 停止点より先に進む。
-- `FLEBOOT_PY106B`: `names_n 110`・`getproc_calls 110`・`hook_calls 1`。`head_at_stop` = `0x16b8488`。`name_of_slot_exc` = **`PyExc_RuntimeError`**。他: `PyErr_SetString` (slot `0x16b8408`)、`Py_NewInterpreterFromConfig` (`0x16b8250`)。`threw` は `unlifted` (target `0x115a6170`)。
+- `FLEBOOT_PY106B`: `names_n 110`・`getproc_calls 110`・`hook_calls 1`。`head_at_stop` = `0x16b8488`。`name_of_slot_exc` = **`PyExc_RuntimeError`**。他: `PyErr_SetString` (実測の slot `0x115a62d0`・JSON の `slot_setstr_after_bind`。静的 map の slot は `0x16b8408`)、`Py_NewInterpreterFromConfig` (`0x16b8250`)。`threw` は `unlifted` (target `0x115a6170`)。
 - 結果 JSON: `tools/flelift/boot/results/boot_summary_py106def_default_py106bind.json` (`probe.names` に 110 件の名前表)。
 - 読み: 既定経路では束縛関数が GetProcAddress と Python312 の load hook に届く (§2-2・§2-3 の 209 停止点とは違う)。読めたのは、束縛が slot `0x16b8488` に格納する**名前の文字列** (`PyExc_RuntimeError`) と、probe が返した cell の型トークン (`0x7f300045`) である。名前は束縛関数 `0xc39ceb` の `lea` が渡す静的な文字列 (§1) なので、この観測は静的判定を実行時に再現したもの。**実 Python の型オブジェクト (`PyExc_RuntimeError` の実体の値) は読めていない**。したがって受入 1 (PyExc_* の実体の観測) は未達のまま。
-- 注意: 束縛の後の `unlifted 0x115a6170` は probe 後段の停止で、boot 本体の `exit` とは別。本 REPORT では扱わない (#2909 の範囲外・PM 判断)。
+- 注意: 束縛の後の `unlifted 0x115a6170` は probe 後段の停止で、boot 本体の `exit` とは別。本 REPORT では扱わない (#2909 の範囲外。PM agent の判断待ち: 子 issue を切るか。既定案: 切らず §6 の再開条件に残す)。
 
 ## 3. RANGE (-4) と repo の写像 (受入 2)
 
