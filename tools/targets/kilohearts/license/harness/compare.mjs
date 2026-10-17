@@ -49,7 +49,10 @@ const negCtrl = args.includes('--neg-ctrl');   /* ネガコン: 合否を反転�
 
 for (let t = 0; t < ntrials; t++) {
   const ncalls = u32(); u32();
-  if (pathFlags && M._kh_set_flag_a) M._kh_set_flag_a((t & 1) ? 0x2 : 0x20);
+  if (pathFlags) {
+    if (!M._kh_set_flag_a) throw new Error('--path-flags: kh_set_flag_a 未 export (lic_build --module K の flag_setters を確認)');
+    M._kh_set_flag_a((t & 1) ? 0x2 : 0x20);
+  }
   H8().fill(0, ARENA, ARENA + 0x10000);   /* trial 冒頭の zero 化は固定窓 (native_ref.c の ARENA_CLEAR と同一: mgr slot 0x0400F020 を含む) */
   if (KH_BASE) H8().fill(0, Number(KH_BASE + KH_SIZE - 0x48n - 0x300n), Number(KH_BASE + KH_SIZE - 0x48n + 0x40n));   /* callee フレーム窓を 0 確定 (native の clone offset パッチと対) */
   let usedNow = 0, failed = null;

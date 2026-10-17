@@ -231,11 +231,11 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 ## 13. #4413 kclp native_ref scenario (ctx-fuzz native oracle)
 
 - 対象: `harness/scen_kclp.h` (ACFRegisterPlugin_kclp の 32bit 検索関数 0x180f89cf0 を、経路フラグ .data 0x182989344 を指定して呼ぶ)。偶数 trial = ymm 経路 (flag 0x20)、奇数 trial = scalar 経路 (flag 0x2)。
-- 測定 commit: `876bb09f7` (コードを変えた最後の commit)。以後 harness の差分は 0 (`git diff 876bb09f7 HEAD -- tools/targets/kilohearts/license/harness` = 空)。
+- 時系列 (commit 順):
+  - `876bb09f7`: kclp scenario 追加。前 run の測定 (素材 `plugins-kilohearts` 展開): rc=0・0.017 s・出力 66,146 B・不一致 0 件・ネガコン (比較の向きを反転) で 200 行の不一致・`HeartCore.core_64` sha256 一致 (`d55ce8b4c0ad7ebedf1a4a1f74443a91d255596be887a514e54269ec8751441e`、76,642,304 B)。
+  - `6f5da495e`: `--path-flags` 追加 (harness の最後のコード変更)。突合の測定 commit。素材 `plugins-kilohearts` 展開・`HeartCore.core_64` sha256 `d55ce8b4c0ad7ebe` 一致。`native_ref kclp 200 1` rc=0 → `compare.mjs --path-flags` **200/200 bit-exact (200 calls)**・ネガコン (`--neg-ctrl`) **0/200**・フラグ無し (`compare.mjs` 既定) 200/200。
+  - 本 run: `compare.mjs` の `--path-flags` で setter 欠落時に fail する (無音で書込みを飛ばさない)。**未再測定**: `$ARTIFACTS_DIR` (`fl-win64` のみ) に `HeartCore.core_64` が無いため。再測定は `oc_artifacts: fl-win64 plugins-kilohearts` を付けた run で行う。
 - 正しいコマンド (引数 5 つ。4 つでは usage で rc=2): `native_ref <HeartCore.core_64> kclp 200 1 <out.bin>`。出力は `work/` 配下に置く。
-- ビルド: `cc -O1 -Wall native_ref.c scenarios.c` rc=0 (本 run で再確認)。`native_ref - list` に `kclp` を含む (本 run で確認)。
-- 前 run の記録 (測定 commit `876bb09f7`・素材 `plugins-kilohearts` 展開): rc=0・0.017 s・出力 66,146 B・不一致 0 件・ネガコン (比較の向きを反転) で 200 行の不一致・`HeartCore.core_64` sha256 一致 (`d55ce8b4c0ad7ebedf1a4a1f74443a91d255596be887a514e54269ec8751441e`、76,642,304 B)。
-- **本 run で未再実行**: `$ARTIFACTS_DIR` (`fl-win64` のみ) に `HeartCore.core_64` が無く、正しいコマンドの再測定ができなかった。上の前 run 値は再確認されていない。再測定は `oc_artifacts: fl-win64 plugins-kilohearts` を付けた run で行う。
 - 未確認: ymm 経路 (flag 0x20) に入ったことを示すトレース・分岐カウントは未記録。
 - 関数 B (0x180fb6124) は未実装。`modules.F.lift` 追加は未実施 (#4413 の次 run)。
 - 経路フラグの wasm 切替: `lic_build.py --module K` (lift 集合は A `0x180f89cf0` のみ・`0x180fb6124` を含む 2 関数) で、`.data` の `0x182989344` / `0x182989340` を setter `kh_set_flag_a/b` から書き換え可能にした (`globals.c` の `const` を外す)。`compare.mjs --path-flags` が trial ごとに `kh_set_flag_a` へ書く (偶数 0x20 / 奇数 0x2、scen_kclp.h と同規則)。
