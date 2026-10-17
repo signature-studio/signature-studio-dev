@@ -88,3 +88,20 @@
 ### 未解決 (追跡 **#863**。新規 issue は起票していない)
 
 (a) 実失敗の捕獲 (通算 0 件)。(b) 再現条件の特定 (頻度 5/760)。(c) 失敗時の T は記録されない (verify 時点の値のみ)。underrun 時点の T の記録は別途必要。(d) 初回 run 仮説 (キャッシュ状態との切り分け)。
+
+## §33 underrun 時点の目標充填 T の記録 (#863 未解決 (c))
+
+- 変更: worklet の `underrun_trace` 通知に `T = depth × buffer_frames` を載せ、shim の `ConsumerUnderrun.T` と e2e の判定行 `cw_T=` に出す。SAB レイアウト・wasm は不変。
+- 測定 commit: `a11946b16` (本番向けのコードのみ。`git diff 03627cab5 a11946b16 -- public/worklets src/runtime tools/audio/integration` = 13 行。`03627cab5` は origin/main)。
+- 判定 (clean): `e2e.sh` 15/15 PASS・exit 0 (7.8 s)。`prod_target_fill=1536`・underrun 0 件のため `cw_at_underrun=[none]` (`cw_T` は出ない)。
+- 強制 underrun (検証用・本 PR の外) で `cw_T` の出力を確認: 1 フレーム分の `consumed=0` を注入し `underruns=1`・`cw_p=25600 cw_consumed=0 cw_rebuf=256`。`cw_T` は dev 1536 / preview 1792。同 run の `prod_target_fill` は dev 1792 / preview 1792。
+- 読み: `cw_T` は underrun 時点の値、`prod_target_fill` は verify 時点の値。同じ run 内で dev のみ一致しなかった (1536 と 1792)。仮説: T (depth・buffer_frames) が run 途中で変わった。1 run のみの観測で、未検証。
+- 注意 (手順): 強制 underrun は `e2e.sh` が `git archive HEAD` を検証するため、作業ツリーの変更ではなくコミットで入れた。検証後に打ち消しコミットで戻し、本番向けブランチ (`863-au15-underrun-T-clean`) へは cherry-pick で本番コミットだけを載せた。
+
+### 通算
+
+- 通算は §32 までの 5 件 / 760 run のまま (本節は判定行の確認で、捕獲試行ではない)。
+
+### 未解決 (追跡 **#863**。新規 issue は起票していない)
+
+(a) 実失敗の捕獲 (通算 0 件)。(b) 再現条件の特定 (頻度 5/760)。(c) 失敗時の T は記録された (本節)。`prod_target_fill` と `cw_T` の食い違い (dev 1 run) は仮説のみで未検証。(d) 初回 run 仮説 (キャッシュ状態との切り分け)。
