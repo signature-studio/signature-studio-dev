@@ -179,6 +179,23 @@
 - 未解決 (起票先): 可変長整数の符号化、unwind map / try map / IP-to-state map の中身、funclet RVA の全数取り出し、独立再計算、2 件の画像外ポインタ → [MX-42] (#3807・親 #3791)。
 - 検証差分 (docs/WORKFLOW.md §6): 測定 commit 62a3fda35 より後のコード差分は §7 のとおり (0 行)。
 
+### 8.1 可変長整数 (compressed int) の符号化 (MX-48・#4787)
+
+- 一次資料: `ehdata4_export.h` の公開写し (trcrsired/windows-msvc-sysroot `include/ehdata4_export.h`)。`ReadUnsigned` と `getNETencoded` の規則を `scripts/mx6_fh4_cint.py` に移植。先頭 byte の下位 4 bit で長さ L を決め、値は LE(bytes[pb:pb+L]) >> L (L=5 は flag 0x0F で、後続 4 byte の LE32)。pb は前から L 進める。`s_negLengthTab` と一致。
+- 測定 commit = **3239e912d** (`scripts/mx6_fh4_cint.py` の追加のみ。素材 `plugins-massivex` の `Massive X.vst3` md5 `622993e7` 一致)。再現: `python3 scripts/mx6_fh4_cint.py --selftest` と `python3 scripts/mx6_fh4_cint.py "$PE" "$RUNNER_TEMP/fh4_cint.json"`。所要 3.6 秒・load 0.13→0.20。
+
+| 項目 | 結果 |
+|---|--:|
+| NC (往復 20,014 値・連続読み 500 値・表との一致) | 3/3 PASS |
+| FH4 entry / 相異なる fi | 2,542 / 2,117 |
+| 固定部が読めない entry (既知の画像外 2 件) | 2 |
+| UnwindMap entry (5,621 件・nextOffset の戻り先が state -1 (buffer 前) か entry 先頭) | 不整合 0 |
+| TryBlockMap entry (185 件・tryLow ≤ tryHigh ≤ catchHigh) | 不整合 0 |
+| IPtoStateMap entry (9,850 件) | 11 行 (fi 10 件・entry 数 1〜70) が関数範囲外 |
+
+- IP map の 11 行は、2 本目以降の entry が関数長を超える (値が数千万から 4 億台)。fi 0x62ef3b0 は 2 行が共有する。確認した 4 件 (fi 0x6257284・0x62ef3b0・0x630bcc8・0x639080c) では dispIPtoStateMap が fi+9 または fi+27 にあり、funclet の範囲とずれている。残り 6 件は未確認。符号化の誤りとは断定できない (表の位置の割当て・別関数との共有の可能性)。**未解決**。
+- 受入 1 の判定: 符号化そのものは一次資料どおり復号し、unwind / try は全件整合。IP map の 11 行を切り分けるまで「確定」とは書かない → `Refs #4787`。
+
 ## 9. MX-39 (#3776): 付録へ分割移動
 
 MX-39 の深い closure 到達・E8/E9 候補の由来・MSVC funclet の取り込み方式 (U4d・U4e) の節 (§9) は付録 `REPORT_APPENDIX_3776.md` §9 にある (250 行上限のため分割移動)。
