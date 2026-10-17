@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SR-95 #5987: join.tsv の証拠なし行 (evidence=none) が SerumController 由来かを、既存 TSV だけから判定する (静的・PE 不要)。
+"""SR-101 #5987: join.tsv の証拠なし行 (evidence=none) が SerumController 由来かを、既存 TSV だけから判定する (静的・PE 不要)。
 
 判定 (行ごと・所属関数 F の証拠で分ける):
   F が SC 関数集合に入る                         -> SC 証拠 (self)
@@ -24,7 +24,8 @@ def read(path):
 
 
 join_p, direct_p, vt_p, sc_p = sys.argv[1:5]
-SC = {int(x, 16) for x in open(sc_p).read().split() if x.strip()}
+with open(sc_p) as f:
+    SC = {int(x, 16) for x in f.read().split() if x.strip()}
 direct_callers = {}
 for r in read(direct_p):
     direct_callers.setdefault(int(r["func"], 16), set()).add(int(r["caller"], 16))
