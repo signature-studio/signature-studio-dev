@@ -327,6 +327,7 @@
 | `tools/m11/REPORT_SHX-T44.md` | ~70 | #4189 (SHX-T44, 親 #4123): `function_448490` の 10 mov 渡し site の機械語判定 (`frame_share/site_check.py`)。全 site で親 rbp を静的リンクとして渡し、callee が親の `[rbp+0x48]`・`[rbp+0x4c]` を読み書き。残り 291 site の callee 読み先の一括抽出 (`write_local` 121・`read_local` 106・`arg_home_only` 74)。修復 pass と OFF/ON 実測は子 [SHX-T45] #4459 |
 | `tools/m11/REPORT_SHX-T44_APPENDIX.md` | ~250 | #4189: mov 渡し 301 site の site 単位の表 (call・callee 読み先・access_class・IR 突合)。前半 (250 行まで)。REPORT_SHX-T44 §6 の付録 |
 | `tools/m11/REPORT_SHX-T44_APPENDIX_2.md` | ~60 | #4189: 上記付録の続き (site 表の後半) |
+| `tools/m11/REPORT_SHX-T61.md` | ~80 | #5855 (SHX-T61): callee `function_4483f0` の計装 `ldfix/fix_shx_t61.py` (既定 OFF)。既定 IR の指紋・ON 計装の段階別 rc・trace 分岐の確認。hang 後に `@fx61_buf` を読む経路は未確定 (受入 1 未達) |
 | `tools/m11/REPORT_SHX-T51.md` | ~50 | #5588 (SHX-T51): base_mismatch 53 site (SSA 値渡し・18 組) の修復範囲の判定 (`frame_share/neighbor_gap.py`)。13 組は alloca 拡幅 (R8) で覆えず、5 組は gap 未測定 (暫定) |
 | `tools/m11/REPORT_SHX-T58.md` | ~115 | #5690 (SHX-T58): SSA 値渡しの残件 5 組 (d26460・e4f310・977f50・441380・6905f0) の修復範囲の確定 (`frame_share/frame_bound.py`)。5 組とも R8 では覆えない (枠超過または親の rbp 域との衝突) |
 | `tools/m11/REPORT_SHX-T48.md` | ~90 | #5576 (SHX-T48): D23 301 site のうち `unmatched` 56・`no_prologue` 3 の site 単位判定 (`frame_share/unmatched_check.py`)。`no_prologue` 3 は `ir_truncated`、`unmatched` 3 は call 欠落 (`function_40b620`)、残りは SSA 値渡し。制御フロー付き走査は子 [SHX-T48] #5575 |

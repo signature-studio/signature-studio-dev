@@ -124,6 +124,11 @@ if [ $TRACE = 1 ]; then
   cc "$GEN/trace_wrap.c" "$W/obj/trace_wrap$SUF$WSUF.o" $CF
   cc "$HERE/trace_rt.c" "$W/obj/trace_rt.o" $CF
   BOOT="$W/obj/boot_trace$SUF$WSUF.o $W/obj/trace_wrap$SUF$WSUF.o $W/obj/trace_rt.o"
+  # #5855 (SHX-T61) 計装: IR に @fx61_buf (計装の記録領域) があるときだけ読み出し関数をリンクする (既定の trace は変えない)
+  if grep -q '^@fx61_buf' "$GEN/boot_trace.ll" 2>/dev/null; then
+    cc "$HERE/fx61_rec.c" "$W/obj/fx61_rec.o" $CF
+    BOOT="$BOOT $W/obj/fx61_rec.o"
+  fi
 else
   cc "$IR" "$W/obj/boot_plain$SUF.o" $CF
   BOOT="$W/obj/boot_plain$SUF.o"
