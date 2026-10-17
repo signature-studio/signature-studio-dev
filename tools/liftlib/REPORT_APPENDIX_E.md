@@ -224,3 +224,11 @@ index f66f69b4d..289a1e6c1 100644
   - 既定経路の不変は、HEAD と main `972b3fa3b` の leafspec A/B (上の 6 件が一致) で示した。
 - §23.10 の「bsr は ZF を追跡しない」は、上の §23.10 の箇条で更新済み。
 - 未解決 (起票先): `shr cl`・`adc`・`cmp rcx,0` → 子 #6078〜#6080 (親 #4350)。
+
+### 23.16 LIFTLIB-31 (#6079) — `adc r,imm` handler の e2e 実測 (元測定の記録)
+- **変更**: p1 に `adc r64,imm` (`dst = dst + imm + CF`) を追加。入力 CF は `_flag_cf_i1` で flag 状態から読み、CF を作れない経路 (`fl=None`・`bsrzf`) は `Unsupported`。T33 で `icmp ult i64 %a, %b` / `zext i1` / `add i64` ×2 と Unsupported を固定。
+- **単体**: `python3 tests/test_unit.py` → `ALL UNIT TESTS PASS (36)`。
+- **e2e (測定 commit `036006d57`・`bash tools/liftlib/liftlib_e2e.sh --quick`・wall 4 分 15 秒・`elapsed_s` 33.7)**: `fa_gain` BIT-EXACT 400/400・`kh_gain` BIT-EXACT 366/366・`ott` (既定 auto) PASS (checks 8 / broken 0 / census junkHi 104 ≤ 104)・`ott_auto_none` FAIL。`ott_auto_none` の FAIL は §3.3 (`REPORT_APPENDIX_3067.md`) の既知の期待差分と同じ値で、ログに `adc` の出力行は無い。
+- **注記**: 上の値は実装 run の測定の記録。後続の run (レビュー fix) では素材 (`work-liftlib` 等) が無く再実行していない。
+- **測定 commit 以降のコード差分**: `git diff 036006d57 HEAD -- tools/liftlib` → 0 行 (測定 commit が最後のコード変更)。
+- IR 側の再測定 (`function_1801ba860` の `adc rax,0`) は未実施。4 分岐の再結線は #4352 (LIFTLIB-27)。
