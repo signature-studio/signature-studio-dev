@@ -126,6 +126,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_4806.md` | ~60 | FLE-29 (#4806) A1: opt-in 経路 (FLE_IPP=1) の dsp_ippv2 load hook は非 0 を返す (前提の「0 を返す」は不成立)。`0x15F34A0` は unit 132 で登録され unit 209 の 16B store (ret `0x1078570`) で 0 に戻る。store 元の関数は未特定 |
 | `tools/flelift/boot/REPORT_APPENDIX_5058.md` | ~70 | FLE-41 (#5058): cap 超過後の次の dispatch で `log_cap` の例外を投げて boot を止める修正・既定 cap 4096 の停止 (units 13) と cap 0 の対照 (units 895)・規則検査の変異。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4931.md` | ~50 | FLE-4931 (#4931): REPORT §13 の全文 (既定経路 mode 3 の survey で 942 unit を分類・covered=942・測定 commit `ceb5a0ba6`・差分 0 の証跡・件数 47 の説明・boot_metric の再生成理由)。REPORT §13 は結論と要点表 |
+| `tools/flelift/boot/REPORT_APPENDIX_5415.md` | ~40 | FLE-45 (#5415): InitContext.InitTable (0x15eac90) の 0 化の時点 (unit 895 の ExitProcess 直前・書込み命令は未特定)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_6054.md` | ~80 | FLE-51 (#6054): 0x4080a2 の rsi = dst (`0x12d777d0`) の既定経路での確認・残骸を消す対照 (zero) の GetMem 変化・受入 1 は未達 (0x6b91e8 は既定経路で未実行) |
 | `tools/flelift/boot/REPORT_APPENDIX_4004.md` | ~80 | FLE-18 (#4004): 既定経路の dispatch(0) (0x67264b の target 0)・呼出時の `[0x15e0a48]` の実測 (既定 / shim の call-time 表)・0x6b91e8 の第 2 呼出点。REPORT §10 の「唯一の呼出し点」の訂正 |
 | `tools/flelift/boot/REPORT_APPENDIX_3868.md` | ~90 | FLE-17 (#3868) の付録: `0x6bbc20` の書込み経路の上流 (実行時の呼出し連鎖・既定 route の書込み・静的走査 (rip 相対 lea)・監視の範囲)。REPORT_APPENDIX_3771 §A の後続 |
