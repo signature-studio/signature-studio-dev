@@ -220,7 +220,7 @@
 
 - F1 の set `0xc4dea0` と clear `0xc4ea3b` は別関数。F1 に set/clear が同一関数で対になる箇所は無い。
 - 「対」の判定は store の値で行う (スクリプト §4)。同一関数に定数 1 と定数 0 の store があるのは F2 の `0xf51fd0`・`0xfefba0`・`0x11d58c0` の 3 関数。`0xfff070`・`0x1042d20` は定数 1 の store のみで、もう一方は `88 xx` (レジスタ値の store) のため定数 0 は PE 上で未確認。
-- 測定 commit: `d444114e6` (`py5413_flag_writers.py` を含む commit)。以後 `tools/python/analysis` の差分は本 PR 内の docs のみ。
+- 測定 commit: `db1ba3345` (スクリプトを最後に変えた commit。表の値はこの版の出力)。
 
 ### 未解決 (起票先付き)
 
