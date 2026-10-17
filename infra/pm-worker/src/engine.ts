@@ -338,6 +338,8 @@ export class Engine {
   obs: Sample[];
   dirty = false;
   private busy = false;
+  // この tick で /oc を投稿した数 (launch・再投入の意図・wake の合計)。room (TARGET − active) の残りを wake が見るため。
+  private tickPosted = 0;
   private ocPosts: OcPost[];
   private wouldRecs: WouldRec[];
 
@@ -1240,6 +1242,7 @@ export class Engine {
 
   // /oc を投稿した issue の印: launchedAt・launchObs (投稿後の観測の起点)。oc:no-pr の計数は呼び出し側 (picks の np・再投入の意図) が行う。
   private markPosted(n: number, at: string): void {
+    this.tickPosted++;
     this.d.store.put("launchedAt", String(n), at);
     this.s = { ...this.s, launchedAt: { ...this.s.launchedAt, [String(n)]: at } };
     this.d.store.put("launchObs", String(n), { state: "launched", at, changedAt: at } satisfies LaunchObs);
@@ -1458,8 +1461,10 @@ export class Engine {
   }
 
   // 停止行の直接の再投入 (wake・CI-250)。停止行のうち oldest-first の対象へ、/oc の再投入コメントを Worker が直接投稿する (oc-pm の判断を挟まない)。
-  // 投稿の条件は launch と同じ: 停止中 (halt・stop・blocked・review-only) では送らず、同期が古いときも送らない。LIVE_LAUNCH=1 のときだけ投稿し、dry-run は記録する。
-  // 1 時間に WAKE_PER_H 件・同じ issue は 24 時間に WAKE_REF_DAY_MAX 件。prio:critical と needs-user-input は除く (selectWake)。
+  // 投稿の条件は launch と同じ: 停止中 (stop・blocked・review-only) では送らず、同期が古いときも送らない。LIVE_LAUNCH=1 のときだけ投稿し、dry-run は記録する。
+  // 稼働枠: plan.room (TARGET − active) から、この tick で launch・意図が使った分を引いた残りまで。残りが無ければ送らない (TARGET を超えない)。
+  // 1 時間に WAKE_PER_H 件・同じ issue は 24 時間に WAKE_REF_DAY_MAX 件。prio:critical・needs-user-input は除く (selectWake)。
+  // 対象は直前の報告が『## 停止報告』の見出しを持つ停止行だけ (承認の『明確な停止報告』。報告本文 botReport で判定)。
   // 投稿した停止行は同じ tick の oc-pm に送らない (run が進行中になるため)。
   private wakeHistory(now: number, key: "wakeLive" | "wakeWould"): Array<{ ref: number; at: number }> {
     return pruneHistory(now, this.d.store.get<Array<{ ref: number; at: number }>>("meta", key) ?? []);
@@ -1467,17 +1472,19 @@ export class Engine {
   async wakeStopped(gh: Gh | null): Promise<PmTarget[]> {
     const plan = this.meta.lastPlan;
     if (!this.fresh() || !plan || plan.stop || plan.blocked || plan.phase.review_only) return [];
+    const frame = plan.room - this.tickPosted;
+    if (frame <= 0) return [];
     const live = !!(this.launchLive() && gh);
     const now = this.d.now();
     const key = live ? "wakeLive" : "wakeWould";
     const hist = this.wakeHistory(now, key);
-    const targets = this.detectPmTargets();
+    const targets = this.detectPmTargets().filter((tg) => tg.kind === "stopped_report" && isStopReport(this.s.botReport[String(tg.ref)]?.body ?? ""));
     const picks = selectWake(now, targets, hist, {
       perH: this.d.cfg.wakePerH,
       refDayMax: this.d.cfg.wakeRefDayMax,
       excludeLabels: ["needs-user-input"],
       labelsOf: (n) => this.s.issues[String(n)]?.labels ?? [],
-    });
+    }).slice(0, frame);
     if (picks.length === 0) return [];
     this.meta.counters = this.meta.counters ?? this.zero();
     const sent: PmTarget[] = [];
@@ -1763,6 +1770,7 @@ export class Engine {
     const now = this.d.now();
     this.meta.tickAt = now;
     this.dirty = false;
+    this.tickPosted = 0;
     let gh: Gh | null = null;
     try {
       gh = await this.d.gh();

@@ -20,13 +20,16 @@ const live = (clock = { t: T0 }, env: Record<string, string> = {}) =>
 const gh = async (ctx: Ctx) => await (ctx.app.engine as any).d.gh();
 // wake が読むのは直近の plan (停止・保留・review-only) だけ。launch を通すと、停止行は通常の再着手 (picks) で先に投稿され、wake の検査にならない。
 // そこで launch は呼ばず、停止していない plan を直接置く。
-const planOk = (ctx: Ctx) => {
-  (ctx.app.engine as any).meta.lastPlan = { at: new Date(T0).toISOString(), picks: [], phase: { review_only: false }, stop: undefined, blocked: undefined };
+const planOk = (ctx: Ctx, room = 24) => {
+  (ctx.app.engine as any).meta.lastPlan = { at: new Date(T0).toISOString(), picks: [], phase: { review_only: false }, stop: undefined, blocked: undefined, room };
 };
 // 停止行 (run-outcome split) を 1 件作る。ラベルは既定で oc:no-pr。
-const stopped = async (ctx: Ctx, n: number, o: { labels?: string[]; atMin?: number; body?: string; prio?: string } = {}) => {
+// 直前の報告は『## 停止報告』の見出しで始まる (wake の対象の条件)。report: null で報告を書かない。
+const STOP_REPORT = "## 停止報告\n判断待ちです。次の一手: PM が方針を決めてください。";
+const stopped = async (ctx: Ctx, n: number, o: { labels?: string[]; atMin?: number; body?: string; prio?: string; report?: string | null } = {}) => {
   const labels = o.labels ?? ["oc:no-pr"];
   await send(ctx.app, "issues", issueEv(n, { labels, body: o.body }));
+  if (o.report !== null) await send(ctx.app, "issue_comment", commentEv(n, IMPL_BOT, o.report ?? STOP_REPORT, at((o.atMin ?? 10) - 1)));
   await send(ctx.app, "issue_comment", commentEv(n, IMPL_BOT, outcomeBody("split"), at(o.atMin ?? 10)));
   // PM の応答後 (猶予の明け) にして stopped_report に回す。
   await send(ctx.app, "issue_comment", commentEv(n, HUMAN, "<!-- oc-pm-decision: rule=skip reversible=yes -->\nPM 判断", at(0)));
@@ -61,6 +64,41 @@ test("正の対照: 素の停止行 (ラベル無し・子無し) は /oc で 1 
   await ctx.app.engine.wakeStopped(await gh(ctx));
   assert.equal(wakeTo(ctx.m.calls).length, 1, "素の停止行は起こす");
   assert.equal(wakeTo(ctx.m.calls)[0].url.includes("/issues/600/comments"), true);
+});
+
+test("ネガコン: 『## 停止報告』の見出しが無い停止行は wake しない (承認の『明確な停止報告』)", async () => {
+  const ctx = await live();
+  await stopped(ctx, 605, { labels: [], report: "作業を進めました。次は確認します。" });
+  await markFresh(ctx);
+  planOk(ctx);
+  await ctx.app.engine.wakeStopped(await gh(ctx));
+  assert.equal(wakeTo(ctx.m.calls).filter((c) => c.url.includes("/issues/605/")).length, 0, "見出し無しの停止行は起こさない");
+});
+
+test("稼働枠: wake は plan.room を超えない。room が 0 以下なら送らない", async () => {
+  const ctx = await live();
+  await stopped(ctx, 660, { labels: [] });
+  await stopped(ctx, 661, { labels: [], atMin: 20 });
+  await markFresh(ctx);
+  planOk(ctx, 1);
+  await ctx.app.engine.wakeStopped(await gh(ctx));
+  assert.equal(wakeTo(ctx.m.calls).length, 1, "room=1 なら 1 件だけ");
+  const ctx0 = await live();
+  await stopped(ctx0, 662, { labels: [] });
+  await markFresh(ctx0);
+  planOk(ctx0, 0);
+  await ctx0.app.engine.wakeStopped(await gh(ctx0));
+  assert.equal(wakeTo(ctx0.m.calls).length, 0, "room=0 なら送らない");
+});
+
+test("稼働枠: この tick で launch が使った分を引いてから wake する", async () => {
+  const ctx = await live();
+  await stopped(ctx, 663, { labels: [] });
+  await markFresh(ctx);
+  planOk(ctx, 1);
+  (ctx.app.engine as any).tickPosted = 1;
+  await ctx.app.engine.wakeStopped(await gh(ctx));
+  assert.equal(wakeTo(ctx.m.calls).filter((c) => c.url.includes("/issues/663/")).length, 0, "launch が枠を使い切ったら wake しない");
 });
 
 test("ネガコン: 子持ちの親は wake しない (detectPm が停止行から外す)", async () => {
