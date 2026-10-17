@@ -117,3 +117,21 @@ SC 集合 `sc.txt` (1 行 1 アドレス・21 行) は、`receiver_this_trace.py
 `python3 -c "import runpy,sys; sys.argv=['x','Serum2_win64.vst3','--vtable','0x180a2bf58']; g=runpy.run_path('receiver_this_trace.py', run_name='sc_export'); [print(hex(a)) for a in sorted(g['sc_closure']())]" 2>/dev/null | grep '^0x' > sc.txt` (`receiver_this_trace.py` の import 時の出力を除くため `grep '^0x'`)
 実行: `python3 arg_none_sc_judge.py join.tsv direct.tsv vt_ind.tsv sc.txt` 0.02 s・出力 md5 `7e3b713b…`。
 入力 md5 (`/tmp` の作業 dir・リポジトリ外): `join.tsv` `c762b72e…`・`direct.tsv` `b449ddd0…`・`vt_ind.tsv` `42bcf98b…`・`trace.tsv` `1e1f5500…` (§2 と一致)。
+
+## 6. SR-100 (#5986): vtable 候補の受け手の表 (RTTI) の確定 (未解決 (a) の入口)
+
+- 日付: 2026-10-17 / 親: #5612 / 本 issue: #5986。入力 PE の sha256 `501e7bb3…` / 19,236,864 B (§0 と一致・`plugins-serum2` から展開)。
+- 新規ツール: `vt_head_scan.py` (中間スロットの VA から表の先頭を後退探索し RTTI を付ける・静的・PE のみ)。
+- 実行: `python3 vt_head_scan.py Serum2_win64.vst3 0x180a1d8c8 0x180a1dc18 0x180a2bfd8`
+
+| 中間スロット VA | 表の先頭 | index | COL | RTTI |
+|---|---|---|---|---|
+| `0x180a1d8c8` | `0x180a1d848` | 16 | `0x180a1f460` | `.?AVEditController@Vst@Steinberg@@` |
+| `0x180a1dc18` | `0x180a1db98` | 16 | `0x180a1f690` | `.?AVEditControllerEx1@Vst@Steinberg@@` |
+| `0x180a2bfd8` | `0x180a2bf58` | 16 | `0x180a2c800` | `.?AVSerumController@@` |
+
+- 訂正 (§3 (a) の前提): `vtable_dump.py` で `RTTI=?` と出たのは、表の中間スロット (index 16) を先頭として渡したため。先頭は上表のとおり 16 slot 手前にある (`[head-8]` が COL)。
+- setter `0x18000e310` は 3 表とも index 16 (disp `0x80`)。`disasm_range.py` で、`[rcx+0x10]` に `rdx` を格納し、旧値 `[rax+0x10]` の vptr[2] を呼ぶ。
+- slot 16 (`[reg+0x80]`) の間接 call は PE 全体で 184 箇所・98 関数 (逆アセンブル走査・所属関数は `.pdata`)。受け手 object が上表 3 表のどれかは、この 184 箇所の受け手 reg を遡って判定する必要があり、本 run では未実施。
+- 受入 1 の件数: 変更なし (確定 0・非確定 308)。確定には、184 箇所の受け手 reg が指す object を上表 3 表のどれかに結ぶ処理が要る。
+- 未解決: (a') slot 16 の 184 箇所の受け手 object の表の判定 (#5986 残)。
