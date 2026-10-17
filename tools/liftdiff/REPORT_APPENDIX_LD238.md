@@ -83,3 +83,40 @@
 
 - **784520 の残り**: 修正後の segv は `call [rax+0xb8]` (VMT slot 23) 周辺と推定。`vmt2` の VMT は 8 slot (`LD_VMT_SLOTS = 8`) しか作られない。slot 23 に仮 proc 番地を書く試行 (probe の外で blob を差し替え) は `rip=0x50110000` で segv し、thunk が敷かれていない番地を指した。**slot 23 の仮 proc を敷くには `rt/ld_core.h` の `LD_VMT_SLOTS` 拡張が要る** (rt の変更は本 run では行わない)。
 - **未解決**: 784520 の VMT slot 23 (rt の仮 proc 域の拡張が要る) / 8e7e10 のグローバル 0x1599430 の初期化 / a965c0 のグローバル 0x15e2258 の初期化 / 6 関数の戻り経路の判定。起票先は [LD-238] #4423 (継続)。
+
+## 8. 追補 (784520 の VMT slot 23 を rt の仮 proc 域に拡張)
+
+- **測定 commit**: `d7ff728d8` (rt と cases の変更を含む最後の commit)。コード差分 (`git diff a34610a8b HEAD -- tools/liftdiff`) は `rt/ld_core.h` の `LD_VMT_SLOTS` 8→24 (と仮 proc 名配列) と `ldlib/cases.py` の `VMT_SLOTS` 8→24 の 2 箇所のみ。
+- **前提**: `targets/m11.json` の `ir` は #5886 以降 `work/ld288/boot3_40c420_tr.ll` を指す。素材 `work-liftdiff` 同梱の IR には無いため、`tests/ld288_40c420_xmm0.py` で `tools/m11/work/boot_final3.ll` から生成した (2.5 秒)。`liftdiff.py build targets/m11.json` は `sig_mismatch 0`・`undefined 0`。
+- **なぜ拡張が要るか**: 784520 は `call [rax+0xb8]` (VMT slot 23) を呼ぶ。`LD_VMT_SLOTS = 8` のままでは slot 23 の仮 proc thunk が敷けず、`rip=0x50110000` で segv していた (§7)。`LD_VMT_SLOTS = 24` で thunk が `LD_VMT_IDX0 + 23` まで敷かれる。VMT 域 (arena+0x2000〜+0x20C0) は vmt2 の内部オブジェクト (arena+0x3000) と重ならない。
+
+### 実測 (native・probe 2 本・測定 commit `d7ff728d8`)
+
+| 関数 | 実行 ok (前 §7) | 実行 ok (今回) | 失敗の内訳 |
+|---|---|---|---|
+| 668390 | 1/1 | 1/1 | — |
+| 6683d0 | 1/1 | 1/1 | — |
+| 784520 | 0/2 | **1/2** | arg0 ケース: addr 0x1 @ 0x50f666 (arg1 の整数 1 を ptr 扱い。arg0 は this 固定の試験設計上の失敗) |
+| 8e7e10 | 0/2 | 0/2 | addr 0x0 @ 0x8e7fbd (変化なし) |
+| a965c0 | 0/3 | 0/3 | fault 記録なし (変化なし) |
+
+回帰 `tests/ld211_fvm_probe.py` (同 commit): 45e1a0 系 6 件は 3/3 (変化なし)。784520 は 0/5 → 1/5。668390・6683d0 は 0/3 のまま (LD-211 §3 と同じ)。
+
+回帰テスト (native・wasm を含む build 後): `test_ld199_fvm_pin` / `test_ld200_struct_stub` / `test_ld203_slot_fill` / `test_ld253_point_arg_slot` / `test_ld259_patch_p` は全て PASS (rc=0)。
+
+### 8e7e10 / a965c0 のグローバルの位置 (逆アセンブル訂正)
+
+- §5 の「VA 0x1599430」は誤り。`objdump -d` で読むと、8e7e10 の fault 直前の命令 `mov rax,[rip+0xd11473]` は **VA 0x15f9430**。`.data` (0x13a5000〜) の外、`.bss` (0x15e6000〜) 相当の領域。
+- a965c0 の間接呼出し先 `mov rax,[rip+0xb4bc69]` は VA 0x15e2258 (§5 と一致)。こちらも `.bss` 相当。
+- 両方とも PE のセクションデータに値が無く、boot 後の値は `boot_state.json` の `img` に含まれるかを未確認。
+- 切り分け (作業用・未コミット): `p=i:<RVA>:q=<仮 VMT>` で 0x15f9430 に仮 VMT を入れると、`[rax+0x40]` を読んで `addr 0x40000400ba89` の segv になる。仮 VMT の slot 8 は仮 proc ではなく、別の VMT 構造が要る。a965c0 は 0x15e2258 に仮 proc を入れると `rip=0x40000400ba49` で segv (仮 proc のマーク値を実行してしまう)。**どちらも仮値の置き方が誤りで、正しい値 (boot 後の実値) が要る。**
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 784520 の arg1 ケース (整数 1 を ptr 扱い) | 試験設計 (arg 割当) の見直しが要る | [LD-238] #4423 (継続) |
+| 8e7e10 のグローバル VA 0x15f9430 (.bss) の実値 | 実行不能のまま | [LD-238] #4423 (継続) |
+| a965c0 のグローバル VA 0x15e2258 (.bss) の実値 (間接呼出し先) | 実行不能のまま | [LD-238] #4423 (継続) |
+| 6 関数の戻り経路 (rax・rdx・xmm0) の判定 | `ret_override` 未付与 | #4429 系 (LD-215・#5886 の別レーン) |
+| `liftdiff.py run` の `unsupported_sig` (float 引数の 784520 は wasm 比較の対象外) | wasm 側の比較は未実施 | [LD-238] #4423 (継続) |
