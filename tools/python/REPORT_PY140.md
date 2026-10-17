@@ -81,20 +81,22 @@
 
 ## 保留 (PE で確定できなかった点)
 
-- **ゲート**: 送出 leaf の入口に至る前に `0x60c220(obj, 0x57f, op, arg)` の戻り値 (> 0 で status 1) と `0x728f50` (mode bit 4) と `0xfdeaf0` (mode bit 0x20) がある。戻り値の値は未確定。`0x60c220` は `obj` の `vtbl+0x80` に委譲する汎用の問合せ (`0x60c22c`〜`0x60c24f`)。
-- **mode の源**: `0xfdd270` は `0x1542bec` (`.data` の定数表) を `vtbl+0x80` の戻り値で引き、`call 0x81c0a0` の戻り値が 0 のとき `or bl, byte ptr [rip+0xa]` (`0xfdd2a8`、対象 VA `0xfdd2b9`) を行う。表の添字の値域と `0x81c0a0` は未確定。
+- **ゲート**: 送出 leaf の入口に至る前に `0x60c220(obj, 0x57f, op, arg)` の戻り値 (> 0 で status 1) と `0x728f50` (mode bit 4) と `0xfdeaf0` (mode bit 0x20) がある。戻り値の値は未確定。`0x60c220` は `obj` の `[obj+0x80]` を直接呼ぶ汎用の問合せ (`0x60c22c`〜`0x60c24f`)。
+- **mode の源**: `0xfdd270` は `0x1542bec` (`.data` の定数表) を `vtbl+0x80` (`call [rax+0x80]`・`rax=[G+8]` の vtbl) の戻り値で引き、`call 0x81c0a0` の戻り値が 0 のとき `or bl, byte ptr [rip+0xa]` (`0xfdd2a8`、対象 VA `0xfdd2b9`) を行う。表の添字の値域と `0x81c0a0` は未確定。
 - **runtime の状態**: `rsi` (`0xfdd402` の `[rax+0xcc]` と比較する値) やゲート関数の対象 `obj` は runtime の状態。送出の成否はこの状態に依存する。
 
 ## PY-406 受入 1: `0x60c220` の戻り値条件
 
 - **確定した構造** (`pe_disasm.py 60c220`): `0x60c220` は `msg.Result` (`[rbp+0x38]`、初期値 0) を戻す。`[rbp+0x20]`=edx (0x57f)・`[rbp+0x28]`=r8・`[rbp+0x30]`=r9 を立てたあと、`obj` (`rbx`=rcx) が非 0 なら `call qword ptr [rbx+0x80]` を `rcx=[rbx+0x88]`・`rdx=&msg` で呼ぶ (`0x60c244`〜`0x60c24f`)。よって戻り値は呼ばれた先が `msg.Result` に書く値そのもの。
-- **未確定**: 呼ばれる先 (`[obj+0x80]`) の値。REPORT の旧記載「vtbl+0x80」は誤りで、`[obj+0x80]` を直接読む (VMT 経由ではない: `0x410090` の `call [rbx-0x38]` は VMT 経路)。この関数ポインタは obj のインスタンス状態で、PE 内の静的な書込み元が確定できない。
+- **未確定**: 呼ばれる先 (`[obj+0x80]`) の値。`[obj+0x80]` を直接読む (VMT 経由ではない: `0x410090` の `call [rbx-0x38]` は VMT 経路)。この関数ポインタは obj のインスタンス状態で、PE 内の静的な書込み元が確定できない。
 - **探索範囲と結果**: `analysis/flapi/pe_obj80_writers.py` が block00031_PE の実行可能 section を線形走査 (5,022,467 命令を復号)。`mov qword ptr [<非フレーム reg>+0x80], <src>` は 77 件。うち src が `lea reg,[rip+disp]` で `0x410090` を指すものは 0 件。`call 0x410090` の直接参照も 0 件。すなわち「`0x410090` が `obj+0x80` に入る」経路は静的な即値・rip 相対では見つからない。線形走査のため、間接 (レジスタ経由の複数段) の書込みは除外しきれない。
 - **結論**: 戻り値 ≤ 0 の条件は、`obj+0x80` の実行時の値 (呼び先) と、その呼び先が `msg.Result` に書く値で決まる。静的には確定できない。理由は上記の書込み元が PE から一意に決まらないことである。確定には実行時の trace (`obj`・`[obj+0x80]`・呼び先が書く `msg.Result`) が要る。
 
 ## 検証
 
-- 本 REPORT の数値は PY-246 の実装 commit `a0fc92492` (tools/python のコードを最後に変えた commit) で測定した。`9b57a83cd` 以降の差分は REPORT のみ。
+- 本 REPORT の 27 関数の数値 (送出 leaf・VK・修飾) は PY-246 の実装 commit `a0fc92492` で測定した。`a0fc92492`..`9b57a83cd` の差分は REPORT のみ。
+- 新節 (PY-406 受入 1) の数値 (`decoded=5022467 writes_to_nonframe+0x80=77`) は `pe_obj80_writers.py` を含む commit `70c323053` で測定した。この PR の commit が `tools/python` のコードに加えたのは `analysis/flapi/pe_obj80_writers.py` の追加 (63 行) のみ。`pe_ui_dispatch_probe.py` と `pe_disasm.py` は `a0fc92492` 以降変更なし。
+- `a0fc92492`..`70c323053` の `tools/python` の非 md 差分 (157 ファイル) は main 側 (`9b57a83cd`..`1e95ba237`) の取り込みで、この PR の変更ではない。
 - 解析 probe (`analysis/flapi/pe_ui_dispatch_probe.py`) の測定 commit は `ca104e569`。旧版の `cond()` は符号付き分岐 (`jle`・`jg`) を判定できず到達しない経路を出していたため、ca104e569 でフラグを演算幅から求めるように直した。以下の probe 出力は ca104e569 以降のコードによる。
 - 測定 commit `a0fc92492` (HEAD `9b57a83cd` と tools/python のコード同一) で実行したコマンドと結果:
 
@@ -110,7 +112,7 @@
 | `node tests/provider_check.mjs` | rc 1。§1 (表の整合) は通過し、件数は `{"functions":435,"implemented":220,"unimplemented":215,"mcp_static":60,"PASS":true}` (§1 のみを切り出して実行。rc 0)。§2 (エラー code) のアサートも通過。§3 で `work/midi.py` が無く ENOENT (`work/` は gitignore の素材置き場。`fetch_inputs.sh` 未実行)。受入 4・5 の未達は未解決表 (#4579) のとおり | — |
 
 - 修飾子 (`rdx`) の値: 上の出力では cut/copy/paste = 0x4、selectWindow の arg≤0 = 0x1、他 = 0x0。PE の静的値と一致。
-- 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff a0fc92492 HEAD -- tools/python ':!*.md'` の出力は 0 byte (コード差分 0。再測定は不要)。
+- 差分の証跡 (`docs/WORKFLOW.md` §6): 27 関数の表の測定 commit `a0fc92492` から HEAD までの `pe_ui_dispatch_probe.py`・`pe_disasm.py` の差分は 0 行 (`git diff a0fc92492 HEAD -- tools/python/analysis/flapi/pe_ui_dispatch_probe.py tools/python/analysis/flapi/pe_disasm.py` が 0 byte)。新節の測定 commit `70c323053` の差分は上の「検証」のとおり。
 - `FL_ENGINE=wasm node tests/all_tools.mjs` は本 PR では実行していない (受入 5 は子 #4579 で扱う)。
 
 ## 未解決

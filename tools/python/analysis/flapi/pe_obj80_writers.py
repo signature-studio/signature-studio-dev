@@ -54,7 +54,7 @@ def main():
             print(f"== {hex(va)} {op}")
             for a, m, o in ctx:
                 print(f"   {hex(a)} {m} {o}")
-    print("--- 0x410090 は 'call 0x410090' 直前の書込みとして:")
+    print("--- 全書込み (非フレーム reg の +0x80):")
     for va, op, ctx in hits:
         print(f"  {hex(va)} {op}")
 
