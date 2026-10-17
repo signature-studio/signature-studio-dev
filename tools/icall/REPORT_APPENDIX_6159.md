@@ -16,7 +16,7 @@
 | `--version` | `RetDec version: v5.0` | `RetDec version: v5.0` |
 | Commit hash | `53e55b4b26e9b843787f0e06d867441e32b1604e` | `53e55b4b26e9b843787f0e06d867441e32b1604e` |
 | Build date | 2022-12-08T10:13:13Z | 2026-10-17T14:38:52Z (再ビルド日時) |
-| ビルド型 | Release (上流既定) | Debug (`-g`) |
+| ビルド型 | 未確認 (素材の build 型は測定していない) | Debug (`CMAKE_BUILD_TYPE=Debug` を指定。`CMakeCache.txt` の値は未保存のため未確認) |
 | 入力 `/bin/true` の出力 C | sha256 `3fb49af7f60ec9a84cc230b2bbdd68ed4a3b3f63951f7e7b465deb73824b41fe` | 同じ |
 
 **版一致の範囲**: commit hash (`53e55b4b`) は一致。install tree 内の全バイナリ (`bin/*`) や `lib/*.a` との逐一比較は**未確認**。上流ソースからの再現 build で Release と Debug の差を取っただけで、素材 bundle が上流 `v5.0` から作られたかの完全な確認は「未確認」のまま (R7 ④)。
@@ -50,16 +50,35 @@
 - GCC 13 で必要な回避: `-include cstdint`。上流 v5.0 は GCC 7 前提 (`docker/Dockerfile` の `-DCMAKE_LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/`)。
 - `timeout` で make を止めると `Error 2` が連鎖表示されるが、ビルド失敗ではない (再実行で続きから進む)。
 
+## 3a. 測定 commit と差分 (WORKFLOW §6)
+
+- 測定 commit: `097225b74` (main)。ビルド対象の上流は `avast/retdec` `v5.0` = `53e55b4b26e9b843787f0e06d867441e32b1604e` (`git ls-remote` で確認)。
+- 検証起点 (本付録を書いた時点の PR head): `72bf22db2`。
+- `git diff 097225b74 72bf22db2 -- tools/icall docs/DOC_MAP.md --stat` の出力:
+
+```
+ docs/DOC_MAP.md                     |  1 +
+ tools/icall/REPORT_APPENDIX_6159.md | 65 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
+```
+
+- 同 diff の `docs/DOC_MAP.md` 部分は本 PR で追加した 1 行 (`tools/icall/REPORT_APPENDIX_6159.md` の索引行) のみ。コード (`tools/icall` 配下のスクリプト・ソース) の変更は 0 件。
+- 上流ビルドはリポジトリのコードを使わないため、`097225b74` 以降のコード差分は測定結果に影響しない (再測定不要)。
+
 ## 4. 残件 (#5115 受入 1 の前提が揃った後)
 
 - `getJumpTarget` が `Undefined` を返した値の確定 (Fresh Air 残落ち 6 件, `REPORT_APPENDIX_1844.md`)。これには debug build で `Decoder::resolvePseudoCalls()` (`decoder.cpp`) に入り、対象 6 件の SymbolicTree を確認する必要がある。本 run は版一致と build 手順までで、ここは未着手。
 - 再実行に使う入力は Fresh Air の対象 binary (`plugins-freshair`) が必要 (`oc_artifacts` は #5115/#4206 の依頼参照)。
 
-## 5. 再現
+## 5. 再現 (§3 で実際に通した手順のみ)
+
+`-DRETDEC_ENABLE_YARA=OFF` 等の yara 関連指定は §3 で実行していないため含めない (効果は未確認)。
 
 ```
 git clone --depth 1 --branch v5.0 https://github.com/avast/retdec.git src-retdec
 mkdir build-debug && cd build-debug
-cmake ../src-retdec -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-include cstdint" -DRETDEC_ENABLE_YARA=OFF -DRETDEC_COMPILE_YARA=OFF -Wno-dev
+cmake ../src-retdec -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-include cstdint" -G "Unix Makefiles" -Wno-dev
 make -j4 retdec-decompiler
 ```
+
+`-G "Unix Makefiles"` は §3 の対処 2 (Ninja から変更) に対応する。`make retdec-decompiler` の完了は §3 の表のとおり。
