@@ -1,8 +1,10 @@
 # FLE-51 (#6054): 0x4080a2 の rsi と 0x6b91e8 残骸の影響 (部分達成)
 
 > 親: #4426 (受入 1 の子)。前提: `REPORT_APPENDIX_4004.md` §6-b (残骸の読出し 17 件・読出し元は未特定)。
-> 測定 commit: `11771b9ad` (診断 `rsi_4080a2_probe.sh` を足した commit)。`rsi_zero_variant.sh` は同じ PR の別 commit。
-> 検証 HEAD: 本 PR の HEAD (commit 本文は PR を参照)。
+> 測定 commit: `11771b9ad` (コードを変えた最後の commit。既定経路のコードはこの commit で固定)。
+> 既定経路の測定 (§3・§4) はこの commit の `fle6_measure.sh`・`rsi_4080a2_probe.sh` で採った。
+> zero 変種 (§5) は `rsi_zero_variant.sh` を含む `2e7f70d6c` (同 PR の別 commit・このスクリプトを追加した commit) で採った。
+> 差分: §8 (`git diff 11771b9ad HEAD -- tools/flelift`)。
 
 ## 1. 結論
 
@@ -79,3 +81,14 @@ bash tools/flelift/boot/rsi_zero_variant.sh                  # base / zero の�
 ```
 
 素材: `oc_artifacts: fl-win64 toolchain-emsdk`。
+
+## 8. 測定 commit 以降の差分
+
+`git diff 11771b9ad HEAD -- tools/flelift` の結果 (新規 2 件のみ・既存の既定経路のコードは変更なし):
+
+```
+A	tools/flelift/boot/REPORT_APPENDIX_6054.md
+A	tools/flelift/boot/rsi_zero_variant.sh
+```
+
+`fle6_measure.sh`・`fle_boot.mjs`・`rt/`・`x64c.py`・`rsi_4080a2_probe.sh` は差分 0。
