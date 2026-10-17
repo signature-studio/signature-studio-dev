@@ -3,7 +3,7 @@
 - 日付: 2026-10-16 / 親: #4930 (SR-82) / 前段: `REPORT_SR60.md` (直接呼出元)・`REPORT_SR82.md` (vtable 候補・SC 内の受け手分類)
 - 範囲: 静的解析のみ。実 VSTGUI 上の動的確認は範囲外。
 - 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3`。sha256 `501e7bb3…` / 19,236,864 B (REPORT_SR82 と一致を確認)。作業用 dir はリポジトリ外。
-- 測定 commit: `9754af068` (origin/main。下の §4 に差分)。
+- 測定 commit: §2 の 4 ツールと `arg_row_join.py` は `9754af068` (origin/main)。§5 の判定は `11a0d21e5` (下の §4 に差分)。
 
 ## 0. 結論
 
@@ -91,9 +91,8 @@ trace の ARG / ARG-CHILD 行を、所属関数 F の証拠で分ける。直接
 
 ## 4. 測定 commit と差分
 
-- 測定 commit: `9754af068` (origin/main。§2 の 4 ツールと `arg_row_join.py` の出力は、この版の入力で得た)。
-- 測定 commit 以降の変更: `arg_row_join.py` (新規) と本 REPORT のみ。既存の測定ツールは変えていない。
-- 鮮度の証跡: `git diff --quiet 9754af068 HEAD -- tools/targets/serum2/gui/receiver_this_trace.py tools/targets/serum2/gui/arg_caller_types.py tools/targets/serum2/gui/arg_vt_indirect.py tools/targets/serum2/gui/arg_vt_args.py` は 0 (差分 0 バイト・終了コード 0)。`git diff 9754af068 HEAD -- tools/targets/serum2/gui` の stat は `REPORT_SR94.md` と `arg_row_join.py` の 2 ファイルのみ。
+- 測定 commit: §2 の 4 ツールと `arg_row_join.py` の出力は `9754af068` (origin/main) の入力で得た。§5 の判定は `11a0d21e5` (`arg_none_sc_judge.py` の修正 commit) で再測定した。
+- 鮮度の証跡: 測定ツール 4 本 (`receiver_this_trace.py` / `arg_caller_types.py` / `arg_vt_indirect.py` / `arg_vt_args.py`) は `git diff --quiet 9754af068 HEAD -- <4 本>` が 0 (差分 0 バイト・終了コード 0)。`arg_row_join.py` と `arg_none_sc_judge.py` は本 PR で新規。`tools/targets/serum2/gui` 全体の差分 (`git diff --name-only 9754af068 HEAD -- tools/targets/serum2/gui`) には main 側の他 PR の変更 (REPORT_APPENDIX_* / REPORT_SR37.md / classify_sr83_unresolved.py など) が含まれるため、鮮度の根拠にしない。
 
 ## 5. 証拠なし 236 行の SerumController 由来判定 (#5987)
 
@@ -113,7 +112,8 @@ trace の ARG / ARG-CHILD 行を、所属関数 F の証拠で分ける。直接
 - 判定の意味: 「SC 由来の証拠が無い」ことまでしか言えない。「呼出元なし」は、呼出元が見つからないことで、非 SC と確定したわけではない。よって、SC 由来の確定は 0 件、非 SC の確定も 0 件である。
 - 件数の検算: `vt_ind.tsv` の `n_sites_sc` 合計 19・`n_sites` 合計 118,222 は §2 と一致。
 
-測定 commit: `68c4a5b81` (本 PR で追加したのは `arg_none_sc_judge.py` と本 §5 のみ)。測定ツール (`receiver_this_trace.py` / `arg_caller_types.py` / `arg_vt_indirect.py` / `arg_vt_args.py`) の `9754af068` から HEAD までの差分は 0 バイト。
-SC 集合 `sc.txt` (1 行 1 アドレス・21 行) は `receiver_this_trace.py` を runpy で読み、`sc_closure()` の戻り値を書き出して作った (出力先はリポジトリ外)。
+測定 commit: `11a0d21e5` (`arg_none_sc_judge.py` の修正 commit)。測定ツール 4 本の `9754af068` から HEAD までの差分は 0 バイト。
+SC 集合 `sc.txt` (1 行 1 アドレス・21 行) は、`receiver_this_trace.py` を runpy で読み `sc_closure()` の戻り値を書き出して作る (出力先はリポジトリ外)。1 行コマンド:
+`python3 -c "import runpy,sys; sys.argv=['x','Serum2_win64.vst3','--vtable','0x180a2bf58']; g=runpy.run_path('receiver_this_trace.py', run_name='sc_export'); [print(hex(a)) for a in sorted(g['sc_closure']())]" 2>/dev/null | grep '^0x' > sc.txt` (`receiver_this_trace.py` の import 時の出力を除くため `grep '^0x'`)
 実行: `python3 arg_none_sc_judge.py join.tsv direct.tsv vt_ind.tsv sc.txt` 0.02 s・出力 md5 `7e3b713b…`。
 入力 md5 (`/tmp` の作業 dir・リポジトリ外): `join.tsv` `c762b72e…`・`direct.tsv` `b449ddd0…`・`vt_ind.tsv` `42bcf98b…`・`trace.tsv` `1e1f5500…` (§2 と一致)。
