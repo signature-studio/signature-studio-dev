@@ -106,6 +106,12 @@ window.__done = new Promise((resolveAll, rejectAll) => {
           const seg = [];
           for (let i = 0; i < n; i++) seg.push(Array.from(f2.subarray(i * 3, i * 3 + 3)));
           result.tl = { n, cols: ["notify_ms", "fill", "underruns", "wake", "cb0", "cb1", "wr"], rows, seg_cols: ["tb", "t0", "cb1"], seg };
+          // 待ち記録: out_wait の wait32 1 回ごとの [開始, 終了, rc] (rc 0=通知, 2=timeout, 1=値変化で即戻り)
+          const nw = M._flasio_wt_count();
+          const fw = new Float64Array(M.wasmMemory.buffer, M._flasio_wt_ptr(), 4096 * 3);
+          const waits = [];
+          for (let i = 0; i < nw; i++) waits.push(Array.from(fw.subarray(i * 3, i * 3 + 3)));
+          result.wt = { n: nw, cols: ["t0", "t1", "rc"], waits };
         }
         result.hb_gaps = window.__hb_gaps ?? [];
         // recs = worklet の直近 64 quantum: [p, rd, wr, wl, dms (前 quantum からの Date.now 差)]

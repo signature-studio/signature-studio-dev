@@ -191,6 +191,16 @@ static uint32_t g_tl_n;
 static double g_cb0, g_cb1, g_cb_tb, g_cb_t0;
 static double g_tl2[FLASIO_TL_N][3];
 double *flasio_tl2_ptr(void) { return &g_tl2[0][0]; }
+#define FLASIO_WT_N 4096
+static double g_wt[FLASIO_WT_N][3];
+static uint32_t g_wt_n;
+static void wt_note(double t0, double t1, int rc) {
+    if (g_wt_n >= FLASIO_WT_N) return;
+    double *r = g_wt[g_wt_n++];
+    r[0] = t0; r[1] = t1; r[2] = (double)rc;
+}
+double *flasio_wt_ptr(void) { return &g_wt[0][0]; }
+uint32_t flasio_wt_count(void) { return g_wt_n; }
 double *flasio_tl_ptr(void) { return &g_tl[0][0]; }
 uint32_t flasio_tl_count(void) { return g_tl_n; }
 /* 診断計装 (判定に使わない): fla_open 直後 (床と burst 拡張の後) の初期 depth。実行中の動的拡張で変わる前の値 */
@@ -308,7 +318,8 @@ ASIOError flasio_start(void) {
     fla_halt();
     fla_reset_indexes();
     A.stop = 0; A.ready = 0;
-    g_tl_n = 0;
+    g_tl_n = 0; g_wt_n = 0;
+    fla_wait_trace_hook = wt_note;
     A.grows = 0; A.shrinks = 0; A.T0 = A.T_max = A.depth * A.B;
     if (pthread_create(&A.th, NULL, thread_fn, NULL) != 0) return ASE_HWMalfunction;
     while (!__atomic_load_n(&A.ready, __ATOMIC_SEQ_CST))

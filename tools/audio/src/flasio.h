@@ -89,6 +89,8 @@ typedef struct {
 void flasio_get_stats(flasio_stats_t *s);
 /* 診断用 (判定に使わない): producer 周期の時系列。行 7 double = [notify_ms(worklet Date.now), fill, underruns, wake, cb0, cb1, wr] (epoch ms) */
 double *flasio_tl_ptr(void);
+double *flasio_wt_ptr(void);
+uint32_t flasio_wt_count(void);
 double *flasio_tl2_ptr(void);
 uint32_t flasio_tl_count(void);
 void flasio_configure(uint32_t depth, uint32_t latency_hint);   /* create_buffers 前のみ */
