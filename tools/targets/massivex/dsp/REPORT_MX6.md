@@ -191,12 +191,13 @@
 | 固定部が読めない entry (既知の画像外 2 件) | 2 |
 | UnwindMap entry (5,621 件・nextOffset の戻り先が state -1 (buffer 前) か entry 先頭) | 不整合 0 |
 | TryBlockMap entry (185 件・tryLow ≤ tryHigh ≤ catchHigh) | 不整合 0 |
-| IPtoStateMap entry (9,850 件) | **旧値 (修正前)**。分離 code の表を通常の IP map として読んでいた。下の再測定まで無効 |
+| IPtoStateMap entry (9,850 件) | 測定 (`eecfb86a9`・`plugins-massivex` md5 `622993e7`)。`ip_kind` は **全 2,542 行が `plain`**。`isSeparated` は全 fi で 0 (分離経路 `sep_*` は実 PE で 1 回も通らない) |
+| IP map 範囲外 | **11 行 (10 fi)**・全て `plain`・分離・非分離の別はなし |
 
-- **修正 (reviewer 指摘 1)**: 旧版 census は `isSeparated` を見ず、全 entry で dispIPtoStateMap を IP map として読んでいた。分離 code (isSeparated = 1) では dispIPtoStateMap は SepIPtoStateMap への RVA なので、上の 9,850 件・11 行は誤読を含む旧値である。現行の `ip_map_for` は SepIPtoStateMap の行を pdata の開始 RVA で選び、その dispOfIPMap を IP map として検査する。分離・非分離の件数は census の `ip_kind` / `ip_out_of_range_by_kind` に出る。
-- **再測定は未実施**: 入力の `Massive X.vst3` (`plugins-massivex`) が本 run の `$ARTIFACTS_DIR` に無いため。修正後の IP map の数値はまだ無く、「11 行は符号化の誤りか」の判定はできていない。**未解決**。
-- 修正前の 4 件 (fi+9 / fi+27) の位置計算は、現行スクリプトの census 出力 `ip_out_of_range_detail` (`dispIPtoStateMap_at_fi_plus` を含む) から再現する (旧版は `mx6_fh4.py` の未使用の `ptr_after` で計算していた)。
-- 受入 1 の判定: 符号化そのものは一次資料どおり復号し、unwind / try は全件整合。IP map の 11 行を切り分けるまで「確定」とは書かない → `Refs #4787`。
+- 分離経路 (`ip_map_for` の SepIPtoStateMap 読み) は selftest の合成ケース (`sep_match` / `sep_nomatch`) でのみ検証した。実 PE の 11 行は分離 code 由来ではない。
+- 11 行の内訳 (`ip_out_of_range_detail`): `dispIPtoStateMap_at_fi_plus` は fi+1 が 1 件、fi+5 が 7 件、fi+9 が 3 件、fi+27 は 0 件。修正前の記述にあった「4 件 (fi+9 / fi+27)」は現行 census から再現できないため取り消す。
+- 再現: `python3 scripts/mx6_fh4_cint.py --selftest` と `python3 scripts/mx6_fh4_cint.py "$PE" "$RUNNER_TEMP/fh4_cint.json"` (`$PE` = `plugins-massivex` の `Massive X.vst3`)。
+- 受入 1 の未解決: 11 行の原因は未特定 (符号化の誤りかは未判定)。「確定」とは書かない → `Refs #4787`。
 
 ## 9. MX-39 (#3776): 付録へ分割移動
 
