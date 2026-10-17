@@ -114,6 +114,7 @@
 - IR: 既定 `b202c157a80807f2`、`M11_M2R=1` `325b086322a29aee`。IR 差分は 24 行 (`diff` の変更行 48 = 両側)。build はどちらも rc 0 (wasm 6,033,657 B)。
 - unit 結果 (既定 = `M11_M2R=1`): 通常起動 units_run 109・skipped 5・icall_ok 435・icall_miss 7・init_count 111・boot_stage 1、survey ok 873、寛容起動 ok 871・icall_ok 2131。`image_va_words_new` は run 69721・survey 70977・寛容 72042 で両条件とも同じ。
 - 観測: 同じ `M11_M2R=1` の build を手動で走らせた 1 回だけ survey 70979・寛容 72044 (+2) が出た。その後の 4 回 (スクリプト 1 回・手動 3 回) は 70977 / 72042 で、再現しなかった。原因は未確定。
+- 測定 commit: `ef0a11d6d` (スクリプトを入れた commit)。同 HEAD で `unit_before_after_4498.sh` を再実行し、上の値が再現 (rc 0・所要 3 分 49 秒・load 0.58→1.09・4 vCPU)。
 - 結論: `M11_M2R=1` で unit の結果は変わらない。既定は OFF のまま (本番 IR を変えるのは PM 判断)。
 - 注: `m11_e2e.sh` 全体は回していない。`lift_pe.sha256` が素材に無く、全再生成 (Ghidra + RetDec) に入るため。
 
