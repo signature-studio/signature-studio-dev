@@ -199,7 +199,7 @@ static const char* knownVtableName(uint32_t rva) {
 
 static uintptr_t gDllBase = 0;
 
-// S2HOST_BP="rva,rva,..." (SR-99 #5958・最大 4 件): DR0〜DR3 の execute breakpoint を DLL の関数先頭に張り、
+// S2HOST_BP="rva,rva,..." (SR-99 #5958・最大 4 件): DR0〜DR3 の execute breakpoint を DLL の関数先頭 (S2HOST_BP) または call 命令位置 (S2HOST_BPCALL) に張り、
 // 呼出し時の RIP・戻り先・slot 値を記録する。関数が呼ばれたかどうかだけを見る (クリック注入はしない)。
 static uintptr_t gBpAddr[4];
 static int gBpN = 0;

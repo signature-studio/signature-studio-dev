@@ -1,7 +1,7 @@
 # REPORT 付録 — SR-99 (#5958) slot `0x1817bf760` の runtime 観測
 
 - 親: #5957 (SR-98)。前段: `REPORT_APPENDIX_5935.md` §2.1・§4 (slot 由来 5 箇所・PE 上 WRITE 0 件・READ 289 件)。
-- 日付: 2026-10-16 / 測定 commit (コードを変えた最後の commit): `b32db38c6`。
+- 日付: 2026-10-16 / 測定 commit (コードを変えた最後の commit): `6846baa18` (host コード変更は `b32db38c6`〜`6846baa18` の間に 188 行追加)。§2 の表は `b32db38c6`、§2e は `d1e3cab19`、§2f は `6846baa18` で測定した (節ごとの commit は各節に書く)。
 - 入力: `Serum2_win64.vst3` (sha256 `501e7bb3…5283` / 19,236,864 B、`ref_content.sh` で展開し sha256 一致を確認)。`Serum2_win64.authstub.vst3` は `license/authstub/mpatch.py` で作成 (原 bytes 照合 6/6 OK)。
 - 観測手段: `host/vst3host.cpp` (wine64 9.0 / mingw-w64 上の最小 VST3 host、SR-1 資産)。`S2HOST_SLOT=1` で DR0 に slot の 8 byte 書込 watch を張る (DR7 LEN=10b。slot は 8 byte の関数ポインタで、`0x17bf760` は 8 byte 境界)。`[slot]` 行は watch と同じ 8 byte (`long long`) で読む。`S2HOST_WATCH` の controller +0x10c watch は従来どおり 4 byte (LEN=11)。
 - **測定の範囲**: §2 の表は測定 commit `b32db38c6` (watch 8 byte・DR7 LEN=10b) の値。修正前の `71c51d3d5` (4 byte watch) の値は残していない。
@@ -99,10 +99,13 @@
 - 目的: §2e の残件。slot 由来 call 命令の位置で実行の有無を見る。
 - 変更: `host/vst3host.cpp` に `S2HOST_BPCALL="rva,…"` (最大 4 件・armBp と同じ DR 配列) を追加。`[bp]` 行に rax・r10 を追加。`S2HOST_BP`・`S2HOST_BPCALL`・`S2HOST_SLOT`・`S2HOST_WATCH` の同時指定は起動時に拒否する。
 - 対象 RVA (逆アセンブルで確定。`call` 命令の先頭): `0x136ca7` (`call r10`)・`0x136ce8` (`call r10`)・`0x136d1d` (`call rax`)・`0x1381d8` (`call rax`)。各命令の直前は `mov reg,[0x17bf760]`・`test`・`je` (null チェック)。
+- 測定 commit: `6846baa18` (= HEAD)。`git diff 6846baa18 HEAD -- tools/targets/serum2/host` の出力は 0 行 (差分 0)。
 - 測定: 無改変 DLL・既定 state・4 block・`S2HOST_ATTACH=1 S2HOST_BPCALL="136ca7,136ce8,136d1d,1381d8"`・xvfb-run・`/usr/lib/wine/wine64` (wine 9.0)。
   - 結果: `[bp] armed 4 execute breakpoints`。call 命令 4 箇所の hit は **0 件**。完走 `blocks=4 frames=512 nonzero_cells=1020/1024 peak=0.548306`。
-- 対照 (同じ DLL・同じ run 条件): `S2HOST_BP="136bf0"` (関数入口) は 9 件 hit。hit 時の slot は全て 0 (rax・r10 も slot 由来でない値)。よって bp 機構は動いている。
-- 解釈: slot=0 のとき `test; je` で call を飛ばす。入口 9 件はすべて slot=0 で、slot≠0 の hit は 0 件。call 命令 bp が 0 件なのは、この条件では slot 由来の call が**実行されていない**ことと整合する。ただし `je` の分岐先を直接見ていないため、「飛ばされた」の直接確認ではない。
+- 対照: `S2HOST_BP="136bf0"` (関数入口) の 9 件 hit は §2e (測定 commit `d1e3cab19`) の値で、§2f では再実行していない。§2e の hit 時 slot は全て 0。
+  - 撤回: 以前の版の「hit 時の rax・r10 も slot 由来でない値」は、値を REPORT に記録していなかったため根拠が無い。撤回する。rax・r10 の値は本節では主張しない。
+  - 注記: 本節の測定時のログは REPORT に保存していない (`[bp]` 行の rax・r10 は未記録)。
+- 解釈: slot=0 のとき `test; je` で call を飛ばす可能性がある。§2e の入口 hit では slot はすべて 0 だが、§2f は call 命令位置の slot 値を記録していないため、slot≠0 の call が無いことは確定していない。call 命令 bp が 0 件なのは、この条件で call 命令が実行されなかったことと整合するが、`je` の分岐先を直接見ていないため「飛ばされた」の直接確認ではない。
 - 残件: `je` 分岐先 (`0x136cae`・`0x136cef`・`0x1381ef` 等) への bp で「null で飛ばされた」を直接確定する。XferOnOffButton の操作を伴う条件は未測定。
 
 ## 3. 判定と未達
