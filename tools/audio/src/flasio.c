@@ -186,7 +186,9 @@ static void seg_note(int k, double us) {
 #define FLASIO_TL_N 2048
 static double g_tl[FLASIO_TL_N][7];
 static uint32_t g_tl_n;
-static double g_cb0, g_cb1;
+static double g_cb0, g_cb1, g_cb_tb, g_cb_t0;
+static double g_tl2[FLASIO_TL_N][3];
+double *flasio_tl2_ptr(void) { return &g_tl2[0][0]; }
 double *flasio_tl_ptr(void) { return &g_tl[0][0]; }
 uint32_t flasio_tl_count(void) { return g_tl_n; }
 
@@ -196,8 +198,10 @@ static void do_buffer(int idx) {
     g_cb0 = fla_now_ms();
     if (A.nIn) fla_in_read(A.ibuf[idx], A.B);       /* 入力 buffers[idx] を更新してからコールバック */
     double tb = emscripten_get_now();
+    g_cb_tb = fla_now_ms();
     for (int ch = 0; ch < A.nOut; ch++) memset(A.obuf[idx][ch], 0, A.B * sizeof(float));
     double t0 = emscripten_get_now();
+    g_cb_t0 = fla_now_ms();
     if (A.use_timeinfo) {
         ASIOTime t;
         memset(&t, 0, sizeof t);
@@ -280,6 +284,8 @@ static void *thread_fn(void *arg) {
         do_buffer(idx); idx ^= 1;
         double td = fla_now_ms();
         if (g_tl_n < FLASIO_TL_N) {
+            double *r2 = g_tl2[g_tl_n];
+            r2[0] = g_cb_tb; r2[1] = g_cb_t0; r2[2] = g_cb1;
             double *r = g_tl[g_tl_n++];
             r[0] = (double)LD(c->notify_ms); r[1] = fill; r[2] = LD(c->underruns);
             r[3] = tl_wake; r[4] = g_cb0; r[5] = g_cb1; r[6] = td;

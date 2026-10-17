@@ -57,11 +57,31 @@ underrun を基準 (0 ms) とした相対時刻。
 読み (n=1: L9 のみ、計装途中版での 1 回。HEAD `6b5ddfd22` の 6/6 PASS とは別の試行): producer の wake 間隔は 62.5 ms。直近 61 ms では worklet に停止は見られない (最大 13 ms)。ただし直近 64 quantum (約 171 ms 分) には worklet の 41 ms の quantum 間隔が 1 つあり、その位置は未確認のため、停止の時間帯との重なりは言えない。したがって停止の主体は未確定。producer が OS に preempt されたのか、`wait32` の返りが遅れたのかは、記録点が wake と書き込み完了の 2 点のみのためこの計装では区別できない。
 L9 では producer の wake 間隔 62.5 ms に加えて、-139.9 ms の 41.7 ms gap もあった。consumer の 41 ms と時刻は一致しない。
 
+## 3-2. 段別計装後の再測定 (本 run・受入 1 の JS 側 bufferSwitchTimeInfo 時刻)
+
+計装: `do_buffer` に `tb` (memset 直前)・`t0` (memset 直後 = ホスト `bufferSwitchTimeInfo` 呼出し直前)・`cb1` (呼出し直後) の epoch ms を `flasio_tl2_ptr` で追加 (判定に使わない)。
+測定: `yes` × 4 (PID 指定で停止)・`run_com.mjs --only com_ramp_b256_d2`。
+
+| 試行 | 結果 | 備考 |
+|---|---|---|
+| r6037_a (段別計装前) | FAIL: underruns=1 silence=3968・cb_max 100450 µs | 停止の時間帯 [-20, +80] ms で do_buffer の span が 100 ms。main thread の gap 無し |
+| r6037_b・c1・c2・c3 | 4/4 PASS | underruns 0 |
+| r6037_d1 | FAIL: underruns=1 | 下記 |
+| r6037_d2〜d5 | 4/4 PASS | underruns 0 |
+
+- r6037_a (段別計装前・underrun 0 ms 基準): wake = cb0 = -20.0 ms、cb1 = wr = +80.5 ms。do_buffer の span は 100.5 ms で `cb_max_us` (100450 µs) と一致する。`cb_max_us` は `t0`〜`t1` (クロック読取り + ホスト `bufferSwitchTimeInfo` 本体) の区間なので、**この 1 例の停止は JS 側 bufferSwitchTimeInfo の区間の中で起きた**。ただし段別の記録が無いため、クロック読取り・ホスト本体・OS preempt のどれかは区別できない。
+- r6037_d1 (underrun 0 ms 基準): 直前の producer 書き込みは -38.5 ms、次の wake は +17.4 ms (wake 間隔 55.9 ms)。wake 以降の `tb`・`t0`・`cb1`・`wr` はすべて 17.4 ms で、**do_buffer の中の span は 0 ms**。区間 [-38.5, +17.4] は callback の外 (`wait32` 中か、OS に preempt されていた)。
+- 2 例で停止の位置が違う (a: callback 内側の 100 ms、d1: callback の外側の 55.9 ms 間隔)。どちらも仕事量の計装では説明できず、preempt の可能性が残る。
+- 「wake の遅れ」と「wake 後に実行を得られなかった」は、`tl_wake` と `cb0` が同一時刻のため区別できない。
+- worklet の直近 64 quantum の `dms` 最大 38 ms は位置が未確定 (wake 間隔の窓 [-38.5, +17.4] と一致しない)。
+- main thread heartbeat: 停止の時間帯の gap は無し (d1 の gap 51〜94 ms は underrun より 2.4〜2.7 s 前)。
+
 ## 4. 結論と未解決 (#6037 受入)
 
-- **停止の主体**: 未確定。n=1 (計装途中版) では producer の wake 間隔 62.5 ms、直近 61 ms では worklet に停止なし。171 ms 窓の worklet 41 ms 間隔は位置未確定のため、停止の主体は決められない。
-- **直接経路**: 特定できなかった。「wasm スレッドの preempt」か「producer が wake 後に実行を得られなかった」かは、今の計装では区別できない (区間内に記録点が無い)。
-- **受入 1 (#6037)**: 部分達成。wasm 側 (producer) の時系列と worklet/main の時系列は同じ epoch ms で記録した。JS 側 bufferSwitchTimeInfo の呼出し時刻は未計装 (producer `cb0`/`cb1` で代替)。
+- **停止の主体**: 未確定。停止 2 例 (計装途中版 L9 / 段別計装版 d1) はいずれも producer の書き込み間隔が 55〜62 ms で、worklet の同時刻の停止は確認できていない。停止の位置は 2 例で異なる (a: JS 側 bufferSwitchTimeInfo の区間内 100 ms、d1: 区間外の wake 間隔 56 ms)。
+- **直接経路**: 特定できなかった。区間 a の 100 ms が「クロック読取り・ホスト本体の実行遅延」か「OS の preempt」かは、段別の記録が無い a では区別できない。d1 は callback の外側 (`wait32` 中) で、wake の遅れと wake 後の実行待ちは `tl_wake` = `cb0` のため区別できない。
+- **受入 1 (#6037)**: 部分達成。wasm 側 (producer) と worklet/main の時系列は同じ epoch ms で記録した。JS 側 bufferSwitchTimeInfo の呼出し時刻は、段別計装 (`tb`・`t0`・`cb1`) で記録できるようになった (d1 で確認)。
+- **HEAD での再現頻度**: 負荷下 (`yes` × 4) で b・c1〜c3・d2〜d5 の 8 回は PASS、a と d1 の 2 回で 1 underrun ずつ。計 10 回で 2 回 (20%)。段別計装版の試行は d1 (FAIL 1/5)。
 - **未解決**:
   - 負荷下の失敗頻度が測定ごとに揺れる (計装途中版で 3/12、HEAD で 0/6)。母数が小さく、HEAD での再現は未確認。
   - JS 側 bufferSwitchTimeInfo の独立した呼出しログは追加していない (上記)。
