@@ -34,6 +34,7 @@ static struct {
     int use_timeinfo, notify_lat;
     uint32_t seg_max_us[4];                 /* do_buffer 区間の最大 µs: in_read / memset / bufferSwitch 本体 / out_write */
 } A = { .sr = 48000.0, .depth = 2, .hint = 0 };
+static uint32_t g_open_depth;   /* 診断計装: fla_open 直後の実効 depth */
 
 static void wake32(uint32_t *a) { __builtin_wasm_memory_atomic_notify((int *)a, 0x7fffffff); }
 
@@ -154,6 +155,7 @@ ASIOError flasio_create_buffers(ASIOBufferInfo *infos, ASIOLong n, ASIOLong buff
     if (orc == FLA_E_BURST_TOO_LARGE) return ASE_NoMemory;   /* FL: "Couldn't create the streaming ASIO buffer." (ホストは落とさない) */
     if (orc != 0) return ASE_NotPresent;
     A.depth = fla_ctl()->depth;                 /* burst に合わせて自動拡張された実効 depth */
+    g_open_depth = A.depth;
     for (int b = 0; b < 2; b++) {
         for (int ch = 0; ch < nOut; ch++) A.obuf[b][ch] = calloc(A.B, sizeof(float));
         for (int ch = 0; ch < nIn; ch++) A.ibuf[b][ch] = calloc(A.B, sizeof(float));
@@ -191,6 +193,8 @@ static double g_tl2[FLASIO_TL_N][3];
 double *flasio_tl2_ptr(void) { return &g_tl2[0][0]; }
 double *flasio_tl_ptr(void) { return &g_tl[0][0]; }
 uint32_t flasio_tl_count(void) { return g_tl_n; }
+/* 診断計装 (判定に使わない): fla_open 直後 (床と burst 拡張の後) の初期 depth。実行中の動的拡張で変わる前の値 */
+uint32_t flasio_open_depth(void) { return g_open_depth; }
 
 static void do_buffer(int idx) {
     fla_ctl_t *c = fla_ctl();
