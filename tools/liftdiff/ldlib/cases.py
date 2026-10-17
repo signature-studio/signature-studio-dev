@@ -29,7 +29,8 @@ def make_blob(seed, size=BLOB_SIZE, pfrac=0.30):
 BLOBS = {'r1': (101, 0.30), 'r2': (202, 0.30), 'r3': (303, 0.30), 'r4': (404, 0.85)}
 
 
-VMT_SLOTS = 24  # rt/ld_core.h LD_VMT_SLOTS と一致させる (LD-238: 784520 の slot 23 まで)
+VMT_SLOTS = 8  # 既存 blob (vmt/vmt2/vmtf) の VMT 充填数。変えると既存測定の入力が変わる (LD-238)
+VMT_SLOTS_WIDE = 24  # rt/ld_core.h LD_VMT_SLOTS と一致させる。blob vmt24 専用 (LD-238: 784520 の slot 23 まで)
 LD_VMT_IDX0 = 1024  # rt/ld_core.h LD_VMT_IDX0 (GetProcAddress の index 0..1023 と別域)
 LD_FAKEPROC_BASE = 0x50010000
 LD_FAKEPROC_SZ = 32
@@ -51,14 +52,14 @@ def make_blob_vmt(size=BLOB_SIZE):
     return bytes(buf), [0x1000]
 
 
-def make_blob_vmt2(size=BLOB_SIZE):
+def make_blob_vmt2(size=BLOB_SIZE, nslots=VMT_SLOTS):
     """LD-238 (#4423): 2 段の this 疑似オブジェクト。arena+0x1000 の this の +8 に内部オブジェクト (arena+0x3000) を置き、その先頭に VMT (arena+0x2000) を置く。
     668390 / 6683d0 は [this+8] の先頭 qword を VMT として [VMT+0x20] を間接呼出しするため、this+8 が要る。VMT slot は make_blob_vmt と同じ仮 proc。"""
     buf = bytearray(size)
     buf[0x1000:0x1008] = (0x2000).to_bytes(8, 'little')
     buf[0x1008:0x1010] = (0x3000).to_bytes(8, 'little')
     buf[0x3000:0x3008] = (0x2000).to_bytes(8, 'little')
-    for k in range(VMT_SLOTS):
+    for k in range(nslots):
         buf[0x2000 + 8 * k:0x2000 + 8 * k + 8] = (LD_FAKEPROC_BASE + (LD_VMT_IDX0 + k) * LD_FAKEPROC_SZ).to_bytes(8, 'little')
     return bytes(buf), [0x1000, 0x1008, 0x3000]
 
@@ -73,7 +74,12 @@ def make_blob_u16(size=BLOB_SIZE):
     return bytes(buf), []
 
 
-SPECIAL_BLOBS = {'vm': make_blob_vm, 'vmt': make_blob_vmt, 'vmt2': make_blob_vmt2, 'u16': make_blob_u16}
+def make_blob_vmt24(size=BLOB_SIZE):
+    """LD-238 (#4423): make_blob_vmt2 と同じ 2 段 this で、VMT slot を 24 (slot 23 まで) 埋める。784520 専用 (call [rax+0xb8])。既存 blob の入力は変えない。"""
+    return make_blob_vmt2(size, nslots=VMT_SLOTS_WIDE)
+
+
+SPECIAL_BLOBS = {'vm': make_blob_vm, 'vmt': make_blob_vmt, 'vmt2': make_blob_vmt2, 'vmt24': make_blob_vmt24, 'u16': make_blob_u16}
 
 # (name, ptr 位置集合, blob, ptr オフセット加算)
 PATTERNS = [

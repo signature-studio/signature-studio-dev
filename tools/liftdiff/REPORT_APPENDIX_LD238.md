@@ -120,3 +120,15 @@
 | a965c0 のグローバル VA 0x15e2258 (.bss) の実値 (間接呼出し先) | 実行不能のまま | [LD-238] #4423 (継続) |
 | 6 関数の戻り経路 (rax・rdx・xmm0) の判定 | `ret_override` 未付与 | #4429 系 (LD-215・#5886 の別レーン) |
 | `liftdiff.py run` の `unsupported_sig` (float 引数の 784520 は wasm 比較の対象外) | wasm 側の比較は未実施 | [LD-238] #4423 (継続) |
+
+## 9. 追補 (review 差し戻し: 既存 blob の入力変化を解消)
+
+- **指摘**: `VMT_SLOTS` 8→24 (§8 の `cases.py` 変更) は `make_blob_vmt` / `make_blob_vmt2` / `make_blob_vmtf` の全部に効き、既存 blob `vmt` / `vmt2` / `vmtf` の slot 8〜23 の入力が 0 埋めから仮 proc 番地に変わっていた。既存の fvm 42 件・691dd0 の vmo・ld211・ld259 の測定が古くなる。
+- **修正**: `cases.VMT_SLOTS` を 8 に戻す。24 slot の blob `vmt24` (`make_blob_vmt2(nslots=VMT_SLOTS_WIDE)`) を `SPECIAL_BLOBS` に足し、`tests/ld238_probe.py` の 5 関数はすべて `vmt24` を使う。`rt/ld_core.h` の `LD_VMT_SLOTS` 24 は変えない (仮 proc 域は 24 のまま)。
+- **入力の同一性 (実測・Python で blob バイトを比較)**:
+  - 旧 `a34610a8b` (`ldlib/cases.py` 変更前) と HEAD で `vm` / `vmt` / `vmt2` / `u16` / `vmtf` は sha256 一致 (5 件とも `same`・`VMT_SLOTS` 8 と 8)。既存 blob の入力は元に戻った。
+  - `vmt24` は `d7ff728d8` の `make_blob_vmt2` (24 slot) とバイト一致 (`True`)。旧 §8 の測定入力と同じ。
+  - `vmt24` と `vmt2` の差は qword 16 件 (オフセット 0x2040〜0x20b8 = slot 8〜23)。slot 23 は `LD_FAKEPROC_BASE+(LD_VMT_IDX0+23)*LD_FAKEPROC_SZ` を指す。
+- **回帰 (HEAD・実測)**: `tests/test_ld207_obj_pattern.py` PASS (rc=0)。
+- **未実行 (正直に記録)**: 本 run の作業ツリーには `tools/liftdiff/work/` (m11 IR `work/ld288/boot3_40c420_tr.ll`・`work/m11/boot_state.json`) が無く、`ld_native` のビルドと `ld238_probe.py` が走らない。ld199・ld200・ld203・ld253・ld259・ld211・ld238 probe の HEAD 実測は未実施。§8 の数値は `d7ff728d8` (入力バイトは `vmt24` と同一) の測定で、HEAD 上の再測定ではない。
+- **測定 commit**: §8 の実測は `d7ff728d8`。§9 は入力バイトの同一性 (上記) の確認で、HEAD 上の probe 再測定はしていない。`git diff d7ff728d8 HEAD -- tools/liftdiff/ldlib tools/liftdiff/tests` は `cases.py`・`ld238_probe.py` の 2 ファイルのみ。
