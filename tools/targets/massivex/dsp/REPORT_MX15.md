@@ -49,7 +49,7 @@
 - 再現: `mx_unres_residual.py` の 2 件以上 32 件を、同じ判定 (redo の `plain_ok` / `chain_ok`) で再抽出した。`pairs 32`・`n2 32` (全件 ok 2 候補)。
 - 候補間の比較 (32 pair): `same_ver` 32 / `same_cnt` 32 / `same_flags` 31 / `same_codes` 31 / `same_prolog` 29 / UNWIND_INFO バイト列 `same_uwind` 26。`diff_sec` は 32 件すべて。
 - 32 件中 26 件は UNWIND_INFO のバイト列が完全一致 (同一内容が 2 つの section に載る)。残り 6 件も差は flags / prolog / codes の数項目。
-- 読み取り: 32 件すべてで異なる欄は section 名のみ。section 名 (`.qtmimed` 31 / `.pdata` 1 と `.xdata` の組) で選ぶ規則は、どちらが正かの根拠が無いため採らない。**既存の規則 (mx10 / plain) では 2 件を区別できないことを実測で示した** (受入 2 達成)。
+- 読み取り: section 名は 32 件すべてで異なる。UNWIND_INFO が完全一致するのは 26 件で、残り 6 件は flags / prolog / codes のいずれかが異なる。section 名 (`.qtmimed` 31 / `.pdata` 1 と `.xdata` の組) で選ぶ規則は、どちらが正かの根拠が無いため採らない。**既存の規則 (mx10 / plain) では 2 件を区別できないことを実測で示した** (受入 2 達成)。
 - 検証 (commit `d4ba65dc4`・n=1): `e2e.sh` rc 0 / `OK elapsed=22s` / load 0.56 0.52 0.24 → 0.71 0.56 0.26 (受入 3 の e2e)。`negctl.sh` rc 0 / 9 s / NC1 insns 3118 unsup 5 → FAIL<期待>、NC2 insns 4575 unsup 285 → FAIL<期待>、NC3 insns 31 unsup 0 → FAIL<期待>。
   - §4 で未解決としていた NC2 unsup の差 (292 と MX12 の 746) は、本 run で 285 (同 PE・同 commit の 2 回目も 285 で再現)。3 件の判定は全 run で FAIL<期待>。
 - 入力: `plugins-massivex` を `work/` に展開し、`Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` を再現 (95,356,824 B)。
