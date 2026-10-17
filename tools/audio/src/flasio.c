@@ -192,12 +192,12 @@ static double g_cb0, g_cb1, g_cb_tb, g_cb_t0;
 static double g_tl2[FLASIO_TL_N][3];
 double *flasio_tl2_ptr(void) { return &g_tl2[0][0]; }
 #define FLASIO_WT_N 4096
-static double g_wt[FLASIO_WT_N][5];
+static double g_wt[FLASIO_WT_N][6];
 static uint32_t g_wt_n;
-static void wt_note(double t0, double t1, int rc, uint32_t fill, uint32_t max_fill) {
+static void wt_note(double t0, double t1, int rc, uint32_t fill, uint32_t max_fill, uint32_t fill1) {
     if (g_wt_n >= FLASIO_WT_N) return;
     double *r = g_wt[g_wt_n++];
-    r[0] = t0; r[1] = t1; r[2] = (double)rc; r[3] = (double)fill; r[4] = (double)max_fill;
+    r[0] = t0; r[1] = t1; r[2] = (double)rc; r[3] = (double)fill; r[4] = (double)max_fill; r[5] = (double)fill1;
 }
 double *flasio_wt_ptr(void) { return &g_wt[0][0]; }
 uint32_t flasio_wt_count(void) { return g_wt_n; }

@@ -151,7 +151,7 @@ const fla_layout_entry_t *fla_layout_offsets(int *count);
 
 /* ---- core API (flaudio.c) ---- */
 fla_ctl_t *fla_ctl(void);                 /* 静的コントロールブロック (JS へは fla_ctl_ptr で公開) */
-extern void (*fla_wait_trace_hook)(double t0, double t1, int rc, uint32_t fill, uint32_t max_fill); /* 診断 (判定に使わない): out_wait の wait32 記録 */
+extern void (*fla_wait_trace_hook)(double t0, double t1, int rc, uint32_t fill, uint32_t max_fill, uint32_t fill1); /* 診断 (判定に使わない): out_wait の wait32 記録。fill1 = 返り時 fill */
 uintptr_t  fla_ctl_ptr(void);
 /* 同期 RPC: メイン JS へコマンド送信し ack を待つ。timeout_ms 超過 → -1。pthread 内専用 (main browser thread では fail-fast) */
 int  fla_cmd(uint32_t op, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t res[4], uint32_t timeout_ms);
