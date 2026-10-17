@@ -352,6 +352,7 @@
 | `tools/m11/REPORT_N174.md` | ~90 | #3142 (M11-N174, 親 #3134・#1154): set_other 非 imm のメモリ読込・lea 256 件の接続方式 (stack_slot・alloca・ptr_mem・gep・global_store) と 3 値分類 (件数は REPORT 参照)。残りは #3906・#3907。分類器 `m11_setother_mem_class.py` |
 | `tools/m11/REPORT_N87.md` | ~80 | #1373 (M11-N87, 部分達成せず・実値化 0 件): sigfix 0 詰め inherit 1,172 件の呼出元 def 追跡 (基本ブロック到達定義・入口の呼出元再帰・call 越しの引数レジスタ要約)・復元不能 1,172 件 (未分類 0) の理由別内訳・survey ok 872 (退行なし) |
 | `tools/m11/REPORT_3296.md` | ~95 | #3296 (親 #3229・REPORT_N403 §7): `function_412770` の rep movsq 源 `ptr null` (機械語 `mov rsi,[rax]` の load 脱落・D4 再発例) の修正 `ldfix/fix_src412770.py` と、修正前後の寛容起動の unit 結果 (kind 差 8 件は不変)。判定 (D4 再発例・REPORT_1080 と一致)・撤回した address 0 の記述・測定 commit 以降の差分 |
+| `tools/m11/REPORT_5092.md` | ~42 | m11 #5092 (M11-31): unit 144 の `0x6c` 出所の survey trace 計測 (`M11_SURVEY_TRACE=1`・受入 1 未達・未特定) |
 | `tools/m11/REPORT_5358.md` | ~70 | m11 #5358 (FLE-44, 親 #4011): `function_409c80` の `0x409d2d jae 0x409c40` を引数付き tail call に直す修正 (`ldfix/fix_tail409c80.py`) の機械語の根拠・修正前後の boot 測定 (既定 OFF・`M11_M2V=1`)・未解決 (trap アドレス・OOB の直接原因)。測定値の正本 |
 | `tools/m11/REPORT_APPENDIX_5358.md` | ~100 | m11 #5358: `REPORT_5358.md` §8 (arg 実値と s24 の書換え位置) の移送 (§8 の移送 + §9 (本 PR で追加: 書換え経路の機械語突合・同一 build の再測定・計装)。行数上限のため分割移動。移送分の内容は不変) |
 | `tools/m11/REPORT_APPENDIX_3161.md` | ~20 | m11 #3161 (REPORT_N403.md §10 の分割移動): 1 通りの所要 (IR 46–47 s・build 22–24 s・run 1–2 s・survey 15–16 s)・LB=0x10000 の boot5 有無の補足・寛容起動 (#2779) との関係・§10-4 結論 |

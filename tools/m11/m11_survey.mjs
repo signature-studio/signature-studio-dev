@@ -3,6 +3,7 @@
 //       trap を 'oom' に分類する. image 領域を壊した unit (InitTable 破壊) は実行前の image を戻して 'clobber' に分類する.
 // 環境変数: M11_SURVEY_UNITS=<path> (unit 別ラベル JSON) / M11_SURVEY_COST=<path> (unit 別 VA・GetMem 消費 JSON) / M11_SURVEY_STACK=<i,..> (その unit の trap スタック)
 //           M11_VFREE_NOOP=1 (VirtualFree を実解放しない = NC) / M11_VA_UNIT_BUDGET_MB=0 (上限なし = 旧挙動) / M11_VA_BIGTRACE=1 / M11_VA_STACK_AT=<n>
+//           M11_SURVEY_TRACE=1 (unit 144 の実行中だけ m11_set_trace(1) し、[probe_free]/[probe_list]/[m11] 行を [survey][trace144] で出す。build は M11_PROBE_LIST=1 が要る)
 import fs from 'fs';
 import { ptrPre, ptrCheck } from './m11_ptrcheck.mjs';
 const M11 = new URL('./', import.meta.url).pathname.replace(/\/$/, '');
@@ -83,7 +84,10 @@ for (let i = SV_FROM; i < SV_END; i++) {
   const lf0 = Number(mod._m11_probe_count(6)), lr0 = Number(mod._m11_probe_count(7)), p413_0 = process.env.M11_INSTR_413060 === '1' ? Number(mod._m11_probe_count(8)) : 0;
   let r, err = null;
   if (process.env.M11_SURVEY_PROGRESS === '1') fs.writeSync(2, '[progress] unit ' + i + ' ' + va + ' begin\n');
+  const trU = process.env.M11_SURVEY_TRACE === '1' && i === 144;
+  if (trU) { errs.length = 0; mod._m11_set_trace(1); }
   try { r = mod._m11_call_unit(i); } catch (e) { err = e; }
+  if (trU) { mod._m11_set_trace(0); for (const l of errs) if (/\[probe_free\]|\[probe_list\]|\[m11\]/.test(l)) console.error('[survey][trace144] ' + l.trimEnd()); }
   if (process.env.M11_SURVEY_PROGRESS === '1') fs.writeSync(2, '[progress] unit ' + i + ' ' + va + ' end\n');
   const clob = !tableIntact();
   if (P134 && i === P134_UNIT) console.error('[probe134] unit ' + i + ' ' + va + ' err=' + JSON.stringify(err ? String((err && err.message) || err) : null) + ' trap_state=' + JSON.stringify(p134obj()));

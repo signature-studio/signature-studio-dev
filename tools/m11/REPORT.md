@@ -248,3 +248,4 @@ unit 149 は OFF/ON とも oob のまま。ON で kind が変わるのは unit 8
 `function_40fcf0` の `function_40fd90` 呼出しの第 1 引数を `[self]` (VMT) に直す。`M11_M2V=1 M11_M2S=1` で last_unit 114→144 に前進したが OOB が残り、icall miss 7→16。「偽の前進」の疑いがあり、受入 1 は未達。測定・測定 commit・差分 0 の証跡・未解決は [REPORT_N4011.md](REPORT_N4011.md)。
 
 ## 21. #5358 [FLE-44]: function_409c80 の tail jump 誤 lift 修正 (部分達成) → [REPORT_5358.md](REPORT_5358.md)
+
