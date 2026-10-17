@@ -69,9 +69,9 @@ static MS void* k_GetProcessHeap(void) { return (void*)0x1000; }
 static int g_keep_x0 = -1;
 static MS void* k_HeapAlloc(void* h, uint32_t flags, uint64_t sz) {
     (void)h; double keep; void* p;
+    __asm__ volatile("movsd %%xmm0, %0" : "=m"(keep));
     if (g_keep_x0 < 0) g_keep_x0 = getenv("OTT_KEEP_XMM0") != NULL;
     if (!g_keep_x0) return heap_alloc(sz, (flags & 8) != 0);
-    __asm__ volatile("movsd %%xmm0, %0" : "=m"(keep));
     p = heap_alloc(sz, (flags & 8) != 0);
     __asm__ volatile("movsd %0, %%xmm0" :: "m"(keep) : "xmm0");
     return p;
