@@ -17,4 +17,14 @@ cmake ../src -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 ninja -j4 retdec-decompiler > make.log 2>&1
 # LLVM の取得時 sha256 は CMake の URL_HASH が cmake/deps.cmake の LLVM_ARCHIVE_SHA256 で照合する。
 # 取得物の sha を独立に確認する場合: sha256sum external/src/llvm.zip (期待値 96389d21…)
-src/retdec-decompiler/retdec-decompiler --version 2>&1 | head -2
+# share/ は support/CMakeLists.txt の install 段と同じ install-share.py を、deps.cmake の URL/SHA/版で直接呼ぶ。
+# 隣に share/ が無いと無言終了する (REPORT_APPENDIX_6023 §2)。
+INST="$W/inst"
+mkdir -p "$INST/bin"
+cp src/retdec-decompiler/retdec-decompiler "$INST/bin/"
+SUPPORT_URL=$(sed -n 's/^SUPPORT_PKG_URL:STRING=//p' CMakeCache.txt)
+SUPPORT_SHA=$(sed -n 's/^SUPPORT_PKG_SHA256:STRING=//p' CMakeCache.txt)
+SUPPORT_VER=$(sed -n 's/^SUPPORT_PKG_VERSION:STRING=//p' CMakeCache.txt)
+python3 -u ../src/support/install-share.py "$INST" "$SUPPORT_URL" "$SUPPORT_SHA" "$SUPPORT_VER"
+cp ../src/src/retdec-decompiler/decompiler-config.json "$INST/share/retdec/"
+"$INST/bin/retdec-decompiler" --version 2>&1 | head -2
