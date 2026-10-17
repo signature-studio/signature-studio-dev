@@ -97,8 +97,56 @@ def helper_callers():
         print(f"  {name} call@{addr:#x} rcx = {src}")
 
 
+def provenance():
+    """(5) [reg+0x168] 直接書込みの基底レジスタの由来を線形追跡する (関数内・call で由来を消す近似)。
+
+    状態: "CA" = P (C のアドレス) を読んだ値、"D" = [[P]] (= D)。ret で全消去。
+    由来が "D" の書込みだけを出す。0 件は「該当なし」の証拠ではない (引数・戻り値を追わない)。
+    """
+    st = {}
+    rows = []
+    cnt = collections.Counter()
+    for ins in stream():
+        m, ops = ins.mnemonic, ins.operands
+        if m == "ret":
+            st.clear()
+            continue
+        if m == "call":
+            for r in ("rax", "rcx", "rdx", "r8", "r9", "r10", "r11"):
+                st.pop(r, None)
+            continue
+        if ops and ops[0].type == X86_OP_MEM and m in WRITE_MNEM and ops[0].mem.disp == 0x168 and ops[0].mem.index == 0 and ops[0].mem.base:
+            k = st.get(ins.reg_name(ops[0].mem.base), "?")
+            cnt[k] += 1
+            if k == "D":
+                rows.append((ins.address, ins.mnemonic, ins.op_str))
+        if not ops or ops[0].type != X86_OP_REG:
+            continue
+        dst = ins.reg_name(ops[0].reg)
+        if m == "mov" and len(ops) == 2:
+            t = rip_target(ins)
+            if ops[1].type == X86_OP_MEM and t == P:
+                st[dst] = "CA"
+            elif ops[1].type == X86_OP_MEM and t == CELL:
+                st[dst] = "D"
+            elif ops[1].type == X86_OP_MEM and ops[1].mem.base and ops[1].mem.disp == 0 and ops[1].mem.index == 0 and st.get(ins.reg_name(ops[1].mem.base)) == "CA":
+                st[dst] = "D"
+            elif ops[1].type == X86_OP_REG and ins.reg_name(ops[1].reg) in st:
+                st[dst] = st[ins.reg_name(ops[1].reg)]
+            else:
+                st.pop(dst, None)
+        else:
+            st.pop(dst, None)
+    print("== 5. [reg+0x168] 直接書込みの基底の由来 (線形追跡・近似)")
+    print(f"  由来別件数 = {dict(cnt)}")
+    print(f"  由来 D と判定 = {len(rows)} 件")
+    for addr, m, o in rows:
+        print(f"  {addr:#x} {m} {o}")
+
+
 def main():
     helper_callers()
+    provenance()
     v = fo(CELL)
     print(f"== 1. cell {CELL:#x} への RIP 相対参照 (全 .text)")
     print("  cell の PE 値 = " + ("bss(runtime)" if v is None else f"{int.from_bytes(RAW[v:v+8], 'little'):#x}"))
