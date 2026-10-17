@@ -272,6 +272,36 @@ test("LIVE_CLOSE=1: 1 tick に閉じるのは最大 5 件 (残りは次の tick)
   assert.equal((ctx.app.engine.status() as any).counters.closed, 7);
 });
 
+test("LIVE_CLOSE=1: 1 時間に書くのは最大 10 件 (試行を数える。窓を過ぎると再開する)", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, env: { LIVE_CLOSE: "1" }, handlers: [writeOk] });
+  await seedRuleA(ctx, [100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210]);
+  await markFresh(ctx);
+  assert.equal((await ctx.app.engine.autoClose(await engineGh(ctx))).closed.length, 5);
+  await markFresh(ctx);
+  assert.equal((await ctx.app.engine.autoClose(await engineGh(ctx))).closed.length, 5);
+  await markFresh(ctx);
+  assert.equal((await ctx.app.engine.autoClose(await engineGh(ctx))).closed.length, 0, "同じ時間の 11 件目は閉じない");
+  assert.equal((ctx.app.engine.status() as any).counters.closed, 10);
+  clock.t += 3_600_000;
+  await markFresh(ctx);
+  assert.equal((await ctx.app.engine.autoClose(await engineGh(ctx))).closed.length, 2, "1 時間後は残りを閉じる");
+});
+
+test("LIVE_CLOSE=1: 閉じる書き込みが失敗した試行も 1 時間の上限に数える", async () => {
+  const clock = { t: T0 };
+  const failClose = (c: Call) => (isComment(c) ? j({ id: 1 }, 201) : isClose(c) ? j({ message: "boom" }, 500) : undefined);
+  const ctx = await configuredApp({ now: clock, env: { LIVE_CLOSE: "1" }, handlers: [failClose] });
+  await seedRuleA(ctx, [100, 110, 120, 130, 140, 150]);
+  await markFresh(ctx);
+  await ctx.app.engine.autoClose(await engineGh(ctx));
+  assert.equal(ctx.m.calls.filter(isComment).length, 5);
+  clock.t += 60_000;
+  await markFresh(ctx);
+  await ctx.app.engine.autoClose(await engineGh(ctx));
+  assert.equal(ctx.m.calls.filter(isComment).length, 6, "2 回目の tick は残りの 1 件だけを試す (失敗の 5 件も数えて 1 時間の枠を使う)");
+});
+
 test("LIVE_CLOSE=1: 閉じる書き込みが失敗しても、同じ親は 24 時間は再試行しない (二重のコメントを避ける)", async () => {
   const clock = { t: T0 };
   const failClose = (c: Call) => (isComment(c) ? j({ id: 1 }, 201) : isClose(c) ? j({ message: "boom" }, 500) : undefined);
