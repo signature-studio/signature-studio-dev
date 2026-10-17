@@ -2,7 +2,7 @@
 
 測定 commit: `b0c6e835a` (`fle_boot.c` の `py_watch` に `0x15eac90` と `ippsZero_8u` 直後 (site 9) を足した。挙動は変えず記録だけ増やした)。
 コード差分 `git diff 3a3a1f152 b0c6e835a -- tools/flelift` は `fle_boot.c` の監視 slot 2 本と site 9 の 1 件だけ。
-素材: `fl-win64` (`extracted/block00031_PE.bin`)・`toolchain-emsdk` (`/opt/emsdk`)。
+素材: `fl-win64` (`extracted/block00031_PE.bin`)・`toolchain-emsdk` ([EMSDK] の pin 6.0.12)。
 実測: `boot_e2e.sh --fast` (lift 再利用・build 4 variant・run 4 variant) `real 4m11s`・`user 7m39s`・`sys 1m02s`・RC 0。load 開始 1.74。
 
 ## 1. 結論
