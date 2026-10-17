@@ -40,7 +40,7 @@ const cwInfo = (v) => {
   if (cu.length === 0) return "cw_at_underrun=[no_trace]";
   const u = cu[0];
   const tail = u.recs.slice(-6).map(([p, rd, wr, wl, dms]) => `${p}/${rd}/${wr}/${wl}/${dms}`).join(",");
-  return `cw_p=${u.p} cw_consumed=${u.consumed} cw_rebuf=${u.rebuf} cw_notes=${cu.length} cw_at_underrun=[${tail}]`;
+  return `cw_p=${u.p} cw_consumed=${u.consumed} cw_rebuf=${u.rebuf} cw_T=${u.T} cw_notes=${cu.length} cw_at_underrun=[${tail}]`;
 };
 // 最初の underrun の壁時計 (worklet Date.now) と producer の write 区間 (pw_trace) の重なり。gap_us = 0 で区間内、>0 で区間後、<0 で区間前
 const uoInfo = (v) => {

@@ -247,3 +247,4 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 - 上表の未確認欄 (0x100111e2・0x10011206・0x1001122e・0x10012529 の引数) の由来。
 - 引数番号と意味の対応づけ、ポインタ引数で SIGSEGV しない範囲 (§4 と同型の危険がある)。
 - #6039 本文の「5 関数」の表記は、3 つが handler funclet である点に訂正が必要 (本 PR の範囲外。issue 本文の更新は PM 判断)。
+- §11 (残り 4 呼出しの引数の由来と入力範囲・#6039 受入条件 3 の残り) は `REPORT_APPENDIX_3127_B.md` に分割移動した。

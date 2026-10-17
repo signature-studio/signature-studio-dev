@@ -1094,6 +1094,8 @@ class Region:
             src, bits = fl[1]
             out.append("  %s = icmp eq i%d %s, 0%s" % (n, bits, src, tag))
             return n
+        if fl[0] == "shrcf":
+            raise Unsupported("shr cl flag: ZF は未実装 @%x" % va)
         a, b, is_test, bits = fl[1]
         if is_test:
             t = self.nm(va, "ta")
@@ -1115,6 +1117,15 @@ class Region:
             pred = "eq" if cc in ("e", "z") else "ne"
             n = self.nm(va, "fc")
             out.append("  %s = icmp %s i%d %s, 0%s" % (n, pred, bits, src, tag))
+            return n
+        if fl[0] == "shrcf":
+            if cc not in ("b", "c", "nae", "ae", "nb", "nc"):
+                raise Unsupported("shr cl flag: cc %s は CF 以外 (ZF/SF/OF 未実装) @%x" % (cc, va))
+            cf = fl[1][0]
+            if cc in ("b", "c", "nae"):
+                return cf
+            n = self.nm(va, "fc")
+            out.append("  %s = xor i1 %s, true%s" % (n, cf, tag))
             return n
         if fl[0] != "rcrcf":
             return None                          # 通常経路 (comis/int) は各 handler で処理
@@ -1150,6 +1161,8 @@ class Region:
             return fl[1][0]
         if fl[0] == "bsrzf":
             raise Unsupported("bsr flag: CF は未定義 @%x" % va)
+        if fl[0] == "shrcf":
+            return fl[1][0]
         n = self.nm(va, "cf")
         if fl[0] in ("comis", "site"):
             fa, fb, ty = self._cmp_operands(fl, out, va, tag)
@@ -1528,6 +1541,45 @@ class Region:
             st["__w"].add(dst)
             st["fl"] = ("bsrzf", (src, bits))
             self.used("bsr")
+            return True
+        # --- shr r, cl (LIFTLIB-30 / #6078): count=cl&(bits-1)。count==0 は値・フラグ不変。
+        #     CF = count!=0 のとき src の bit (count-1)、count==0 のとき前の CF。count は実行時値なので CF は i1 として
+        #     eager に作り flag 種別 "shrcf" に載せる (CF だけ読める)。前の CF が決まらない (flag 状態なし) ときは Unsupported。
+        if m == "shr" and len(ops) == 2 and ops[0][0] == "reg" and ops[1] == ("reg", "rcx") and not mem:
+            bits = it._ci.operands[0].size * 8
+            if bits not in (32, 64):
+                return False
+            ity = "i%d" % bits
+            dst = ops[0][1]
+            prev = self._flag_cf_i1(st, out, va, tag)
+            a = self._gpr_val(st, dst, va, out, bits=bits)
+            c = self._gpr_val(st, "rcx", va, out, bits=bits)
+            cnt = self.nm(va, "sk")
+            out.append("  %s = and %s %s, %d%s" % (cnt, ity, c, bits - 1, tag))
+            nz = self.nm(va, "snz")
+            out.append("  %s = icmp ne %s %s, 0%s" % (nz, ity, cnt, tag))
+            cm1 = self.nm(va, "sm")
+            out.append("  %s = sub %s %s, 1%s" % (cm1, ity, cnt, tag))
+            cs = self.nm(va, "ss")
+            out.append("  %s = select i1 %s, %s %s, %s 0%s" % (cs, nz, ity, cm1, ity, tag))
+            bt = self.nm(va, "sb")
+            out.append("  %s = lshr %s %s, %s%s" % (bt, ity, a, cs, tag))
+            b1 = self.nm(va, "sbi")
+            out.append("  %s = and %s %s, 1%s" % (b1, ity, bt, tag))
+            bc = self.nm(va, "sbc")
+            out.append("  %s = icmp ne %s %s, 0%s" % (bc, ity, b1, tag))
+            cf = self.nm(va, "scf")
+            out.append("  %s = select i1 %s, i1 %s, i1 %s%s" % (cf, nz, bc, prev, tag))
+            n = self.nm(va, "sr")
+            out.append("  %s = lshr %s %s, %s%s" % (n, ity, a, cnt, tag))
+            if bits == 32:
+                z = self.nm(va, "srz")
+                out.append("  %s = zext i32 %s to i64%s" % (z, n, tag))
+                n = z
+            st[dst] = (n, "i64")
+            st["__w"].add(dst)
+            st["fl"] = ("shrcf", (cf, bits))
+            self.used("shift_cl")
             return True
         # --- cmp / test (整数フラグ生成。値は flag 状態に記録)
         if m in ("cmp", "test") and len(ops) == 2 and ops[0][0] == "reg":
