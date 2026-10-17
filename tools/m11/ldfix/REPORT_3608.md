@@ -184,12 +184,12 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 
 採取の詳細 (8-1〜8-8・採取コマンド・計装) は `REPORT_APPENDIX_3608.md` に分割移動した。要約:
 
-- 144: `function_44aeb0` の a1 は `dsp_ippv2.dll` (0x2572dc) を `function_439550` が小文字化したもの。選択元は未追跡。
-- 149: `[0x10aa1418]` の書込みは `function_412c20` の戻り値 0。0 の由来は未追跡。
+- 144: `function_44aeb0` の a1 は `dsp_ippv2.dll` (0x2572dc) を `function_439550` が小文字化したもの。`dsp_ippv2.dll` を `function_6539e0` へ渡すのは `function_653f40` だけで、unit 144 では `function_65c540` (entry 時カウンタ `18825440` = 0) → `function_653f40` (entry 時 `18825448` = 0) の順に走る (§8-10)。
+- 149: `[0x10aa1418]` の書込みは `function_412c20` の戻り値 0。`412c20` は `arg1` (i32) < 1 で 0 を返し、unit 149 の 4 回の呼出しはすべてこの経路 (`4136a0` の長さフィールド `arg1-4` = `0xc08d8d48`・§8-11)。長さフィールドの書込み元は未特定。
 - 114: halt0 8 件はすべて call site B (`function_412770(18787456)`) を 1 回通り、分岐値 `18787504` = 0x100000002 (i8 = 2) で Halt へ進む。値の書込み元は C 側の `m11_InitLib` (`m11_ov.c` 353 行 `B(r13+0x30) = reason+1`・348 行 `D(r13+0x34)`) で、boot 時に書かれる (§8-9)。
 
 ### 8-4 未解決 (起票先 #3608)
 
 - 149: `function_412c20` の戻り値 (0) の由来、`0x264208` (`Blend2D.dll`) を `function_6539e0` に渡す上流の呼出し元。
-- 144: `function_6539e0` が `0x2572dc` (`dsp_ippv2.dll`) を選ぶ条件 (呼出し元の分岐)。
+- 144: `function_653f40` の 2 つの呼出し元のうち、unit 144 で走るのは `function_65c540` 側 (§8-10)。`18825440` (カウンタ) と `18825448` (ゲート) の書込み元は未特定。
 - 114: call site B (`function_412770(18787456)`) を確定 (A は 0 回・§8-5)。B の分岐値 `18787504` = 0x100000002 は boot (`entry_point`) で書かれ、unit 側では変わらない (§8-7)。boot 内の書込み元は未特定。受入 1 の残り。
