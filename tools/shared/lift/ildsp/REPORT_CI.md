@@ -215,11 +215,16 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
   - 実測 (素材 fl-win64 / toolchain-retdec / toolchain-emsdk を展開して測定。測定 commit は PR 本文に記す): `ci_link.sh` rc 0・wasm-ld rc 1・未解決は期待集合のみ。`@global_var_1803f6610` の参照を絶対アドレスに置いた IR (`ci.ll`) と置く前の IR の差分は参照 2 行のみ。未解決の総行数は 149 (変更前 153・測定は本記述を入れた commit `1a929dfbd` 時点の記録。現 head の値は §9-4)。差 4 行 (GetLastError 2・HeapFree 2) の原因は未確認。絶対アドレス化で emcc の最適化結果が変わったことが考えられるが、この run では確かめていない。
 - 仮置きの効果: shim は cell を 0 初期化 (`global_var_1803f6610` は 0)。したがって仮置きのままでは `icmp eq` の比較対象が変わる。**リンクが通ることと、意味が正しいことは別**。意味の確認 (native との差分) は #3320 の範囲。
 
+### 9-5. uselistorder の除去を IR 正規化段へ移す (T-SH-164 #6235)
+結論: `uselistorder` は `ir_normalize.py --drop-uselistorder` (ci_lift.sh の正規化段) で除き、`ci_link.sh` の `grep -v` を外した。除去前後で `ci.emc.ll` はバイト一致・`ci.o` の未定義シンボル集合は一致・`ci_link.sh` の rc と未解決集合は一致。
+測定 commit: `b1d019794` (コードを変えた最後の commit)。`git diff b1d019794 HEAD -- tools/shared/lift/ildsp tools/shared/lift/libkio` の出力は空。
+- 結論と実測の要約: `uselistorder` は `ir_normalize.py --drop-uselistorder` で除去 (`ci_link.sh` の `grep -v` を外し guard に置換)。除去前後で `ci.emc.ll` はバイト一致・`ci.o` の未定義は 18 件で一致・`ci_link.sh` は rc 0 (wasm-ld rc 1 は期待内・未解決 `function_1801aef40` 1 件)。測定 commit `b1d019794`。詳細と 3 回の実測は `REPORT_APPENDIX_6235.md`。
+
 ### 9-3. 残り (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 外部グローバル: `global_var_1803f6610` は絶対アドレス化済み (§9-2・ci_link.sh)。`@0` (`__unnamed_1`) は shim の仮置きのまま (画像に敷設しない方式を決定、§9-2) | リンクは通るが、仮置きの値で意味が変わりうる | 意味の確認は #3320 |
-| `uselistorder` 行 (174 行) を emcc が読めない | ci_link.sh は行を除いて回避 (リンクは通る)。ir_normalize で扱う対応 | #6235 (T-SH-164) |
+| `uselistorder` 行を emcc が読めない | 解消 (§9-5。`ir_normalize.py --drop-uselistorder` で除去し、ci_link.sh の `grep -v` を外した) | #6235 (T-SH-164・解消) |
 | 直接 jcc 先 `function_1801aef40` (閉包の誤モデル・§8-1) | 未解決 (リンクエラー・1 件) | #6231 (T-SH-163) |
 
 ### 9-4. 再測定 (T-SH-152 #5748・受入 2)
@@ -228,7 +233,7 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
   - `ci_lift.sh` → rc 0 (ALL OK。census FAIL は #6184 で解消済み)。
   - `ci_link.sh` → rc 0 (wasm-ld rc 1)。未解決は **`function_1801aef40` の 1 件のみ** (想定外 0 件)。
 - 後続 fix (`f179908b5` 以前の文言修正) の run では `toolchain-retdec`・`toolchain-emsdk` が取得されず、`ci_lift.sh`・`ci_link.sh` は再実行していない。この head での再実行結果ではない。
-- `uselistorder` 行の起票先は #6235 (T-SH-164)。
+- `uselistorder` 行の起票先は #6235 (T-SH-164)。解消は §9-5。
 - 前回 §9-1 の 153 行のうち IAT 10 種 (147 行) と `function_1801cb600` (5 行) は消えた。原因: `ci_link.sh` が `ci_iat.o` (#5747) と `ci_traps.o` (#3318 の trap 化) をリンクしていなかった。残りは 153 − 147 − 5 = 1 行 (`function_1801aef40`)。
 - 残り `function_1801aef40`: 閉包の jcc 誤モデル (§8-1)。stub で埋めると意味の誤りを隠すため置かない。起票先は #6231 (T-SH-163)。旧起票先の #3318・#5749 はどちらも closed。
 - 受入 2 (未解決 0 件) は未達のまま。
