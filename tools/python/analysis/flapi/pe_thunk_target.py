@@ -3,7 +3,7 @@
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_thunk_target.py <VA(16進)> [<VA(16進)> ...]
 
-展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
+展開: 素材 fl-win64 (docs/REFERENCES.md の素材エントリ) から extracted/block00031_PE.bin を取り出す
 """
 import os
 import struct
