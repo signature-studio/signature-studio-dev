@@ -8,6 +8,7 @@
 #   例 (#113 の 16-bit 試行、既定 WFBox=2 のため S2_WFBOX=0 を付ける): S2_WFBOX=0 S2_REG=$'Software\\Image-Line\\FL Studio 26\\General|LastExportedFormats|4' bash tools/flp/s2_render_probe.sh Autogun.flp 1
 # 検証用の即値パッチ: S2_PATCH に 1 行 1 件 `<VA hex>|<期待バイト hex>|<新バイト hex>` を入れる (oracle ローカルコピーの FLEngine_x64.dll のみ)。
 # レジストリ・トレース: S2_TRACE_REG=1 で WINEDEBUG=+reg にし、開かれたキーを $WORKDIR/s2_reg_keys_<n>.txt に出す。
+# 実行中の観測: S2_SAMPLE (既定 5 秒・0 で無効) ごとに $WORKDIR/s2_progress_<n>.tsv へ「epoch・WAV バイト数(- は無し)・ログ バイト数・wine 系プロセスの CPU 秒合計・RSS KiB 合計」を追記する。WAV サイズが増え続ければ書き出し中、ログとCPU が止まれば停止の疑い。
 # WAV 形式: WAVRenderForm\WFBox = ${S2_WFBOX:-2} (0 = 16-bit / 1 = 24-bit / 2 = 32-bit float、#3052 で実測)、WAVRenderForm\DitherBox = 0 (dither off)。16-bit に戻すには S2_WFBOX=0。
 # 出力は $RUNNER_TEMP 配下のみ (commit 対象外)。結果の要約は tools/flp/REPORT_APPENDIX.md §15・§16・§17。
 set -euo pipefail
@@ -51,7 +52,23 @@ for n in $(seq 1 "$REPEAT"); do
   rm -f "$WORKDIR/$base.wav"
   s=$(date +%s)
   rc=0
+  sample="$WORKDIR/s2_progress_$n.tsv"
+  : > "$sample"
+  # 実行中の観測 (S2_SAMPLE=秒。0 で無効)。5 秒ごとに WAV サイズ・ログ増分・wine 系プロセスの CPU 秒・RSS を記録する。
+  # 終了は PID 指定の kill のみ (pkill・kill 0 等は使わない)。
+  if [[ "${S2_SAMPLE:-5}" != 0 ]]; then
+    (
+      while sleep "${S2_SAMPLE:-5}"; do
+        w=$(stat -c %s "$WORKDIR/$base.wav" 2>/dev/null || echo -)
+        l=$(stat -c %s "$WORKDIR/s2_run_$n.log" 2>/dev/null || echo -)
+        p=$(ps -C wine64-preloader,wine64,FL64.exe -o etimes=,cputimes=,rss= 2>/dev/null | awk '{c+=$2; r+=$3} END {printf "%s\t%s", c+0, r+0}')
+        printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "$w" "$l" "${p:-0	0}" >> "$sample"
+      done
+    ) &
+    sampler=$!
+  fi
   (cd "$INST" && timeout "${S2_TIMEOUT:-120}" xvfb-run -a wine64 FL64.exe /R "Z:${WINPATH}\\$NAME" > "$WORKDIR/s2_run_$n.log" 2>&1) || rc=$?
+  if [[ -n "${sampler:-}" ]]; then kill "$sampler" 2>/dev/null || true; wait "$sampler" 2>/dev/null || true; unset sampler; fi
   e=$(date +%s)
   cp "$WORKDIR/$base.wav" "$WORKDIR/${base}_run_$n.wav" 2>/dev/null || true
   if [[ "${S2_TRACE_REG:-0}" == 1 ]]; then
