@@ -425,6 +425,7 @@
 | `tools/m11/trap_triage/REPORT_APPENDIX_4885.md` | ~90 | #4885: 証拠表の行 67・68・71〜74 の件ごとの判定 (母数 13・真陽性 6・偽陽性 0・保留 7)。REPORT_718 §4l の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5389.md` | ~40 | #5389: 証拠表の行 78・81〜84 の保留 5 件の判定理由 (真陽性 0・偽陽性 0・保留 5・機械語と IR の照合・未解決)。REPORT_718 §4o の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5845.md` | ~60 | #5845: 証拠表の行 78・81・82 の保留 3 件の判定理由 (確定 0・保留 3・機械語と IR の SSA 対応の深掘り・未解決)。REPORT_718 §4o の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_6208.md` | ~50 | #6208: 証拠表の行 78 の判定 (確定 0・保留 1・機械語 3 段 deref と IR 2 段の対応・count==0 到達が未解決)。REPORT_718 §4o の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5660.md` | ~90 | #5660: 証拠表の行 119〜158 (母数 40) の件ごとの突合表。判定 0 件・保留 40 (保留の型 (i)〜(iv))。REPORT_718 §4l の行 119〜158 の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_1654.md` | ~30 | #1654・#1655: REPORT_718 §4c (証拠表の行 99〜193) と §4e (行 194〜288) の全文。250 行上限のため分割移動 (削除していない)。REPORT_718 §4c・§4e の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_6211.md` | ~60 | #6211: 証拠表の行 224・225 (母数 2) の件ごとの判定 (真陽性 0・偽陽性 0・保留 2。機械語と IR の count 源の段数が不一致)。REPORT_718 §4p の正本 |
