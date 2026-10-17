@@ -99,7 +99,14 @@
 - 目的: §2e の残件。slot 由来 call 命令の位置で実行の有無を見る。
 - 変更: `host/vst3host.cpp` に `S2HOST_BPCALL="rva,…"` (最大 4 件・armBp と同じ DR 配列) を追加。`[bp]` 行に rax・r10 を追加。`S2HOST_BP`・`S2HOST_BPCALL`・`S2HOST_SLOT`・`S2HOST_WATCH` の同時指定は起動時に拒否する。
 - 対象 RVA (逆アセンブルで確定。`call` 命令の先頭): `0x136ca7` (`call r10`)・`0x136ce8` (`call r10`)・`0x136d1d` (`call rax`)・`0x1381d8` (`call rax`)。各命令の直前は `mov reg,[0x17bf760]`・`test`・`je` (null チェック)。
-- 測定 commit: `6846baa18` (= HEAD)。`git diff 6846baa18 HEAD -- tools/targets/serum2/host` の出力は 0 行 (差分 0)。
+- 測定 commit: `6846baa18`。その後の HEAD との host 差分はコメント 1 行のみ (`armBp` 直上のコメント修正)。`git diff 6846baa18 HEAD -- tools/targets/serum2/host` の出力:
+
+  ```diff
+  -// S2HOST_BP="rva,rva,..." (SR-99 #5958・最大 4 件): DR0〜DR3 の execute breakpoint を DLL の関数先頭に張り、
+  +// S2HOST_BP="rva,rva,..." (SR-99 #5958・最大 4 件): DR0〜DR3 の execute breakpoint を DLL の関数先頭 (S2HOST_BP) または call 命令位置 (S2HOST_BPCALL) に張り、
+  ```
+
+  差分はコメントのみで、実行される式・分岐は変わらない。よって §2f の測定は HEAD と同じ挙動に対して有効。
 - 測定: 無改変 DLL・既定 state・4 block・`S2HOST_ATTACH=1 S2HOST_BPCALL="136ca7,136ce8,136d1d,1381d8"`・xvfb-run・`/usr/lib/wine/wine64` (wine 9.0)。
   - 結果: `[bp] armed 4 execute breakpoints`。call 命令 4 箇所の hit は **0 件**。完走 `blocks=4 frames=512 nonzero_cells=1020/1024 peak=0.548306`。
 - 対照: `S2HOST_BP="136bf0"` (関数入口) の 9 件 hit は §2e (測定 commit `d1e3cab19`) の値で、§2f では再実行していない。§2e の hit 時 slot は全て 0。
