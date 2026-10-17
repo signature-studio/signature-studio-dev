@@ -79,8 +79,9 @@
 
 - 方式: 基底が非揮発 (rbx/rsi/rdi/rbp 等) の `call` は、呼出し先が **直接 call かつ再帰的に非スタック書込みを持たない** ときだけ区間を跨ぐ。判定は `callee_pure` (循環・間接 call・解決不能な先は不可)。書込みの判定は `insn_may_write_nonstack` (rsp 基底の格納・push・読取り専用命令以外を書込みありとする。文字列命令・rep・xchg 系も書込みあり)。
 - 基底が揮発 (rax/rcx/rdx/r8〜r11) の `call` は、呼出しで値が変わるので `ptr_base_def` とする (跨がない)。
-- 測定 commit: `0a8612203` (分類器を最後に変えた commit)。`git diff fe48dca85 0a8612203 -- tools/m11/m11_setother_ptr_class.py tools/m11/test_setother_ptr_class.py` が本 PR の差分。
-- 測定 (`python3 m11_setother_ptr_class.py work/sigfix_stats/nonimm_class_rows.json --pe <PE> --out ...`・real 0.30 秒・load 0.23):
+- **以下の数値は測定 commit `0a8612203` の分類器による値で、現 HEAD (`2c4090ff4`) の分類器では再測定していない。** `0a8612203` から HEAD までに分類器とテストが変わっている (`git diff 0a8612203 HEAD -- tools/m11/m11_setother_ptr_class.py tools/m11/test_setother_ptr_class.py` は 98 行の追加・3 行の削除。読取り専用命令の書込み判定の修正 `21265b1ed` を含む)。そのため下の内訳は現 HEAD の値ではない。
+- 再測定ができなかった理由: 入力 `work/sigfix_stats/nonimm_class_rows.json` の生成に `work-m11` 素材 (`tools/m11/work/`) が要る。この run の `$ARTIFACTS_DIR` には `fl-win64` しか無く、PR 本文にも `oc_artifacts` 行が無いため取得できなかった。現 HEAD の数値は、素材を取得できる run で `m11_post.py` → `m11_argrecover.py` → `m11_setother_ledger_verify.py` → `m11_setother_nonimm_class.py` の順に入力を再生成してから測り直す。
+- 測定 (`python3 m11_setother_ptr_class.py work/sigfix_stats/nonimm_class_rows.json --pe <PE> --out ...`・real 0.30 秒・load 0.23。`0a8612203` の分類器による値):
 
 ```
 [ptr-class] 対象 122 件 (load_ptr・chain>load_ptr)
@@ -98,6 +99,6 @@
 
 - 前回 (`c988679dc`) からの差: `ptr_call` 17→10。`ptr_base_def` 82→85、`ptr_alias_write` 2→3、`ptr_unknown_write` 2→3、`slot_merge` 16→18 は、跨いだ先の後段判定の移動。実値化は 0 のまま。
 - 残る `ptr_call` 10 件の呼出し先 (実測・`callee_pure` が偽): 呼出し先の本体に非スタック書込みがある (`mov qword ptr [rdx+r8*8], r9`・`movsd qword ptr [rbx+0x18], xmm0`・`movdqa xmmword ptr [rbp+0xc0], xmm9`・`movsd qword ptr [rbp+0x90], xmm2` など) 8 件、本体は直接書かないが呼出し先の先で書込みがある (推移) 2 件。間接 call の先は解決できないため、すべて未決のまま。
-- 単体テスト: `test_setother_ptr_class.py` 11 件 PASS (純粋な呼出し先を跨ぐ正例・書込みのある呼出し先の負例・揮発基底の負例を追加)。
-- 受入条件: `ptr_call` 件数の 3 値実測・未分類 0 は達成。実値化 0 件のため `m11_argrecover_verify.py` の照合は該当なし。
+- 単体テスト: `test_setother_ptr_class.py` 現 HEAD (`2c4090ff4`) で 13 件 OK (純粋な呼出し先を跨ぐ正例・書込みのある呼出し先の負例・揮発基底の負例・読取り専用接頭辞の負例を含む)。
+- 受入条件: `ptr_call` 件数の 3 値実測は `0a8612203` の分類器では達成。現 HEAD での件数の実測は未達 (素材不足で再測定できない)。実値化 0 件のため `m11_argrecover_verify.py` の照合は該当なし。
 - 未解決: 残る `ptr_call` 10 件は呼出し先の書込み範囲が非スタック領域に及ぶため、区間を跨げない (別名解析が要る)。起票先: #4890 (親)。
