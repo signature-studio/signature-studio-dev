@@ -21,7 +21,7 @@
 
 - `tools/plugins/p0c/k80_ucomi_br.py` (新規): ucomi 直後の基本ブロック内で、唯一の `br i1 %cf.N.reload` の条件を、ucomi のオペランドから作る `fcmp` に置換する。
   - jcc の対応: `jb` → `ult` / `jbe` → `ule` / `ja` → `ogt` / `jae` → `oge` (ucomi の flags は CF = a<b または非順序、ZF = a==b または非順序)。
-  - fail-closed: ucomi が無い・分岐が 1 本でない・reload の use が分岐以外にある・function が無いときは止める。1 関数の対象 site が 1 件以外 (0 件・2 件以上) のときも止める (`%ucb.` の名前衝突防止)。再実行は 0 site で止まる。
+  - fail-closed: ucomi が無い・分岐が 1 本でない・reload の use が分岐以外にある・function が無いときは止める。1 関数の対象 site が 0 件のときも止める (再実行を含む)。
 - 配線: `p0c4_abi_e2e.py` で `k80_deref_fix` の後、ext pass の前に実行 (`K80_NO_UCOMI_BR=1` で外せる)。
 - 実 IR の確認: `llvm-as` 通過。生成された式は `%ucb.c = fcmp ule double %ucb.af, %ucb.bf` (double の入力は `%4` = cvtss2sd の結果, `%11` = pand の結果)。
 
@@ -41,10 +41,10 @@
 
 ### 27.4a レビュー差し戻し (round 1) の対応
 
-- 測定は `ba6009b23` のまま (再測定は未実施)。以降の変更は `k80_ucomi_br.py` の fail-closed の範囲と docstring のみで、1 site の入力に対する出力は変わらない。
-- `k80_ucomi_br.py` は 1 関数の対象 site が 1 件以外 (0 件・2 件以上) なら止まる (`%ucb.` の名前衝突防止)。
-- 合成 IR で確認 (`/tmp/opencode/ucb_test`): 1 site は `%ucb.c = fcmp ule double` を生成し rc 0。出力を再入力すると `対象 site が 0 件` で rc 1。2 site は `対象 site が 2 件` で rc 1。
-- 再測定できていない: この run では `toolchain-retdec` の素材と `p0c/work` が無く、`p0c4_abi_e2e.py` を実行できなかった。測定 commit から HEAD までの `tools/plugins/p0c` のコード差分は 0 ではない (上記 2 点のみ)。e2e の再測定は PM の判断待ち。
+- 差し戻し (round 1・round 2) の指摘に対し、`k80_ucomi_br.py` のコードを測定 commit `ba6009b23` の内容に戻した (差分縮小 (b))。残る差分は docstring の訂正のみ。実行結果に影響しないため、測定は `ba6009b23` のまま。
+- docstring の訂正: 「冪等」を「再実行は 0 site として fail-closed で止まる」に直した。合成 IR (`/tmp/opencode/ucb_test/in.ll`, `ba6009b23` のコード) で確認: 1 site は `sites: 1` で rc 0・`%ucb.c = fcmp ule double` を生成。その出力を再入力すると `分岐の対象が無い (fail-closed)` で rc 1。
+- 戻したため、複数 site の判定 (1 関数に ucomi+分岐が 2 件以上あるときの `%ucb.` 名前衝突) は未実装。将来の対象拡大時に #3952 で扱う (27.5)。現在の対象 0x5e12c0 は 1 site。
+- 再測定はしていない: この run では `toolchain-retdec` の素材と `p0c/work` が無く、`p0c4_abi_e2e.py` を実行できなかった。
 
 ### 27.5 未解決
 
@@ -52,3 +52,4 @@
 |---|---|---|
 | 残 13 本の手書き本体 (0x5dfff0 ほか) | BODIES が 13 本のまま | 親 #3952 (本 PR は残件のうち 1 本) |
 | 0x5dfff0 等 xmm 入替え・SIMD 加算順・ポインタ global の 3 類型 | 未着手 | 親 #3952 |
+| `k80_ucomi_br.py` の複数 site 判定 (1 関数に対象 site が 2 件以上あるときに止める。`%ucb.` の名前衝突防止) | 現在の対象 0x5e12c0 は 1 site のため影響なし。対象を広げる前に必要 | 親 #3952 |
