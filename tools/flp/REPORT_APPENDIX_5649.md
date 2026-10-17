@@ -41,3 +41,15 @@ bash tools/flp/s3_gdb_attach_probe.sh    # 別プロセスで起動し gdb を�
 
 - 受入 2 の命中 (ブレークで停止すること): 未確認 (60 s 内に無し)。
 - `wine32` は未導入のまま。32 bit プロセスが要る経路は未確認。
+
+## 6. 駆動手段の追補 (#6001)
+
+- 追加: `tools/flp/s6001_drive_probe.sh` (FL64.exe を Xvfb 上で起動 → xdotool でクリック注入 → xwd で画面採取)。
+- 実測 (2026-10-17・runner 1 台・real 1 m 30 s):
+  - 起動 (S1 と同じ木): FL64.exe の起動後、ウィンドウ列挙 (`xdotool search`) で FL Studio のトップウィンドウを取得。
+  - 初回起動時に「使用データ送信」の確認ダイアログ (No thanks) が前面に出る。`xdotool mousemove … click 1` で No thanks を押すと閉じる (画面採取で確認)。
+  - 閉じるボタン (×) のクリックで Welcome 画面が閉じる。続けて「Problems loading the project」(プラグイン 1 件が開けない) が出る。入力注入は GUI に届く。
+  - `ui.launchAudioEditor` / `openEventEditor` は未実行。Python スクリプト (`tools/python` の経路) か、チャンネル・オーディオクリップの右クリックメニューからの起動が必要だが、この run では駆動手順を確定できなかった。
+- 命中: `0xd82dc6`・`0x1330c70` は未確認。gdb の既存プローブ (`s5991_gdb_dll_probe.sh`) は起動後に何も操作せず、60 s で命中なし (rc=124)。注入後の命中は測定していない。
+- 既知の限界: `kernel.yama.ptrace_scope=0` が要る (runner 限り)。初回起動の各種ダイアログ (使用データ送信・プラグイン読込エラー) を注入で閉じる必要がある。描画座標は解像度 1920x1080 依存。
+- 残り (未達): 1) エディタを開く UI 操作 (Python 実行か右クリック経路) の確定、2) 命中の確認、3) 既知限界の実測。起票先: 本 issue #6001 の再 run で継続 (親 #5991 の範囲)。
