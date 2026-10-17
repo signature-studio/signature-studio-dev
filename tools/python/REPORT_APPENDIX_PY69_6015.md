@@ -78,7 +78,7 @@
 
 ### 追跡 (run 4・#6015): D の型の手がかり
 
-測定: `analysis/flapi/py69_d_type_probe.py` (`FL_WIN64_DIR=<展開先> python3 analysis/flapi/py69_d_type_probe.py`)。コード commit は本 PR の最後のもの。実測 rc=0、real 1m8.059s (load 0.98 付近)。
+測定: `analysis/flapi/py69_d_type_probe.py` (`FL_WIN64_DIR=<展開先> python3 analysis/flapi/py69_d_type_probe.py`)。コード commit は本 PR の最後のもの。実測 rc=0、real 1m8.059s。
 
 | 項目 | 結果 | 根拠 (PE 箇所) |
 |---|---|---|
