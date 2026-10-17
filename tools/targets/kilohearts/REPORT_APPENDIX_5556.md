@@ -132,3 +132,40 @@ ACFStartup() = 0 (0x0)
 | IID を除く 4 つの GUID (`88882C2D…`・`96D42C2D…`・`A207EE9E…`・`12BEA399…`) の interface 名 (IID `382B6A96…` は §6.2 で同定済み) | slot の型が決まらず、受入 (1) の初期化判定に使う戻り値の意味が決まらない | #5556 (本 issue の残り) |
 | slot の戻り値を変えたときの分岐 (`0x180264bb8` 以降の `ACFRegisterComponent` 相当の有無) | 受入 (1) の判定 | #5556 (本 issue の残り) |
 | Web 検索 (GUID の名前引き) は本 run で失敗 | GUID の名前を外部から確定できない | #5556 (本 issue の残り) |
+
+## 8. 追加測定 (KH-169 第 4 run・戻り値の分岐)
+
+前回 §7 の未解決「slot の戻り値を変えたときの分岐」を、`runtime_wine/loader_branch.c` で測ろうとした。QI の戻り値 (argv[2]) と slot[2]・slot[3] の戻り値 (argv[3]) を変えられる。
+
+測定 commit: `2909717fc` (`loader_branch.c` を追加した commit)。
+
+**注意: 下表は未検証の記録 (生ログ無し)。** 第 4 run で得た値を記したもので、stdout の生ログも `loader_branch.exe` の照合も無い。本 run では wine・MinGW・`plugins-kilohearts` 素材が無く、再実行できていない。採取されるまで実測の裏付けとして扱わない。
+
+| QI 戻り値 | slot 戻り値 | slot[3] 呼出し | slot[2] 呼出し | `ACFStartup()` (未検証) |
+|---|---|---|---|---|
+| `0` (S_OK) | `0` | 3 回 | 1 回 | 0・exit 0 |
+| `0` (S_OK) | `1` | 3 回 | 1 回 | 0・exit 0 |
+| `0` (S_OK) | `80004005` | 3 回 | 1 回 | 0・exit 0 |
+| `80004002` (E_NOINTERFACE) | (呼ばれない) | 0 回 | 0 回 | 0・exit 0 |
+
+- 未検証の記録の上では、slot の戻り値を変えても後続の呼出し回数は変わらず、QI 失敗時も 0 で戻る。
+- 結論 (未検証): 記録が正しければ、`ACFStartup` の戻り値 0 は QI・slot の成否に依存しない。戻り値で初期化の成否を判定できない可能性がある。確定はしていない。受入 (1) の「初期化まで通ること」は未達のまま。
+
+### 8.1 GUID の名前
+
+- 第 4 run の記録では、Web 検索 (`382B6A96…`・`88882C2D…`・`96D42C2D…` を含むクエリ) は失敗 (`Web search cancelled`)。本 run では再実行していない。
+- 第 4 run の記録では、`strings` で `HeartCore.core_64` を検索したが、GUID と型名の対応は取れなかった (RTTI の型名のみ)。名前は未特定。本 run では `HeartCore.core_64` を取り出していない。
+
+### 8.2 検証情報
+
+- 素材の展開経路と sha256 は §8.3 を参照。
+- `loader_qi_ok.c` は第 4 run で LOAD OK・QI S_OK・slot[3] 3 回・slot[2] 1 回・戻り値 0・exit 0 (§7 と一致) を記録している。これは §7 の生ログの記録で、`loader_branch` の結果ではない。本 run では wine が無いため再実行していない。
+
+### 8.3 再現情報と未採取の範囲
+
+- 素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` (zip) → 内の `HeartCore.core_64` (76,642,304 B)。sha256 `d55ce8b4…1441e` (§2 と一致)。`windows.zip/1ccb1df8c8f10745` 自体は `HeartCore.core_64` ではなく、プラグイン群の zip。そこから取り出す必要がある。
+- ビルド: `x86_64-w64-mingw32-gcc -O0 -o loader_branch.exe loader_branch.c` (`runtime_wine/` で実行)。第 4 run の `loader_branch.exe` sha256 `16ab2917…` は記録値。本 run では再ビルドできなかったため照合していない。
+- 実行: `WINEDEBUG=-all wine ./loader_branch.exe "$PWD/HeartCore.core_64" <QI の戻り値 16 進> <slot 戻り値 16 進>`。表の 4 条件は `(0 0)`・`(0 1)`・`(0 80004005)`・`(80004002 0)`。第 4 run では全条件 exit 0・stderr 空と記録されている (未検証)。
+- 素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` (zip) → 内の `HeartCore.core_64` (76,642,304 B)。sha256 `d55ce8b4…1441e` (§2 と一致)。`windows.zip/1ccb1df8c8f10745` 自体は `HeartCore.core_64` ではなく、プラグイン群の zip。そこから取り出す必要がある。
+- stdout の生ログ (各条件の全行): **未採取**。第 4 run の stdout は保存されていない。再採取の条件は素材 `plugins-kilohearts`・Wine 9.0・MinGW `x86_64-w64-mingw32-gcc`。採取後にここへ全行と `loader_branch.exe` の sha256 を追記する。
+- 参考: `loader_qi_ok.exe` (QI S_OK・slot 戻り値 0) の §7 の生ログ (7 行) は残っている。`(0 0)` 条件の土台になるが、`loader_branch` 自体の生ログではない。
