@@ -35,8 +35,8 @@ flags は `flapi_table.json` の kwsig.flags と一致する。
 - `0xfdd1e0`: `[0x605ccd] → [+0x7e8]` の object に対し、`edx ≥ 2` なら `0x7cbd30`、それ未満なら `0x7cbd80` を呼ぶ (引数は `ecx`)。
 
 **未確認 (推測で埋めない)**:
-- `[0x603f6b]`・`[0x60421b]` の意味 (モードのフラグか、再生状態のフラグか)。
-- `0x1180d40` (speed を受けて dl=1 を取る経路)・`0x7cbd30`・`0x7cbd80` の中身。`speed << 4` の単位 (tick・pixel・ppq の別) も未確定。
+- `[0x603f6b]`・`[0x60421b]` の意味 (モードのフラグか、再生状態のフラグか)。§4.2 で指す先の byte までは確定。
+- `0x1180d40` の `dl` 引数の意味。`speed << 4` の単位 (tick・pixel・ppq の別) も未確定。`0x1180d40` の呼出し先 (`0x11e79d0`・`0x11f3450`) と呼出し元 4 件は §4.2 で確定。
 - `startStop` の値 (0・1・2 以上) が何を意味するか。`edx==1` で止める分岐と `edx≥2` の分岐の対応は PE 上の形だけ確定し、API 名との対応は未確定。
 
 ## 3. markerJumpJog・markerSelJog (PE 確定の部分)
@@ -53,12 +53,13 @@ flags は `flapi_table.json` の kwsig.flags と一致する。
 ### 3.1 `0xfdd2c0` の op 0x23・0x24 の経路 (`pe_ui_dispatch_probe.py`・arg・mode は未知で両分岐を辿った)
 
 - 両 op とも、`0xfdeaf0` と `0x728f50` の両方に `rcx = op` (0x23 または 0x24) を渡す。
-- `0xfde3e7` の `0x1180ef0(ecx = [rbp+0x3c], dl = [rbp+0x43])` で `dl` が **op 0x23 は 0、op 0x24 は 1**。`markerJumpJog` と `markerSelJog` の作用の違いはこの `dl` にあると読めるが、`0x1180ef0` の中身は未読。
-- `0xfdeaf0` は `0x617920` を呼んだ後 `0x425210(obj, [edx], r8 = op, r9 = arg)` を呼ぶ (引数の形まで確定、`0x425210` の中身は未読)。
-- `0x728f50` は `[rip+0xecd1fc]` が 0 なら 0 を返し、非 0 なら `0x72afa0(obj, op, arg)` を呼ぶ (`0x72afa0` は未読)。
+- `0xfde3e7` の `0x1180ef0(ecx = [rbp+0x3c], dl = [rbp+0x43])` で `dl` が **op 0x23 は 0、op 0x24 は 1**。`markerJumpJog` と `markerSelJog` の作用の違いはこの `dl` にあると読めるが、`dl` 分岐の先は §4.1 の表 (`0x1180ef0` の入口と呼出し先) までしか確定していない。
+- `0xfdeaf0` は `0x617920` を呼んだ後 `0x425210(obj, [edx], r8 = op, r9 = arg)` を呼ぶ (`0x425210` は PostMessageW の thunk。§4.2)。
+- `0x728f50` は `[rip+0xecd1fc]` が 0 なら 0 を返し、非 0 なら `0x72afa0(obj, op, arg)` を呼ぶ (`0x72afa0` の分岐と呼出し元は §4.2)。
 
 **未確認 (推測で埋めない)**:
-- `0x1180ef0` の dl 分岐の意味 (jump と select の違い)、`0x425210`・`0x72afa0` の作用先。
+- `0x1180ef0` の dl 分岐の意味 (jump と select の違い)。
+- `0x72b320` 以下の作用 (`op` と marker 状態の対応は §4.2 の未確定点)。
 - `0xfdd270` の mode の値 (bit 1 が立つ条件) と、`arg`・`mode` が 0 以外のときの分岐。
 - `markerJumpJog`・`markerSelJog` が状態のどこを変えるか (マーカー位置・選択範囲のどれか)。`value` の単位 (tick・bar・marker 番号) と `flags` (`midi.GT_All` の既定) の効果も未確定。
 
@@ -79,11 +80,22 @@ flags は `flapi_table.json` の kwsig.flags と一致する。
 
 この 4 箇所の作用先 (`0x6d9ca0`・`0x6d9d50`・`0xe4b3a0`) と、`0xe43d30` が書く `[rbx+0xd74]`・`[rbx+0xd78]` の意味 (マーカー位置か選択範囲か) は**未確認**。推測で埋めない。
 
-**未確認 (本 issue で残った 4 件)**:
+## 4.2 残り 5 箇所の確定 (#6183 の残作業)
+
+| VA | 確定した内容 (PE 上の事実) | 根拠 |
+|---|---|---|
+| `0x425210` | **user32!PostMessageW の import thunk**。`jmp qword ptr [rip+0x154b8fa]` の IAT slot RVA `0x1570b10` が `PostMessageW` (hint/name RVA `0x1572476`)。`0x1572476` は VA ではなく RVA として読む。`0xfdeaf0` (marker 系) から `edx = [ポインタ]`・`r8 = op`・`r9 = arg` で呼ばれる。 | `pe_thunk_target.py` の出力 `0x1572476` を RVA とみなし IAT (`pefile` の import 表) と照合 |
+| `0x72afa0` | `(obj, op, arg)` を受け、`op` で分岐 (`0xb`・`0xd`・`0x1b`・`0x2b` 等) し、`0x72af60` を経由して `0x72b320([obj+0x40], ...)` を呼ぶ薄いディスパッチ (`0x72af60` は引数を組み立てるだけ)。唯一の呼出し元は `0x728f50` (`[rip+0xecd1fc]` が非 0 のとき)。 | `pe_disasm.py 72afa0` `72b003`〜`72b0cb`・`72af60`。呼出し元は capstone 全走査 (`0x728f74`) |
+| `0x1180d40` | `ecx` (speed) を受け、`0x40c660` の結果 (double) と `0x1180c10` の結果の積で位置を計算し、`0x11e79d0`・`0x11f3450` を呼ぶ。`dl` は `[rip+0x3f]` の byte (`esi` の経路で `0xd0b740` も呼ぶ)。呼出し元は `0xfdd23a` (§2.1 の `dl=1` 側) ほか 3 箇所。 | `pe_disasm.py 1180d40` / capstone 全走査 (`call 0x1180d40` 4 件) |
+| `[0x603f6b]` | `.data` (VA `0x15e1198`) のポインタ変数。その指す先の **byte** を `cmp byte ptr [rcx], 0` で読み、フラグとして分岐する。モード名の確定はしていない。 | `pe_disasm.py fdd220` の `0xfdd226`・`0xfdd22d`・実効アドレスは `next_ip + disp` で計算 |
+| `[0x60421b]` | `.data` (VA `0x15e1468`) のポインタ変数で、同じく指す先の byte をフラグとして読む (`0xfdd246`・`0xfdd24d`)。 | 同上 |
+
+**残った未確認 (推測で埋めない)**:
+- `0x72b320` 以下の作用 (`0x72af60` の先)。`op` と marker の状態 (マーカー位置か選択範囲か) の対応は未確定。
+- `[0x603f6b]`・`[0x60421b]` が指す byte の意味 (モードか再生状態か) と、その値を書く側。
 - `0x1180ef0` の jump 側 (`dl=0`) の終端と、`[rsi+0xd74]`・`[rsi+0xd78]` の意味。
-- `0x425210` (op 0x23・0x24 の経路) は間接 jmp thunk で、`pe_thunk_target.py` の結果は飛び先 `0x1572476`。この飛び先は逆アセンブルすると命令境界が不自然 (`jrcxz` 単独) なので、thunk の作用先は**未確認**。
-- `0x72afa0` の op による分岐 (`cmp eax, 0xb` 等) は読めたが、作用先の関数は未読。
-- `0x1180d40`・`[0x603f6b]`・`[0x60421b]` (continuous 系のフラグ) は、§2.1 のまま未確認。
+
+**前 run の誤り (訂正)**: §3.1 の `0x425210` は「飛び先 `0x1572476` が不自然・作用先不明」と書いたが、これは RVA を VA として逆アセンブルしたための誤読だった。正しくは PostMessageW の thunk (本節の表)。
 
 ## 5. 検証
 
