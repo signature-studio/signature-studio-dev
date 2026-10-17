@@ -1,0 +1,453 @@
+{
+ "variant": "plain",
+ "boot": {
+  "rc": null,
+  "threw": {
+   "cls": "exit",
+   "code": 0
+  },
+  "units_run": 895,
+  "units_total": 942,
+  "units_empty": 46,
+  "rax": "0x1",
+  "longjmp": 1,
+  "stage": 1,
+  "diag_nullfill": {
+   "on": false,
+   "skip": 0,
+   "pass": 0
+  },
+  "getmem": 3680,
+  "freemem": 1499,
+  "va_calls": 25,
+  "va_bytes": 19861424,
+  "getproc": 534,
+  "exit": 1,
+  "cb_calls": 0,
+  "soft_calls": 86,
+  "soft_uniq": 23,
+  "mm_after": {
+   "getmem": "0x407a50",
+   "freemem": "0x407e20",
+   "realloc": "0x408040",
+   "slot3": "0x4083b0"
+  },
+  "undo_probe": {
+   "slot_0x15e1c78": "0x16bb068",
+   "pos_0x20": 0,
+   "count_0x24": 0,
+   "ret_singleton_0x16b82e0": "0x0",
+   "slot_0x15e4790": "0x141d6b8",
+   "safe_obj": "0x0",
+   "safe_obj_0x98": null,
+   "safe_obj_0x88": null
+  },
+  "py_events": {
+   "n": 24,
+   "over": 0,
+   "events": [
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e1c78",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x16bb068",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e4790",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x141d6b8",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b82e0",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e1140",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x16b8488",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b8488",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b8250",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x13a5c90",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x407a50",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15f34a0",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16baff0",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x13a5010",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x200000000",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x13e4d58",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15f26e8",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16bcbf0",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x13e7628",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x2c0000",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15eac90",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 1,
+     "site": 1,
+     "slot": "0x15eac90",
+     "proc": "0x41e7e0",
+     "old": "0x0",
+     "new": "0x13768b0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 43,
+     "site": 8,
+     "slot": "0x15f26e8",
+     "proc": "0x28",
+     "old": "0x0",
+     "new": "0x96793",
+     "aux": "0x0"
+    },
+    {
+     "unit": 85,
+     "site": 2,
+     "slot": "0x13a5010",
+     "proc": "0x59f9a0",
+     "old": "0x200000000",
+     "new": "0x2000a2c4c",
+     "aux": "0x0"
+    },
+    {
+     "unit": 123,
+     "site": 2,
+     "slot": "0x13e4d58",
+     "proc": "0x63aae0",
+     "old": "0x0",
+     "new": "0x2b3",
+     "aux": "0x0"
+    },
+    {
+     "unit": 132,
+     "site": 8,
+     "slot": "0x15f34a0",
+     "proc": "0x1e",
+     "old": "0x0",
+     "new": "0x7f10001c",
+     "aux": "0x0"
+    },
+    {
+     "unit": 548,
+     "site": 2,
+     "slot": "0x13a5010",
+     "proc": "0xc21b50",
+     "old": "0x2000a2c4c",
+     "new": "0x200bb9dc1",
+     "aux": "0x0"
+    },
+    {
+     "unit": 560,
+     "site": 2,
+     "slot": "0x13a5010",
+     "proc": "0xc44460",
+     "old": "0x200bb9dc1",
+     "new": "0x25b8a6a9a",
+     "aux": "0x0"
+    },
+    {
+     "unit": 851,
+     "site": 8,
+     "slot": "0x16bcbf0",
+     "proc": "0x470",
+     "old": "0x0",
+     "new": "0x4b0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 895,
+     "site": 4,
+     "slot": "0x15eac90",
+     "proc": "0x412a12",
+     "old": "0x13768b0",
+     "new": "0x0",
+     "aux": "0x0"
+    }
+   ]
+  },
+  "py_snap": {
+   "last": {
+    "unit": 895,
+    "pos": 0,
+    "count": 0,
+    "mgr": "0x16bb068",
+    "safe_g": "0x141d6b8",
+    "safe_obj": "0x0",
+    "f98": "0x0",
+    "f88": "0x0",
+    "sing": "0x0"
+   },
+   "trace": [
+    {
+     "unit": 0,
+     "pos": 0,
+     "count": 0,
+     "mgr": "0x16bb068",
+     "safe_g": "0x141d6b8",
+     "safe_obj": "0x0",
+     "f98": "0x0",
+     "f88": "0x0",
+     "sing": "0x0"
+    }
+   ],
+   "over": 0
+  },
+  "ipp_ptr_15F34A0": "0x7f10001c",
+  "ipp_ptr_15F40E8": "0x7f0f0000",
+  "ipp_total": 67,
+  "ipp_called": [
+   [
+    "ippsZero_8u",
+    3,
+    "0x67264d"
+   ],
+   [
+    "CreateCursorFromFont",
+    64,
+    "0x815e9c"
+   ]
+  ],
+  "ipp_call_slot": {
+   "slot_15e0a48": "0x15f34a0",
+   "obj_first_qword": "0x7f10001c"
+  },
+  "ipp_stop": null,
+  "ipp_token_at": [
+   [
+    "ippsZero_8u",
+    [
+     "0x15f34a0"
+    ]
+   ],
+   [
+    "CreateCursorFromFont",
+    [
+     "0x15f6f88"
+    ]
+   ]
+  ],
+  "stopped_at_1based": 895
+ },
+ "outmem": {
+  "mem_bytes": 905969664,
+  "stack": {
+   "base": "0x11dd2200",
+   "end": "0x115d2200"
+  },
+  "full": "d75fb961f38efc7bb5ae861a86bab729c80bfb6708d2314fa255edd1a71e8806",
+  "no_cstack": "224662d289196a34ebf36ac3792620e3ba221f3a3ffc9e01449e2ff8e01bd37c",
+  "sections": {}
+ },
+ "survey": null,
+ "tolerant": null,
+ "cfi": null,
+ "log_cap": {
+  "cap": 0,
+  "time_cap_s": 0,
+  "quiet_bin": false,
+  "bytes": 0,
+  "lines": 0,
+  "bin_lines": 0,
+  "bin_bytes": 0,
+  "hit": null,
+  "elapsed_ms": null,
+  "head": [],
+  "tail": []
+ },
+ "px6bbc20": {
+  "calls_all": 0,
+  "calls_site_6c9380": 0,
+  "first_rect_x0_y0_x1_y1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "last_rect_x0_y0_x1_y1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "rect_changes": 0,
+  "x_min_max_y_min_max": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "calls_other_ret": 0
+ },
+ "soft_top": [
+  "LoadImageW:21",
+  "GetSystemMetrics:9",
+  "RegisterWindowMessageW:8",
+  "GetStockObject:7",
+  "RegisterClipboardFormatW:5",
+  "GetDC:4",
+  "ReleaseDC:4",
+  "GetDeviceCaps:3",
+  "LoadCursorW:3",
+  "SystemParametersInfoW:3",
+  "LoadIconW:2",
+  "EnumDisplayMonitors:2",
+  "GetClassInfoW:2",
+  "RegisterClassW:2",
+  "CreateWindowExW:2",
+  "SetWindowLongPtrW:2",
+  "CreatePalette:1",
+  "GetKeyboardLayout:1",
+  "GetClipboardFormatNameW:1",
+  "GetProcessDpiAwareness:1",
+  "EnumDisplaySettingsW:1",
+  "GetClipCursor:1",
+  "EnumFontFamiliesExW:1"
+ ],
+ "ipp": {
+  "mode": 3,
+  "on": true,
+  "ptr_15F34A0": "0x7f10001c",
+  "ptr_15F40E8": "0x7f0f0000",
+  "total": 67,
+  "called": [
+   [
+    "ippsZero_8u",
+    3,
+    "0x67264d"
+   ],
+   [
+    "CreateCursorFromFont",
+    64,
+    "0x815e9c"
+   ]
+  ],
+  "stop": null,
+  "token_at": [
+   [
+    "ippsZero_8u",
+    [
+     "0x15f34a0"
+    ]
+   ],
+   [
+    "CreateCursorFromFont",
+    [
+     "0x15f6f88"
+    ]
+   ]
+  ],
+  "call_slot": {
+   "slot_15e0a48": "0x15f34a0",
+   "obj_first_qword": "0x7f10001c"
+  }
+ },
+ "notes": {
+  "entry": "0x1376820",
+  "longjmp_target": "0x1376840",
+  "init_table": "0x13768b0",
+  "baseline_retdec": {
+   "boot_units": "17 dispatched (16 completed), raise 0xEEDFADE in unit#17 (0x454090)",
+   "survey": "m11 sx 純リンク baseline (tools/m11/work/shimx_link/baseline/m11_boot.survey.json): ok 800 / oob 50 / halt0 44 / closure外 46 / abort 1 / noproc 1。なお --fix 変種は ok 800 / oob 41 / halt0 53 (CAB-129 halt0 対応表適用)。",
+   "route_diff": "results/verdict_boot.jsonl (gen_verdict.py: baseline を native 側、x64c を wasm 側に対応)"
+  }
+ }
+}
