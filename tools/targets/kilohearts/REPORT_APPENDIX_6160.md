@@ -7,7 +7,7 @@
 - 測定 commit: `c4a9461e4` (コードを変えた最後の commit)。
 - 規則: `FUN_1802ed7f0` 内 934〜935 行の `fVar23 = (float)FUN_180fc6870();` (0 引数) を、`*(float *)(*(longlong *)(param_2 + 0x3198) + 0xa8) * 1.5707963705062866f` を引数に渡す形にする。件数 1 を assert。
 - 機械語 (`0x1802ed7f0`〜): `1802ed936 movss xmm7,[rcx+0xa8]` (rcx = [param_2+0x3198]、`mov rcx,[rdx+0x3198]` は 1802ed87c・1802ed8c8 で設定) → `1802eda13 mulss xmm7,[0x181563038]` → `1802eda1b movaps xmm0,xmm7` → `1802eda1e call 0x180fc6870`。
-- 定数 `[0x181563038]` の float 値は `0x3fc90fdb` = 1.5707963705062866 (π/2) を `HeartCore.core_64` から確認。
+- 定数 `[0x181563038]` の float 値は `0x3fc90fdb` = 1.5707963705062866 (π/2 の float32。bit 列を decode して確認)。機械語側の確認に使う `HeartCore.core_64` は `plugins-kilohearts` 素材 (`docs/REFERENCES.md`) から取り出す (手順は `ghidra_route/gtype_census.sh` 冒頭)。
 - 間の区間 (1802ed936〜eda1e) に xmm7 への書込み・rcx の書換え・call は無い (直線区間)。
 - 1802eda2a の `call 0x180fc6d70` の xmm0 = xmm7 (movaps・1802eda27) は変えない。`FUN_180fc6d70` は本規則で変わらない。
 
@@ -37,7 +37,8 @@
 
 - 差分: 引数数不一致 41 → 40 (-1)・error 行 273 → 272 (-1)。`delay.c:935` の `single argument 'fParam' was not specified` が消えた。他の行は変わらない。
 - gain / haas / gate の `.o` は HEAD と基点 (`ghidra_route` を `$RUNNER_TEMP/kh/base_route` に退避したもの) で `cmp` 一致: gain 1435 B・haas 3217 B・gate 3756 B。
-- 測定: `gtype_census.sh` 全体 real 47.6 s (HEAD 測定時 load は 1.0 前後・4 vCPU・n=1)。
+- 測定: `gtype_census.sh` 全体 real 47.6 s (HEAD 測定時 load は 1.0 前後・4 vCPU・n=1)。本数値は本付録が唯一の正本 (PR 本文は本節へリンクする)。
+- 再測定の状態: fbe856a49 の検証 run (fix モード) では `HeartCore.core_64`・Ghidra・emsdk が環境に無く、census を再実行できなかった。本節の数値は再確認していない。再現するときは `gtype_census.sh` を実行し、結果で本節を置き換える。
 
 ## 4. 残件
 
