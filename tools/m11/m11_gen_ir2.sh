@@ -115,6 +115,15 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
     mv work/boot_final.r8b.ll work/boot_final.ll
     python3 m11_cond.py r8b=applied
   fi
+  # #5999 (CI-249): function_f552a0 のループ内呼出し第 1 引数を機械語 [rbx] (= %arg1) に戻し、rcx.0/rcx.1 の loop-carry を外す (#5995)。
+  #   既定 OFF (e2e 期待値ゲートが 101→114 / 873→875 で落ちたため。ldfix/REPORT_5999.md)。M11_FIX_F552A0=1 のときだけ適用する (ir_conditions.json f552a0=applied)。想定外の入力は assert で止まる (fail-closed)。
+  if [ "${M11_FIX_F552A0:-0}" = 1 ]; then
+    python3 ldfix/fix_f552a0.py work/boot_final.ll work/boot_final.f552a0.ll
+    mv work/boot_final.f552a0.ll work/boot_final.ll
+    python3 m11_cond.py f552a0=applied
+  else
+    python3 m11_cond.py f552a0=not-applied
+  fi
   # #3234 (SHX-T40, D23) 実験用: M11_FIX_SHX_T40=1 のときだけ function_448490 の親 object を callee の view に合わせる。
   #   既定 OFF (実測で修復 ON は unit 18 で hang・+0x70 のみでは OOB。tools/m11/REPORT_SHX-T40.md)。既定の IR は変えない。
   if [ "${M11_FIX_SHX_T40:-0}" = 1 ]; then
