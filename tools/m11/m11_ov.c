@@ -1386,6 +1386,38 @@ void m11_414c70_obs(unsigned long long a1, unsigned long long a2, unsigned long 
 }
 #endif
 
+/* #5358 計測専用 (M11_INSTR_414BB0=1 のときだけ有効): function_414bb0 の入口で arg1 (&s24 の候補)・[arg1]・arg2 (c) を出す。
+ * 線形メモリ外は読まない。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_414BB0
+#define M11_INSTR_414BB0 0
+#endif
+#if M11_INSTR_414BB0
+static int g_414bb0_n;
+void m11_414bb0_obs(unsigned long long a1, unsigned long long a2) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long w0 = 0;
+    if (a1 >= 8 && a1 + 8 <= heap) w0 = *(volatile unsigned long long*)(uintptr_t)a1;
+    if (g_414bb0_n++ < 64)
+        fprintf(stderr, "[m11][414bb0] #%d arg1=0x%llx [arg1]=0x%llx arg2=0x%llx\n", g_414bb0_n, a1, w0, a2);
+}
+#endif
+
+/* #5358 計測専用 (M11_INSTR_652500=1 のときだけ有効): function_652500 の入口で arg1 (&s)・[arg1] (文字列ポインタ候補) を出す。
+ * 線形メモリ外は読まない。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_652500
+#define M11_INSTR_652500 0
+#endif
+#if M11_INSTR_652500
+static int g_652500_n;
+void m11_652500_obs(unsigned long long a1) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long w0 = 0;
+    if (a1 >= 8 && a1 + 8 <= heap) w0 = *(volatile unsigned long long*)(uintptr_t)a1;
+    if (g_652500_n++ < 64)
+        fprintf(stderr, "[m11][652500] #%d arg1=0x%llx [arg1]=0x%llx\n", g_652500_n, a1, w0);
+}
+#endif
+
 /* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
  * 8cc190 (Add) は FComparer = TEqualityComparer<K>.Default (53df80 → 479b40 _LookupVtableInfo) の GetHashCode/Equals を使う.
  *   479b40  `movzx rcx,byte [rbx]` (TypeInfo.Kind) の deref 脱落 (D4) で Kind=0 固定, `test cl,2; call rax` (getter 呼出し) 脱落 (D15)
