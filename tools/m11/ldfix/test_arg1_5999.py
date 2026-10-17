@@ -5,6 +5,7 @@
   - 修正前の loop-carry 形 (第 1 引数が %arg1 か境界値) は NG
   - fix_f552a0.py の適用後 (第 1 引数が *%arg1 の load) は OK
   - 6 件でない IR は fail-closed (終了コード 2)
+  - align 付き store/load を経由した *arg1 は OK (旧正規表現は落ちる)
 """
 import os
 import subprocess
@@ -51,6 +52,24 @@ exit:
 }
 '''
 
+# align 付きの store/load を経由した第 1 引数 (*%arg1 を slot に退避して読み直す形)。判定は OK でなければならない。
+ALIGNED = '''define i64 @function_f552a0(i64 %arg1) local_unnamed_addr {
+entry:
+  %p = inttoptr i64 %arg1 to ptr
+  %v = load i64, ptr %p, align 8
+  %s = alloca i64
+  store i64 %v, ptr %s, align 8
+  %r = load i64, ptr %s, align 8
+  %c1 = call i64 @function_12df530(i64 %r, i64 0)
+  %c2 = call i64 @function_12df530(i64 %r, i64 0)
+  %c3 = call i64 @function_12df530(i64 %r, i64 0)
+  %c4 = call i64 @function_12df530(i64 %r, i64 0)
+  %c5 = call i64 @function_12df530(i64 %r, i64 0)
+  %c6 = call i64 @function_12df760(i64 %r)
+  ret i64 %c6
+}
+'''
+
 
 def run(*args):
     return subprocess.run([sys.executable] + list(args), capture_output=True, text=True)
@@ -81,11 +100,17 @@ def main():
         if r.returncode != 2:
             fails.append('call 件数不足が fail-closed にならない (rc=%d)' % r.returncode)
 
+        aligned = os.path.join(d, 'aligned.ll')
+        open(aligned, 'w').write(ALIGNED)
+        r = run(JUDGE, aligned)
+        if r.returncode != 0 or 'ok=6 ng=0' not in r.stdout:
+            fails.append('align 付き store を経由した *arg1 が OK にならない (rc=%d): %s' % (r.returncode, r.stdout))
+
     if fails:
         for f in fails:
             print('FAIL: ' + f)
         return 1
-    print('OK: test_arg1_5999 (3 件)')
+    print('OK: test_arg1_5999 (4 件)')
     return 0
 
 

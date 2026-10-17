@@ -25,7 +25,7 @@ import sys
 
 FN = re.compile(r'^define [^\n]*@function_f552a0\(.*?\n}\n', re.M | re.S)
 DEF = re.compile(r'^\s*(%[\w.]+) = (.*)$', re.M)
-STORE = re.compile(r'^\s*store i64 ([^\s,]+), ptr (%[\w.]+)\s*$', re.M)
+STORE = re.compile(r'^\s*store i64 ([^\s,]+), ptr (%[\w.]+)(?:, align \d+)?\s*$', re.M)
 CALL = re.compile(r'^\s*(?:%[\w.]+ = )?call i64 @function_(12df530|12df760)\((.*)\)\s*$', re.M)
 ARG0 = re.compile(r'^i64 ([^\s,]+)')
 EXPECT_CALLS = 6
