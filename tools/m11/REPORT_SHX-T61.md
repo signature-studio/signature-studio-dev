@@ -92,15 +92,16 @@ $ git diff b07e20aaf HEAD -- tools/m11/ldfix/fix_shx_t61.py tools/m11/shimx_link
 ## 6b. 親の外側 loop 入口の計装 (`fix_shx_t61b`・本 run・既定 OFF)
 
 - 計装: `M11_FIX_SHX_T61B=1` のときだけ親 `function_448490` の外側 loop 入口 `dec_label_pc_4484f4` に入る。入口の通過回数・上限 `%9` (下位 32 bit)・添字 `-32.0`・`-32.2` を `@fx61b_buf` へ書き、回数が `FX61B_LIMIT` (既定 100000) を超えたら trap。記録の load・store だけで分岐は変えない。
-- 既定 OFF: `ir_sha256` 先頭 `b202c157a80807f2`・`shx_t61b=not-applied`・実 boot `units_run=17`・`dllmain_done=true`・`va_calls=2`・`icall_ok=24`・`icall_miss=1`・`boot_rc="1"`・`longjmp_hit=1` (REPORT_SHX-T28 §7 と一致)。
+- 既定 OFF: `ir_sha256` 先頭 `b202c157a80807f2`・`shx_t61b=not-applied`・実 boot `units_run=17`・`dllmain_done=true`・`va_calls=2`・`icall_ok=24`・`icall_miss=1`・`boot_rc="1"`・`longjmp_hit=1`。このうち `units_run`・`dllmain_done`・`icall_ok`・`icall_miss`・`longjmp_hit`・`boot_rc` は REPORT_SHX-T28 §7 と一致する。`va_calls` は REPORT_SHX-T28 §7 に記載が無い (`va_calls=2` の既存の記録は REPORT_SHX-T44 §2 の baseline のみ)。
 - ON (`M11_FIX_SHX_T40=1 M11_FIX_SHX_T61B=1`・既定 LIMIT): IR 生成 rc 0 (`fx61b` 14 行)・build rc 0・trace build rc 0 (`mismatch=0 undefined=0 duplicate=0`)。実 boot は trap で終わり、0.5 s 未満。
 
 | LIMIT | 入口の通過回数 `count` | `lim` (%9) | `idx` (-32.0) | `idx2` (-32.2) | 所要 |
 |---|---|---|---|---|---|
-| 3 | 4 (trap) | 10 | 1 | — (計装前) | 0.52 s |
+| 3 | 4 (trap) | 10 | 1 | 未読取 (この run では読み出していない。`fx61b_buf[3]` は記録されている) | 0.52 s |
 | 100000 (既定) | 100001 (trap) | 10 | 1 | 1 | 0.52 s |
 
-- 読み取り: 入口は上限 10 の下で 100001 回通過し、添字 `-32.0`・`-32.2` は 1 のまま変わらない。外側 loop の続行判定 `%106 = icmp slt %9, %105` (`dec_label_pc_448731`) は、`-32.2`=1 < `%9`=10 で真になり、loop が続く。
+- 読み取り: 入口は上限 10 の下で 100001 回通過し、添字 `-32.0`・`-32.2` は 1 のまま変わらない。
+- 続行判定 (未確定): `dec_label_pc_448731` の `%106 = icmp slt i64 %9, %105` は `%9 < %105` を意味する。`%9`=10 を入れると `10 < 1` で偽になり、式どおりなら続行しない。続行の向きは、`%106` で分岐する `br` の true / false の行き先で決まる。この run では IR を読んでいない (素材 `work-m11` が無く、IR を生成できなかった)。`%105` が `-32.2` の sext であることも未確認。したがって「loop が続く」とは書かない。
 - 分かったこと: 外側 loop の添字 (`-32.0` / `-32.2`) が 1 から進まないことが、入口の記録で確かめられた。ただし、添字が進まない分岐 (`dec_label_pc_448681`・`448669`・`44870f` のどれを通るか) は未記録のため、hang の分岐は未確定。
 - 注意 (計装の作り方): `m11_build.sh` は `FX61B_LIMIT` を stamp に含めない。LIMIT を変えたら `work/boot_final3.ll`・`work/shimx_link/boot_hn.ll`・`boot_fixed.ll` を消してから `m11_gen_ir2.sh` → `m11_build.sh` → `build.sh --trace --soft` の順で作り直す (本 run の LIMIT=3 と 100000 の実測はこの手順)。
 

@@ -3,7 +3,7 @@
 
 外側 loop は dec_label_pc_4484f4 (添字 -32.0 を reload する) で、dec_label_pc_448731 の
   %106 = icmp slt i64 %9, %105   (%9 = [arg2-4] 由来の上限、%105 = -32.2 の sext)
-で続くかを決める。この入口の通過回数 n と、上限 %9 (下位 32 bit)・添字 -32.0 を
+の式で続行の向きを決める (式は %9 < %105。br の向きは IR で未確認)。この入口の通過回数 n と、上限 %9 (下位 32 bit)・添字 -32.0 を
 @fx61b_buf (i32 の配列) に書く。n が FX61B_LIMIT (既定 100000) を超えたら unreachable で trap し、
 JS 側 (run_trace.mjs) が _fx61b_* を読む (fix_shx_t61.py と同じ方式)。
 計装は親の IR の loop 入口だけに入れる。記録のための load・store だけで分岐の結果は変えない。

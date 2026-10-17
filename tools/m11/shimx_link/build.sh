@@ -156,7 +156,7 @@ EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_use
 # sxt_* は trace_rt.c (--trace のみリンク) が定義する。plain で export すると emcc 6.x が undefined exported symbol で止まる
 if [ $TRACE = 1 ]; then EXPORTS="$EXPORTS,_sxt_n,_sxt_name,_sxt_count,_sxt_ret_n,_sxt_ret_unit,_sxt_ret_idx,_sxt_ret_site,_sxt_site_name,_sxt_ret_a,_sxt_ret_b,_sxt_ret_r,_sxt_set_print,_sxt_set_stack"; fi   # SHX-T9k #2593: 呼出し直前の GetLastError と呼出し元 wasm スタックの計装
 if grep -q '^@fx61_buf' "$GEN/boot_trace.ll" 2>/dev/null; then EXPORTS="$EXPORTS,_fx61_count,_fx61_self,_fx61_c4c,_fx61_c48"; fi
-if grep -q '^@fx61b_buf' "$GEN/boot_trace.ll" 2>/dev/null; then EXPORTS="$EXPORTS,_fx61b_count,_fx61b_lim,_fx61b_idx,_fx61b_idx2"; fi   # #5855 (SHX-T61 次段): 親 loop 入口の計装の読み出し口   # #5855 (SHX-T61): 計装の読み出し口 (IR に計装があるときだけ)
+if grep -q '^@fx61b_buf' "$GEN/boot_trace.ll" 2>/dev/null; then EXPORTS="$EXPORTS,_fx61b_count,_fx61b_lim,_fx61b_idx,_fx61b_idx2"; fi   # #5855 (SHX-T61 次段): 親 loop 入口の計装の読み出し口 (IR に @fx61b_buf があるときだけ)
 OUT="$W/m11_sx_$TAG"
 emcc "${OBJS[@]}" -o "$OUT.cjs.tmp" \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
