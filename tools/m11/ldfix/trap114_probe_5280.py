@@ -10,6 +10,10 @@
    +32 call site A (IR 117917 相当: 18787752 を渡す) の通過回数
    +40 call site B (IR 118017 相当: 18787456 を渡す) の通過回数
    +48 最後に通過した call site (1 = A・2 = B・0 = 無し)
+   +56 dec_label_pc_4129be の通過回数 (B の分岐 %51 の直前)
+   +64 dec_label_pc_4129be で読んだ 18787504 の i8 (zext)
+   +72 dec_label_pc_412904 で読んだ 18787504 の i8 (zext)
+   +80 dec_label_pc_412978 で読んだ 18787504 の i8 (zext)
  call site の特定は、元 IR の `call i64 @function_412770(ptr ... 18787752 ...)` と `... 18787456 ...` の行で行う。"""
 import re, sys
 
@@ -18,6 +22,11 @@ ENTRY_FN = 'function_4128b0__lifted'
 SITE_A = 'inttoptr (i64 18787752 to ptr)'
 SITE_B = 'inttoptr (i64 18787456 to ptr)'
 GLOBALS = (18787760, 18787504, 18768032)
+FLAG_LINES = (
+    ('%.pr = load i8, ptr inttoptr (i64 18787504 to ptr)', 'pr', 56, 64),
+    ('%14 = load i8, ptr inttoptr (i64 18787504 to ptr)', 'p14', None, 72),
+    ('%33 = load i8, ptr inttoptr (i64 18787504 to ptr)', 'p33', None, 80),
+)
 
 
 def slot(off):
@@ -46,6 +55,15 @@ def main(src, dst):
             for k, g in enumerate(GLOBALS):
                 out.append('  %%pg%d = load i64, ptr inttoptr (i64 %d to ptr), align 8' % (k, g))
                 out.append('  store i64 %%pg%d, ptr %s, align 8' % (k, slot(8 + 8 * k)))
+            continue
+        flag = next((f for f in FLAG_LINES if start <= i <= end and l.strip().startswith(f[0])), None)
+        if flag is not None:
+            _, tag, cnt_off, val_off = flag
+            out.append(l)
+            if cnt_off is not None:
+                out += bump(tag, cnt_off)
+            out.append('  %%v_%s = zext i8 %s to i64' % (tag, l.split('=')[0].strip()))
+            out.append('  store i64 %%v_%s, ptr %s, align 8' % (tag, slot(val_off)))
             continue
         if start <= i <= end and 'call i64 @function_412770(' in l and (SITE_A in l or SITE_B in l):
             tag = 'sa' if SITE_A in l else 'sb'
