@@ -8,7 +8,8 @@
   2. 各呼出元を含む関数の先頭 (push rbp 直前の ret/int3/nop の後を後方探索)
   3. 呼出元の直前 16 命令
 
-限界: 間接 call・lea 経由の関数ポインタは含まない。走査は 0x1000000..0x1400000 のみ。
+走査範囲: 1〜3 は逆アセンブル (call のみ, .text 0x1000000..0x1400000)。参照の件数は生バイト走査 (E8/E9 rel32・絶対 32bit・RVA 32bit, 0x400000..0x13a44b0) で、jmp は生バイト経由のみ。RIP 相対 lea は未走査。
+限界: 間接 call・RIP 相対 lea・レジスタ経由の関数ポインタは含まない。
 使い方: FL_WIN64_DIR=<展開先の親> PYTHONPATH=<unicorn,pefile,capstone,tools/shared の site-packages> python3 hs_call_41d050.py
 """
 import os
@@ -52,17 +53,25 @@ def main():
             print('  0x%x %s %s' % (i.address, i.mnemonic, i.op_str))
 
     blob = rd(0x400000, 0x13a44b0 - 0x400000 + 0x1000)
-    absn = sum(1 for p in range(len(blob) - 4)
-               if struct.unpack('<I', blob[p:p + 4])[0] == FUNC)
-    rvan = sum(1 for p in range(len(blob) - 4)
-               if struct.unpack('<I', blob[p:p + 4])[0] == FUNC - 0x400000)
-    relc = 0
-    for p in range(len(blob) - 5):
-        if blob[p] in (0xe8, 0xe9):
-            rel = struct.unpack('<i', blob[p + 1:p + 5])[0]
-            if 0x400000 + p + 5 + rel == FUNC:
-                relc += 1
+
+    def refs(target):
+        absn = sum(1 for p in range(len(blob) - 4)
+                   if struct.unpack('<I', blob[p:p + 4])[0] == target)
+        rvan = sum(1 for p in range(len(blob) - 4)
+                   if struct.unpack('<I', blob[p:p + 4])[0] == target - 0x400000)
+        relc = 0
+        for p in range(len(blob) - 5):
+            if blob[p] in (0xe8, 0xe9):
+                rel = struct.unpack('<i', blob[p + 1:p + 5])[0]
+                if 0x400000 + p + 5 + rel == target:
+                    relc += 1
+        return relc, absn, rvan
+
     print('== 0x%x の参照 (0x400000..0x13a44b0 の生バイト)' % FUNC)
+    relc, absn, rvan = refs(FUNC)
+    print('  rel32 call/jmp: %d 件 / 絶対 32bit: %d 件 / RVA 32bit: %d 件' % (relc, absn, rvan))
+    print('== control 0x41d110 の参照 (同じ生バイト走査)')
+    relc, absn, rvan = refs(0x41d110)
     print('  rel32 call/jmp: %d 件 / 絶対 32bit: %d 件 / RVA 32bit: %d 件' % (relc, absn, rvan))
 
 
