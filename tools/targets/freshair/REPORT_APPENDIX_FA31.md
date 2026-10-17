@@ -192,3 +192,6 @@ pdata の関数境界ごとに逆アセンブル (capstone) し、E8/E9 の直�
 - 結論 (本 run): **受入 1〜3 は未達**。ctor の引数 (第 2 引数の 2 語・制御ブロック) を実機の呼出元どおりに与えない限り、P は構築できず、`+0xb98`・`+0xba8` への書込みも捕まえられない。書込みフックは ctor が通った後の段階でしか意味を持たないため、本 run では設置しない。
 - 製品 KPI (FLEngine 起動 dispatch・units_run・最初のウィンドウ): 動かしていない。harness の観測のみ。
 - 測定: `fa31_ctl.sh` (既定) は rc=0・31 s・`caa820=0 ca7db0=72 d8c140=0 d8d700=0` (本 run の基準)。FA_UI31_CTOR 試行は real 0.021 s (FAULT で即終了・n=1)。
+- 静的 (本 run・PM 第 30 波の再投入): ctor 呼出元 13 箇所は全て `rcx=this`・`rdx=A`・`r8=0`・`r9=0` で呼ぶ。`A` は `ca3d50(weak, out)` の戻り値 (`ca3d50` は weak の `+0x60`=ptr・`+0x68`=制御ブロックから shared 相当を作る) で、ctor 先頭は `A` を `+0xb88`/`+0xb90` に移す。
+- 試行 (本 run): `A` を `ca3d50` 経由に変えた (`Q={+0x60=P 所有, +0x68=cb}` → `ca3d50(Q, A)` → `ctor(P, A, 0, 0)`)。`ca3d50` は FAULT しない。ctor は 8/8 で従来どおり `rip=0x18040ddbb addr=0x394e0` で FAULT。
+- 読み (静的): FAULT 箇所は `0x18040dd9a` 以降の shared_ptr 解放 (`lock xadd [rdi+0xc]`) の後で、`addr=0x394e0` は `[r15+0x20]` (vector の end ポインタ相当) の読み。`r15` が不正 (ctor 呼出し元の外側の状態に依る) と推測。`A` の組み方を直しても消えないため、`A` の内容ではなく ctor の外側の状態 (呼出元の this の由来) が原因と推測 (未判定)。
