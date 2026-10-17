@@ -76,8 +76,8 @@ sweep の比較 (同じ 131 関数・既定の値):
   - `work-m6-ott` → `tools/m6/work/`・`tools/ott/work/` (`libottnative.so`・`lift_meta.json`・`entrylift/` を含む)。
   - `plugins-freshair` → `tools/targets/freshair/fetch.sh` を `FA_DL` 指定で実行 (SlateCore.core_64 を作成)。
   - `plugins-ott` の `Install_Xfer_OTT_137.exe` を 7z で展開し、`$_13_/OTT_x64.dll` (AMD64・ImageBase 0x180000000) を `$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll` として配置。REPORT.md の記述 (ImageBase 0x180000000) と一致。
-  - `fl-win64` → `$ANALYSIS_DIR/win64`。`toolchain-retdec` は展開のみ (`ott_route` は `/opt/retdec` 既定を使い本 run では未使用)。emsdk は `/opt/emsdk` 既存を使用。
+  - `fl-win64` → `$ANALYSIS_DIR/win64`。`toolchain-retdec` は展開のみ (`ott_route` は `[RETDEC]` 既定を使い本 run では未使用)。emsdk は `[EMSDK]` 既存を使用。
 - `bash tools/icall/fa_route_build.sh` rc 0 (`fa_route.cjs` 88,639 B)。`bash tools/ott/native/build.sh` rc 0。
 - sweep: `bash tools/icall/diff/fa_sweep.sh 8 60` (既定・従来値とも rc 0)。一次出力は `work/fa_route/sweep.jsonl` (131 行)。
 - `icall_e2e.sh`・`entry_e2e.sh --quick` は既定・`OTT_KEEP_XMM0=0` の両方で rc 0・PASS (§3a)。
-- 再現: `ANALYSIS_DIR=$HOME/analysis bash tools/icall/diff/fa_sweep.sh 8 60` → `funcs 131 bit一致 56 | native crash/timeout 64 | wasm のみ err 10 | 値の不一致 1`。
+- 再現: `ANALYSIS_DIR=<解析 dir> bash tools/icall/diff/fa_sweep.sh 8 60` → `funcs 131 bit一致 56 | native crash/timeout 64 | wasm のみ err 10 | 値の不一致 1`。
