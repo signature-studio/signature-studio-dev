@@ -3,7 +3,7 @@
 ## 13. dllmain モードの実測 (`.data` の一致判定) — T-SH-130 (#4834, 受入 2 は未達)
 
 ### 13.1 結論 (1 行)
-`dllmain` モード (DllMain 後の `.data` を基準にした全バイト比較) は 223 件とも FAIL。不一致は `.data` の 12 バイト (RVA `0x48030`〜`0x4803b`) で、うち 6 バイトは host のアドレス (ASLR) に依存する。既定の `ok` は PASS (223/223 一致) のまま。`all` は ALL OK。
+`dllmain` モード (DllMain 後の `.data` を基準にした全バイト比較) は 223 件とも FAIL。native/wasm の不一致は `.data` の 12 バイト (RVA `0x48030`〜`0x4803b`)。別に、同一入力の 2 回実行で `data_base.bin` が変わるバイトが 6 個 (RVA `0x48032`〜`0x4803c`、ASLR 依存)。両者は別の測定で、後者は前者の範囲に含まれない (`0x4803c` が 12 バイトの外)。既定の `ok` は PASS (223/223 一致) のまま。`all` は ALL OK。
 
 ### 13.2 測定条件
 - 測定 commit: `0403e1a49` (`tools/shared/lift/rex/` の最後のコード変更。HEAD と一致)。
@@ -23,10 +23,11 @@
 | `dllmain` 実行 1 | FAIL | `compared=223 match=0 mismatch=223`・`writes ... data=223` | 2 s | 1.28 0.51 0.19 → 1.28 0.51 0.19 |
 | `dllmain` 実行 2 | FAIL | `compared=223 match=0 mismatch=223`・`writes ... data=223` | 2 s | 1.28 0.51 0.19 → 1.26 0.52 0.19 |
 
-`dllmain` の不一致は全件 `.data` の同じ 12 バイト。`writes data=223` は DllMain 前の初期 `.data` を基準にした書込の数で、DllMain が `.data` を書くため 0 にならない。
+`dllmain` の不一致は全件 `.data` の同じ 12 バイト (RVA `0x48030`〜`0x4803b`)。`writes data=223` は DllMain 前の初期 `.data` を基準にした書込の数で、DllMain が `.data` を書くため 0 にならない。
 
-### 13.4 ASLR による 6 バイトの変化 (2 回実行の出力)
+### 13.4 ASLR による 6 バイトの変化 (2 回実行の出力、RVA `0x48032`〜`0x4803c`)
 `REX_DATA_BASE_OUT` で書かれる `data_base.bin` (`.data` の先頭 111,064 B) を 2 回の `dllmain` 実行で比較した。
+この 6 バイトは「2 回実行で変わる範囲」であり、§13.1 の native/wasm 不一致 (12 バイト) とは別の測定。`0x4803c` は 12 バイト範囲の外なので、6 バイトは 12 バイトに含まれない。両者の包含関係は未測定 (native/wasm 側の不一致バイトを ASLR 無効で測り直していないため、12 バイトとの重なりは主張しない)。
 
 ```
 $ cmp -l data_base_1.bin data_base_2.bin | wc -l
@@ -41,10 +42,10 @@ $ cmp -l data_base_1.bin data_base_2.bin
 ```
 (`cmp -l` の値は 8 進数。)
 
-`setarch x86_64 -R` (ASLR 無効) で同じ 2 回を実行すると、差は 0 バイト (`cmp` が SAME)。したがって 6 バイトの変化は host のアドレス (ASLR) に由来する。lifter の誤りではなく、比較の基準 (native 側の DllMain 後の `.data`) に host 依存の値が入っている。
+`setarch x86_64 -R` (ASLR 無効) で同じ 2 回を実行すると、差は 0 バイト (`cmp` が SAME)。したがって 2 回実行の 6 バイトの変化は host のアドレス (ASLR) に由来する。lifter の誤りではなく、比較の基準 (native 側の DllMain 後の `.data`) に host 依存の値が入っている。
 
 ### 13.5 判定の扱い
-受入 2 (`.data` 全バイト一致) は本 PR では解決しない。一致判定から host 依存の 12 バイトを外すか、決定的な値にするかの判断は PM (#4834)。既定案は本 PR では判定を変えず、`dllmain` は FAIL のまま残し、`all` には含めない。
+受入 2 (`.data` 全バイト一致) は本 PR では解決しない。一致判定から host 依存のバイトを外すか、決定的な値にするかの判断は PM (#4834)。native/wasm の不一致 12 バイトと ASLR の 6 バイトの関係は、判断の前に測り直す必要がある (本 PR では未測定)。既定案は本 PR では判定を変えず、`dllmain` は FAIL のまま残し、`all` には含めない。
 
 ### 13.6 再現
 ```
