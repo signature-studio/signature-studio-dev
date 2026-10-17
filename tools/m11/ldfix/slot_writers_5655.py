@@ -38,4 +38,4 @@ while off < len(data):
 
 for t in sorted(hits):
     st = [h for h in hits[t] if h[2] == 'store']
-    print('slot=%s refs=%d stores=%d %s' % (hex(t), len(hits[t]), len(st), hits[t][:8]))
+    print('slot=%s refs=%d stores=%d stores_list=%s' % (hex(t), len(hits[t]), len(st), st))
