@@ -65,32 +65,34 @@
 
 | 本 | rc | WAV | ログ (バイト) | 計算 thread (R・wchan 0) の utime (ticks) |
 |---|---|---|---|---|
-| Fruity Convolver (RIP 採取あり) | 124 | なし | 1434 | tid 7657: 60 s 5376 → 150 s 13869 → 240 s 22273 |
+| Fruity Convolver (RIP 採取あり・HEAD `7493d05f8` の run) | 124 | なし | 1434 | tid 14479: 60 s 5488 → 150 s 13915 → 240 s 22401 |
 | Fruity Parametric EQ 2 | 124 | なし | 1562 | tid 10383: 60 s 5484 → 150 s 13903 → 240 s 22435 |
 | Fruity Center | 124 | なし | 1498 | tid 12187: 60 s 5647 → 150 s 14366 → 240 s 23184 |
 | FLEX | 未再測 | なし | 1434 | 前回 §3 の 150 s のみ (600 s の記録は無い) |
 
 - 採取は 4 点 (60/150/240 s) で同じ形: 計算 thread が 1 本だけ R のまま utime が増え続け、他の thread は pipe 読み・futex の待ち。
-- 3 本の run は `S2_RIP_AT` を空にして行った (RIP 採取の影響を除く)。Convolver のみ RIP 採取あり。
+- 3 本の run は `S2_RIP_AT` を空にして行った (RIP 採取の影響を除く)。Convolver のみ RIP 採取あり。Parametric EQ 2・Fruity Center の run は `S2_RIP_AT=""` で `S2_TIMEOUT=300 S2_THREAD_AT="60 150 240"` (script は `666a5d4c8` と同じ実行経路)。
+- 表の Convolver 行は HEAD `7493d05f8` の run (RIP 採取あり)。前回の run の値は採らない (上記)。
 - 前回 (旧 §5.1) の値は、tid と値の生データが本ランナーに残っていないため採用しない。
 - 前提: `kernel.yama.ptrace_scope=0` (既定 1 では gdb が `Could not attach to process` で、RIP 採取は空になる)。
 
 ### 5.2 RIP 採取 (Fruity Convolver・S2_TIMEOUT=300・S2_RIP_AT="60 150 240")
 
 - 再現コマンド: `S2_TIMEOUT=300 S2_THREAD_AT="60 150 240" S2_RIP_AT="60 150 240" bash tools/flp/s2_render_probe.sh "Fruity Convolver.flp" 1`。
-- 計算 thread は LWP 7657 (main の 7578 とは別)。`QuickFontCache_x64.dll` のロード先は 0x79f70000 (RVA = RIP − 0x79f70000)。
-  - 60 s: `0x6ffffbfc1b64` (QuickFontCache の範囲外)。
-  - 150 s: `0x7a0f5c0d` (RVA 0x185c0d)。
-  - 240 s: `0x7a0f60a2` (RVA 0x1860a2)。
-- 150 s の `0x185c0d` は前回 (旧 §5.2) の値と一致。240 s の RIP は前回の記録 (`0x185c0d`) と一致しない。旧 §5.2 の「150 s・240 s で一致」は、この run では成り立たない。
-- 逆アセンブル: `0x185c0d` (VA 0x585c0d) の `cmp BYTE PTR [rax+0x1a],0` → `je 0x585bf0` は、前回の REPORT 記述どおり (レビューで照合済み)。RVA 0x1860a2 の逆アセンブルは未確認 (今回は生バイナリの offset が RVA と合わず、確認できなかった)。
-- 判定: 150 s でループ末尾 (`0x585c0d`) を確認。240 s は別の RIP (`0x1860a2`)。`[obj+0x1a]` の値・終了条件・関数名は未確認。spin か polling かは、この採取からは言えない。
+- 測定 commit: `7493d05f8` (HEAD・検証用の再測定)。script の実行経路は `666a5d4c8` と同じ。
+- 計算 thread (`s2_threads_1.tsv` の R 1 本・60 s の tid 14479) の RIP。`QuickFontCache_x64.dll` のロード先は run ごとに変わる (ASLR)。RVA = RIP − ロード先 (この run のロード先は `r-xp` 領域 0x7a0f5000 付近):
+  - 60 s: `0x7a0f5b72` (RVA 0x185b72)
+  - 150 s: `0x7a0f5bf4` (RVA 0x185bf4)
+  - 240 s: `0x7a0f5bbf` (RVA 0x185bbf)
+- 3 点とも `0x185b72`〜`0x185bf4` の範囲 (ループ本体の内側) にある。前回 (旧 §5.2) の `0x185c0d` とは一致しない。`0x185c0d` が今回の run で再現しなかった理由は未確認。
+- 逆アセンブル: 前回の `0x585c0d` (VA = RVA + 0x400000) の `cmp BYTE PTR [rax+0x1a],0` → `je 0x585bf0` は、前回の REPORT 記述どおり (レビューで照合済み)。今回の RVA (0x185b72・0x185bbf・0x185bf4) の逆アセンブルは未確認。
+- 判定: RIP は 3 点ともループ範囲内で、ループ内の同じ領域で計算が続いている。ループの終了条件 `[obj+0x1a]` の値・関数名は未確認。spin か polling かは、3 点の採取からは言えない。
 - 注: gdb の attach は各採取で FL64.exe を止めるため、RIP 採取の run の時間は採取なしの run と比べられない。
 
 ### 5.3 未解決 (起票先: #5302 のまま `Refs`)
 
 - 計算 thread の呼び出し元 (ループ本体) の特定。RIP を 0.1 s 間隔で多数採る、または `QuickFontCache_x64.dll` の `0x585b70` を呼ぶ呼び出し元を gdb の breakpoint (hit count) で数える。
-- 240 s の RIP (`0x1860a2`) の逆アセンブル。
+- 今回の RIP (RVA 0x185b72・0x185bbf・0x185bf4) の逆アセンブル。
 - 受入 1 (4 本の原因記録): 4 本とも「WAV なし・1 thread が CPU を使い続ける」まで。「遅い」と「固まっている」の区別は未達。
 - FLEX の 300 s 再測定は未実施 (前回 §3 の 150 s のみ)。
 - wine の ptrace 経由の backtrace: 今回は未試行。
