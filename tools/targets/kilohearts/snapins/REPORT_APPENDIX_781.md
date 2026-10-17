@@ -71,8 +71,13 @@ python3 snapins/scripts/carve_iat_census.py work/winpkg/HeartCore.core_64 work/c
 
 ### 2.1 #18 (GetLastError) を規則 2 の fail-fast に合わせない根拠 (KH-155・#5379)
 
-規則 2 は #18 を fail-fast と判定するが、`IMP_SHIM` の `rax = 0;` は維持する。判定を変えて fail-fast にすると既存 RESULT が変わるため (以下は #5379 の前 run の実測。本節では再測定していない):
+規則 2 は #18 を fail-fast と判定するが、`IMP_SHIM` の `rax = 0;` は維持する。判定を変えて fail-fast にすると既存 RESULT が変わるため。
 
+- 測定 commit = `7d75fb1db` (origin/main。#5379 の前 run の測定基準)。本節の数値は前 run の実測で、本 PR では再測定していない。
+- 差分 (測定 commit から本 PR の HEAD まで):
+  - `git diff 7d75fb1db HEAD -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/snapins/harness` の出力は空 (0 行)。khbase の実行入力は変わっていない。
+  - `snapins.json` は既存エントリ不変。追加は `carveproc` のみ (13 行追加・削除 0)。
+  - `snapins/` 全体では `REPORT_APPENDIX_5377.md`・`5378.md`・`5653.md` の付録、`scripts/carve_process_split.py`・`scripts/ksge_process_layout.py`、`carveproc` の差分がある。いずれも khbase の実行入力ではない。
 - 変更版 (`GetLastError` を IMP_SHIM から外し既定 `abort()`) で `lift/build.py khbase --path s0 --trials 200 --seed 1` を実行: `RESULT trials 155/200 bit-exact; calls 10344/10389`。`FAIL trial 0 call 47 fn 180fb5c20: wasm trap: Aborted()` ほか trial 5・9 も同じ関数で abort。
 - 現行版 (`rax = 0`): `RESULT trials 200/200 bit-exact; calls 10500/10500`。
 - 他 13 本 (matrix〜disperser〜delay・limiter 等) は変更版でも 200/200 bit-exact (abort なし)。host harness (khmrel / khmaster / khmring) は khbase が落ちたため未測定。
