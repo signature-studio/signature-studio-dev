@@ -1090,6 +1090,10 @@ class Region:
         if fl[0] == "rcrcf":
             _cf, _bits, prev = fl[1]
             return self._flag_zf_i1({**st, "fl": prev}, out, va, tag)
+        if fl[0] == "bsrzf":
+            src, bits = fl[1]
+            out.append("  %s = icmp eq i%d %s, 0%s" % (n, bits, src, tag))
+            return n
         a, b, is_test, bits = fl[1]
         if is_test:
             t = self.nm(va, "ta")
@@ -1104,6 +1108,14 @@ class Region:
         fl = st.get("fl")
         if fl is None:
             raise Unsupported("flag state cleared")
+        if fl[0] == "bsrzf":
+            if cc not in ("e", "z", "ne", "nz"):
+                raise Unsupported("bsr flag: cc %s は ZF 以外 (CF/SF/OF 未定義) @%x" % (cc, va))
+            src, bits = fl[1]
+            pred = "eq" if cc in ("e", "z") else "ne"
+            n = self.nm(va, "fc")
+            out.append("  %s = icmp %s i%d %s, 0%s" % (n, pred, bits, src, tag))
+            return n
         if fl[0] != "rcrcf":
             return None                          # 通常経路 (comis/int) は各 handler で処理
         cf, bits, prev = fl[1]
@@ -1136,6 +1148,8 @@ class Region:
             raise Unsupported("flag state cleared")
         if fl[0] == "rcrcf":
             return fl[1][0]
+        if fl[0] == "bsrzf":
+            raise Unsupported("bsr flag: CF は未定義 @%x" % va)
         n = self.nm(va, "cf")
         if fl[0] in ("comis", "site"):
             fa, fb, ty = self._cmp_operands(fl, out, va, tag)
@@ -1463,6 +1477,32 @@ class Region:
             st["__w"].add(dst)
             st["fl"] = None
             self.used("shift")
+            return True
+        # --- bsr r, r (LIFTLIB-26): ZF = (src==0)。src==0 のとき dst は前値を保つ (Intel 未定義・実装依存の扱いを固定)。
+        #     flag 状態は専用種別 "bsrzf" (ZF だけを読める)。CF/SF/OF は bsr で未定義のため、e/ne/z/nz 以外の cc は Unsupported。
+        if m == "bsr" and len(ops) == 2 and ops[0][0] == "reg" and ops[1][0] == "reg" and not mem:
+            bits = it._ci.operands[0].size * 8
+            if bits not in (32, 64):
+                return False
+            ity = "i%d" % bits
+            dst = ops[0][1]
+            src = self._gpr_val(st, ops[1][1], va, out, bits=bits)
+            old = self._gpr_val(st, dst, va, out, bits=bits)
+            decl = "llvm.ctlz.%s" % ity
+            if decl not in self.mod.declares():
+                self.mod.add_declare("declare %s @%s(%s, i1) nounwind readnone speculatable" % (ity, decl, ity))
+            ctl = self.nm(va, "bc")
+            out.append("  %s = call %s @%s(%s %s, i1 true)%s" % (ctl, ity, decl, ity, src, tag))
+            ix = self.nm(va, "bi")
+            out.append("  %s = sub %s %d, %s%s" % (ix, ity, bits - 1, ctl, tag))
+            cz = self.nm(va, "bz")
+            out.append("  %s = icmp eq %s %s, 0%s" % (cz, ity, src, tag))
+            n = self.nm(va, "bs")
+            out.append("  %s = select i1 %s, %s %s, %s %s%s" % (n, cz, ity, old, ity, ix, tag))
+            st[dst] = (n, ity if bits < 64 else "i64")
+            st["__w"].add(dst)
+            st["fl"] = ("bsrzf", (src, bits))
+            self.used("bsr")
             return True
         # --- cmp / test (整数フラグ生成。値は flag 状態に記録)
         if m in ("cmp", "test") and len(ops) == 2 and ops[0][0] == "reg":

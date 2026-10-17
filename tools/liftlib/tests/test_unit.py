@@ -1020,9 +1020,48 @@ def t31():
     print("T31 ok (image_bytes_c: image_bytes 無し・空は None (存在しない image は読まない))")
 
 
+def t32():
+    """[LIFTLIB-26 / #4350] p1 `bsr r64,r64`: ZF=(src==0) を整数 flag 状態に載せ、src==0 のとき dst は前値を保つ。
+
+    合成機械語 `48 0f bd c1` (bsr rax,rcx) を lift_data_insn に通し、生成 IR に ctlz と select が出ること、
+    flag 状態が ("int", (src, 0)) になることを固定する (cmp rcx,0 の既存経路と同じ ZF の読み方になる)。"""
+    from types import SimpleNamespace as NS
+    from liftlib.passes import p1
+    from liftlib import ir as IR
+
+    mod = IR.Module.parse("define void @function_1000() {\nentry:\n  ret void\n}\n")
+    out = []
+    st = {"__w": set(), "rax": ("%old", "i64"), "rcx": ("%src", "i64"), "fl": None}
+    it = NS(va=0x1000, mnem="bsr", op_str="rax, rcx", mem=None, is_call=False,
+            ops=[NS(type=1, reg="rax"), NS(type=1, reg="rcx")],
+            _ci=NS(operands=[NS(size=8), NS(size=8)]))
+    stub = NS(mod=mod, nm=lambda va, t: "%%%s_%d" % (t, len(out)), used=lambda k: None,
+              _GPR_ALU=p1.Region._GPR_ALU, _gpr_val=lambda st_, reg, va, o, bits=64: st_[reg][0])
+    res = p1.Region.lift_data_insn(stub, it, [("reg", "rax"), ("reg", "rcx")], st, out, "")
+    text = "\n".join(out)
+    assert res is True, res
+    assert "call i64 @llvm.ctlz.i64(i64 %src, i1 true)" in text, text
+    assert "icmp eq i64 %src, 0" in text and "select i1" in text, text
+    assert st["fl"] == ("bsrzf", ("%src", 64)), st["fl"]
+    assert any(isinstance(l, str) and l.startswith("declare i64 @llvm.ctlz.i64") for l in mod.items), mod.items[:2]
+    stub._flag_zf_i1 = lambda *a: p1.Region._flag_zf_i1(stub, *a)
+    stub._flag_cc_i1 = lambda *a: p1.Region._flag_cc_i1(stub, *a)
+    stub._flag_cf_i1 = lambda *a: p1.Region._flag_cf_i1(stub, *a)
+    o2 = []
+    c = stub._flag_cc_i1(st, "e", o2, 0x1000, "")
+    assert c is not None and "icmp eq i64 %src, 0" in "\n".join(o2), o2
+    for bad in ("b", "l", "s", "a"):
+        try:
+            stub._flag_cc_i1(st, bad, [], 0x1000, "")
+        except p1.Unsupported:
+            continue
+        raise AssertionError("bsr の直後の cc %s は Unsupported のはず" % bad)
+    print("T32 ok (bsr r64: ctlz + select(src==0 で dst 保持), ZF は bsrzf(src,64)、e/ne 以外の cc は Unsupported)")
+
+
 if __name__ == "__main__":
     import traceback
-    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31)
+    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31, t32)
     fails = []
     for f in tests:
         try:
