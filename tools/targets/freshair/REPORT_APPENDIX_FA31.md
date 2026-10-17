@@ -185,13 +185,16 @@ pdata の関数境界ごとに逆アセンブル (capstone) し、E8/E9 の直�
 ### 8.5 FA-74 (#5255): 実機 ctor で P を構築する試行 (FA_UI31_CTOR・既定 OFF)
 
 - 追加: `FA_UI31_CTOR=1` のとき、`FA_UI31` の slot 5 呼出前に P を実機 ctor `0x180d8a6e0` で構築し、構築前後の `[P+0xb98]`・`[P+0xba8]`・vtable を `UI31CTOR` 行に記録する。既定 (未設定) は従来どおり 0 埋めで、判定基準・既定経路は不変。
-- 実測 (測定 commit `97a5bd8ab`・`FA_CTL31=1 FA_HEAP_ZERO=1 FA_UI31=1 FA_UI31_CTOR=1 ./native_fa31 SlateCore.core_64 fa31_epf.txt 0`・S900〜S907): rc=0。
+- 測定 commit の扱い: `FA_UI31_CTOR` の分岐は `97a5bd8ab` に無い (`97a5bd8ab` は測定の基準であり、この試行の測定 commit ではない)。試行コードは `c01e2d022` で入り、`451c9fb76` (現 PR head) で `ca3d50` 経由に変わった。
+  `git diff 97a5bd8ab 451c9fb76 -- tools/targets/freshair/lift2/native/` の出力は `FA_UI31_CTOR` 分岐の内側の +22 行・-0 行 (`if (getenv("FA_UI31_CTOR"))` の中)。既定経路 (`FA_UI31_CTOR` 未設定) は同じ分岐に入らないため挙動は変わらない。
+- 実測 (旧 run・`FA_CTL31=1 FA_HEAP_ZERO=1 FA_UI31=1 FA_UI31_CTOR=1 ./native_fa31 SlateCore.core_64 fa31_epf.txt 0`・S900〜S907): rc=0。以下の数値は旧 run の記録で、本 fix run では素材が無く再現していない (『再測定の状況』参照)。
   - ctor の構築は **全 8 シナリオで FAULT**: `rip=0x18040ddbb addr=0x394e0`。ctor が呼ぶ shared_ptr 解放経路 (`0x18040dd9a`〜`0x18040ddbb`) の `[rdi+0xc]` 参照で落ちる。引数 `A = {P 所有, 制御ブロック}` の与え方が実機と合っていない (推測)。
   - ctor 前の `+0xb98`・`+0xba8` は 0、FAULT 後も 0 のまま。vtable は `0x18110a420` (ctor の先頭まで実行されたことは確認)。
   - その後の slot 5 は従来どおり `rip=0x180cb9ce9 addr=0xa80` で FAULT (`returned` 0 件)。
 - 結論 (本 run): **受入 1〜3 は未達**。ctor の引数 (第 2 引数の 2 語・制御ブロック) を実機の呼出元どおりに与えない限り、P は構築できず、`+0xb98`・`+0xba8` への書込みも捕まえられない。書込みフックは ctor が通った後の段階でしか意味を持たないため、本 run では設置しない。
 - 製品 KPI (FLEngine 起動 dispatch・units_run・最初のウィンドウ): 動かしていない。harness の観測のみ。
-- 測定: `fa31_ctl.sh` (既定) は rc=0・31 s・`caa820=0 ca7db0=72 d8c140=0 d8d700=0` (本 run の基準)。FA_UI31_CTOR 試行は real 0.021 s (FAULT で即終了・n=1)。
+- 測定 (旧 run): `fa31_ctl.sh` (既定) は rc=0・31 s・`caa820=0 ca7db0=72 d8c140=0 d8d700=0`。FA_UI31_CTOR 試行は real 0.021 s (FAULT で即終了・n=1)。
+- 再測定の状況 (本 fix run): 素材 `plugins-freshair` (`SlateCore.core_64`・factory `.epf` 8 本) が `$ARTIFACTS_DIR` に無く、`fl-win64` のみ。`run_ctrl.sh 2 5` (BIT-EXACT 15/15 の回帰確認) と `fa31_ctl.sh` を `451c9fb76` で実行できなかった。`native_ctrl.c` は `clang -fsyntax-only` で通過 (rc=0) を確認したのみ。素材追加 (`oc_artifacts: fl-win64 plugins-freshair`) までは回帰確認は未実施。
 - 静的 (本 run・PM 第 30 波の再投入): ctor 呼出元 13 箇所は全て `rcx=this`・`rdx=A`・`r8=0`・`r9=0` で呼ぶ。`A` は `ca3d50(weak, out)` の戻り値 (`ca3d50` は weak の `+0x60`=ptr・`+0x68`=制御ブロックから shared 相当を作る) で、ctor 先頭は `A` を `+0xb88`/`+0xb90` に移す。
-- 試行 (本 run): `A` を `ca3d50` 経由に変えた (`Q={+0x60=P 所有, +0x68=cb}` → `ca3d50(Q, A)` → `ctor(P, A, 0, 0)`)。`ca3d50` は FAULT しない。ctor は 8/8 で従来どおり `rip=0x18040ddbb addr=0x394e0` で FAULT。
+- 試行 (旧 run・commit `451c9fb76`): `A` を `ca3d50` 経由に変えた (`Q={+0x60=P 所有, +0x68=cb}` → `ca3d50(Q, A)` → `ctor(P, A, 0, 0)`)。`ca3d50` は FAULT しない。ctor は 8/8 で従来どおり `rip=0x18040ddbb addr=0x394e0` で FAULT。
 - 読み (静的): FAULT 箇所は `0x18040dd9a` 以降の shared_ptr 解放 (`lock xadd [rdi+0xc]`) の後で、`addr=0x394e0` は `[r15+0x20]` (vector の end ポインタ相当) の読み。`r15` が不正 (ctor 呼出し元の外側の状態に依る) と推測。`A` の組み方を直しても消えないため、`A` の内容ではなく ctor の外側の状態 (呼出元の this の由来) が原因と推測 (未判定)。
