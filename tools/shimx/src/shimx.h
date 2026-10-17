@@ -1188,6 +1188,8 @@ unsigned shimx_seh_depth(void);                                        /* 登録
  * n > out_cap なら out は先頭 out_cap 件のみ有効で、n は真の件数の上界 (重複を含みうる)。
  * 呼出し側は n > out_cap のとき cap を増やして再呼出しする。FuncInfo 不正・上限超過は -1。 */
 int shimx_fh3_funclets(const uint8_t* img, uint32_t img_size, uint32_t fi_rva, uint32_t* out, uint32_t out_cap);
+/* FH3 try map + IP-to-state map → ShxSehScope 表 (out に先頭 out_cap 件)。戻り値は件数 (超過も真の件数)。FuncInfo 不正は -1。 */
+int shimx_fh3_scopes(const uint8_t* img, uint32_t img_size, uint32_t fi_rva, uint32_t func_end_rva, ShxSehScope* out, uint32_t out_cap);
 HMODULE shimx_module_register(const char* name, HMODULE base, const char* winPath);
 int  shimx_proc_register(HMODULE m, const char* name, DWORD ordinal, void* fn);
 void shimx_set_proc_resolver(void* (*fn)(HMODULE m, const char* name, DWORD ordinal));

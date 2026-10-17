@@ -54,3 +54,52 @@ int shimx_fh3_funclets(const uint8_t* img, uint32_t img_size, uint32_t fi_rva,
     }
     return (int)n;
 }
+
+/* FH3 の try map と IP-to-state map から ShxSehScope 表を作る (MX-57 #4928)。
+ * IP map は {Ip RVA, State} の 8 byte 昇順。entry i の状態は [ip[i], ip[i+1]) (最後は func_end) に効く。
+ * try t の [tryLow, tryHigh] に入る状態の範囲ごとに、handler を 1 件ずつ scope にする:
+ *   pType == 0 → catch-all (kind 2)、それ以外 → typed (kind = pType の RVA)。target = dispOfHandler。
+ * 未検証: unwind map (kind 0/1 の pad 領域) は扱わない。nested try の照合順は handler 順のまま。 */
+int shimx_fh3_scopes(const uint8_t* img, uint32_t img_size, uint32_t fi_rva, uint32_t func_end_rva,
+                     ShxSehScope* out, uint32_t out_cap) {
+    if (!img || (uint64_t)fi_rva + 36 > img_size) return -1;
+    uint32_t magic = fh3_rd32(img, img_size, fi_rva);
+    if (magic != 0x19930520u && magic != 0x19930521u && magic != 0x19930522u) return -1;
+    uint32_t n_try = fh3_rd32(img, img_size, fi_rva + 12);
+    uint32_t disp_try = fh3_rd32(img, img_size, fi_rva + 16);
+    uint32_t n_ip = fh3_rd32(img, img_size, fi_rva + 20);
+    uint32_t disp_ip = fh3_rd32(img, img_size, fi_rva + 24);
+    if (n_try > SHX_FH3_CAP_TRY || n_ip > SHX_FH3_CAP_STATE) return -1;
+    for (uint32_t i = 1; i < n_ip; i++)
+        if (fh3_rd32(img, img_size, disp_ip + 8u * i) < fh3_rd32(img, img_size, disp_ip + 8u * (i - 1)))
+            return -1;
+
+    uint32_t n = 0;
+    for (uint32_t t = 0; t < n_try; t++) {
+        uint32_t tb = disp_try + 20u * t;
+        int32_t low = (int32_t)fh3_rd32(img, img_size, tb);
+        int32_t high = (int32_t)fh3_rd32(img, img_size, tb + 4);
+        uint32_t n_catch = fh3_rd32(img, img_size, tb + 12);
+        if (n_catch > SHX_FH3_CAP_CATCH) return -1;
+        uint32_t disp_ha = fh3_rd32(img, img_size, tb + 16);
+        for (uint32_t i = 0; i < n_ip; i++) {
+            int32_t state = (int32_t)fh3_rd32(img, img_size, disp_ip + 8u * i + 4);
+            if (state < low || state > high) continue;
+            uint32_t begin = fh3_rd32(img, img_size, disp_ip + 8u * i);
+            uint32_t end = (i + 1 < n_ip) ? fh3_rd32(img, img_size, disp_ip + 8u * (i + 1)) : func_end_rva;
+            if (end <= begin) continue;
+            for (uint32_t h = 0; h < n_catch; h++) {
+                uint32_t ptype = fh3_rd32(img, img_size, disp_ha + 16u * h + 4);
+                uint32_t target = fh3_rd32(img, img_size, disp_ha + 16u * h + 12);
+                if (n < out_cap) {
+                    out[n].begin = begin;
+                    out[n].end = end;
+                    out[n].kind = ptype ? ptype : 2u;
+                    out[n].target = target;
+                }
+                n++;
+            }
+        }
+    }
+    return (int)n;
+}
