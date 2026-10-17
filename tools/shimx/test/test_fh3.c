@@ -130,9 +130,9 @@ static void t_unwind_scopes(void) {
     /* out_cap 超過: 件数は真の件数 (4) */
     CHECK(shimx_fh3_unwind_scopes(img, sizeof img, 0x100, 0x400, s, 1) == 4);
 
-    /* prev が自分以上の循環は途中で止める (無限ループしない) */
+    /* prev が自分以上の循環は途中で止める (無限ループしない)。state 2 → 2 で止まるので件数は 2 (range ごとに 1 件) */
     put32(img, 0x210, 2);
-    CHECK(shimx_fh3_unwind_scopes(img, sizeof img, 0x100, 0x400, s, 8) >= 0);
+    CHECK(shimx_fh3_unwind_scopes(img, sizeof img, 0x100, 0x400, s, 8) == 2);
     put32(img, 0x210, 1);
 
     /* magic 不一致は棄却 */
