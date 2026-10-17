@@ -233,6 +233,12 @@ static u32 ipp_token(const char* nm) {
     g_ipp_nm[g_ipp_n] = d;
     return IPP_TOK_BASE + g_ipp_n++;
 }
+/* #6220 診断: ホスト C (memset) が obj+0xc4 を含む範囲に書く所を記録する (lifted の store フックの外)。 */
+static void wobj_hw_(const char* who, u64 dst, u64 n, u32 before) {
+    if (dst <= 0x12d7a090ull + 0xc4ull && 0x12d7a090ull + 0xc4ull < dst + n)
+        fprintf(stderr, "[wobj-host] who=%s dst=%#llx n=%llu obj+0xc4_before=%#x ret=%#llx\n", who,
+                (unsigned long long)dst, (unsigned long long)n, before, (unsigned long long)LD64(R[4]));
+}
 static int ipp_call(u64 t) {   /* fle_ff から。処理したら 1 */
     if (t < IPP_TOK_BASE || t >= IPP_TOK_BASE + g_ipp_n) return 0;
     u32 i = (u32)(t - IPP_TOK_BASE);
@@ -240,7 +246,7 @@ static int ipp_call(u64 t) {   /* fle_ff から。処理したら 1 */
     g_ipp_calls[i]++; g_ipp_total++;
     if (!strcmp(g_ipp_nm[i], "ippsZero_8u")) {   /* IppStatus ippsZero_8u(Ipp8u* pDst, int len) */
         u64 dst = R[1]; int len = (int)(R[2] & 0xffffffffu);
-        if (dst && len > 0) memset((void*)(uintptr_t)dst, 0, (size_t)len);
+        if (dst && len > 0) { wobj_hw_("ippsZero_8u", dst, (u64)len, (u32)LD8(0x12d7a090ull + 0xc4ull)); memset((void*)(uintptr_t)dst, 0, (size_t)len); }
         py_watch(9, (u32)len, dst);
     } else if (g_ipp_stop) {                     /* mode 2: 停止して名前と呼出元を残す */
         g_ipp_stop_nm = g_ipp_nm[i]; g_ipp_stop_site = LD64(R[4]);
@@ -419,6 +425,7 @@ void imp_LoadStringW(void) {   /* gui_compat.c と同一: buf[0]=0 を書かな�
 }
 void imp_memset(void) {        /* CRT 実体 (soft 0 返却だと意味破壊) */
     u64 dst = R[1]; u32 c = R[2] & 0xff; u64 n = R[3];
+    wobj_hw_("imp_memset", dst, n, (u32)LD8(0x12d7a090ull + 0xc4ull));
     if (n) memset((void*)(uintptr_t)dst, (int)c, n);
     py_watch(3, (u32)n, dst);
     R[4] += 8; R[0] = dst;

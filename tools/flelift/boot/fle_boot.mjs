@@ -444,6 +444,12 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     cfi: cfi && { rc: cfi.rc, threw: cfi.threw && cfi.threw.cls, longjmp: cfi.longjmp, exit: cfi.exit },
 }));
 console.log('FLEBOOT_UNDO ' + JSON.stringify(undoProbe));
+// #6213: 陽性対照の読取り (boot 停止時点の受け手 slot の値。監視が出ない理由の切り分け用・読むだけ)
+{
+    const dv6213 = new DataView(m.HEAPU8.buffer);
+    const r6213 = (a) => (a + 8 <= U8.length ? '0x' + dv6213.getBigUint64(a, true).toString(16) : null);
+    console.log('FLEBOOT_SLOT6213 ' + JSON.stringify({ slot_0x5ac308: r6213(0x5ac308), slot_0x11f6100: r6213(0x11f6100), slot_0x976410: r6213(0x976410) }));
+}
 // PY-4877 (#5168): FLE_PY4877_PC=1 のとき、boot 停止後に patternCount (0xd64d40) を直接実行し、呼出し前の E[1..999] を読む (計測のみ)。
 // 読みは呼出し前 (pre) と呼出し後 (post) の両方を取る。summary の書出し後なので boot の計数には影響しない。
 if (process.env.FLE_PY4877_PC === '1') {

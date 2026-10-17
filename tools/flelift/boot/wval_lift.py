@@ -75,6 +75,8 @@ STORE = re.compile(r'\b(ST(?:8|16|32|64|F32|F64|X|Y))\(')
 INCLUDE_RT = re.compile(r'^#include "fle_cpu\.h"\s*$')
 ENTER_FN = re.compile(r'^void f_(6ba1f0|6bc010|6cd520|6c9280)\(void\) \{$')
 LABEL = re.compile(r'^L_[0-9a-f]+:;$')
+REP_SZE = {'q': 8, 'd': 4, 'w': 2, 'b': 1}
+REP_LINE = re.compile(r'^\s*/\* [0-9a-f]+: rep (?:movs|stos)(q|d|w|b)\b')
 
 # --objwatch (#4287・診断用): obj = [f_6ba1f0 の rbp+0xe0] (f_6cd520 の rbx = rcx = obj) の mode 字段 [obj+0xc4] への
 # 全幅 (1/2/4/8/16 byte) の store を、宛先アドレス一致で記録する。値の比較はしない。
@@ -117,6 +119,18 @@ static void wo_chk_(uint64_t va, uint64_t a, uint32_t n, const void* p) {
 #define WO_STY(va, a, lo, hi) ({ X128 wol_ = (lo), woh_ = (hi); wo_chk_((va), (a), 16, &wol_); STY((a), wol_, woh_); })
 '''
 
+# #6220 (診断): rep movs/stos は ST マクロを通らず memmove/memset で書かれるため、宛先範囲 [d, d+n*sz) と obj+0xc4 の一致を見る。
+REP_HOOK = r'''
+static void wo_rep_(uint64_t va, uint64_t d, uint64_t bytes) {
+    uint64_t tgt = wo_obj_ ? wo_obj_ + 0xc4ULL : @FIXOBJ@ + 0xc4ULL;
+    if (bytes == 0 || !(d <= tgt && tgt < d + bytes) || wo_n_ >= @CAP@) return;
+    wo_n_++;
+    fprintf(stderr, "[wobj-rep] va=%#llx dst=%#llx bytes=%llu obj=%#llx R0=%#llx R1=%#llx R5=%#llx ret=%#llx\n",
+            (unsigned long long)va, (unsigned long long)d, (unsigned long long)bytes, (unsigned long long)wo_obj_,
+            (unsigned long long)R[0], (unsigned long long)R[1], (unsigned long long)R[5], (unsigned long long)LD64(R[RSP]));
+}
+'''
+
 # 関数の入口ラベル (VA → 行の直後に挿入する呼出し)
 OBJ_ENTRY = {'L_6ba1f0:;': 0x6ba1f0, 'L_6cd520:;': 0x6cd520}
 # obj が f_6ba1f0 内で確定する位置 (VA 0x6ba25b のラベルの直後)
@@ -129,12 +143,14 @@ def patch(lines, value, cap, objwatch=False, fixobj=0x12d7a090):
     hooked = False
     sites = 0
     entry_pending = None
+    rep_sz = 1
     for line in lines:
         if not hooked and INCLUDE_RT.match(line):
             out.append(line)
             out.append(HOOK.replace('@VALUE@', hex(value) + 'ULL').replace('@CAP@', str(cap)))
             if objwatch:
                 out.append(OBJ_HOOK.replace('@CAP@', str(cap)).replace('@FIXOBJ@', hex(fixobj) + 'ULL'))
+                out.append(REP_HOOK.replace('@CAP@', str(cap)).replace('@FIXOBJ@', hex(fixobj) + 'ULL'))
             hooked = True
             continue
         m = COMMENT_VA.match(line)
@@ -148,6 +164,11 @@ def patch(lines, value, cap, objwatch=False, fixobj=0x12d7a090):
             out.append('  wv_enter_(%#xULL);' % entry_pending)
             entry_pending = None
             continue
+        rm = REP_LINE.match(line) if objwatch else None
+        if rm:
+            rep_sz = REP_SZE[rm.group(1)]
+        if objwatch and 'memmove((void*)A_(d0_' in line and 'fDF' in line:
+            line = line.replace('{ uint64_t n_ = R[RCX];', '{ uint64_t n_ = R[RCX]; wo_rep_(%#xULL, R[RDI], n_ * %d);' % (va, rep_sz), 1)
         if STORE.search(line) and not line.lstrip().startswith('/*'):
             prefix = 'WO_%s(' if objwatch else 'WV_%s('
             line, k = STORE.subn(lambda s: (prefix % s.group(1)) + '%#xULL, ' % va, line)
