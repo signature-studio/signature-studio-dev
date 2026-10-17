@@ -51,7 +51,7 @@ underrun を基準 (0 ms) とした相対時刻。
 | main thread heartbeat | 下限 20 ms 超の間隔は underrun 後 [+210, +247, +271] ms と [-3232〜-2934] ms のみ。停止の時間帯 [-100, +60] ms に gap は無い |
 | 区間内の seg 最大 (run 全体) | memset 2780 µs・out_write 2225 µs・bufferswitch 2375 µs (1 run の最大。区間は計算の仕事量より桁違いに長い) |
 
-読み: underrun の直前 61 ms については、**worklet も main thread も止まっていない**。producer は書き込みの間隔が伸び、wait を抜けてから次の書き込みまでの区間が 60 ms を超えた。ただしこの計装では、producer が OS に preempt されたのか、`wait32` の返りが遅れたのかは分けられない (記録点が wake と書き込み完了の 2 点のみ)。なお worklet の直近 64 quantum (約 171 ms 分) には 41 ms の quantum 間隔が 1 つあった。直近 61 ms の最大は 13 ms で、41 ms はそれより前に起きている (正確な位置は未確認)。
+読み: underrun の直前 61 ms については、**worklet も main thread も止まっていない**。producer は連続する 2 回の wake の間隔が 60 ms を超えた (その間は wait32 の中にあった)。ただしこの計装では、producer が OS に preempt されたのか、`wait32` の返りが遅れたのかは分けられない (記録点が wake と書き込み完了の 2 点のみ)。なお worklet の直近 64 quantum (約 171 ms 分) には 41 ms の quantum 間隔が 1 つあった。直近 61 ms の最大は 13 ms で、41 ms はそれより前に起きている (正確な位置は未確認)。
 L9 では producer の +1.4 ms の 62.5 ms gap に加えて、-139.9 ms の 41.7 ms gap もあった。consumer の 41 ms と時刻は一致しない。
 
 ## 4. 結論と未解決 (#6037 受入)
