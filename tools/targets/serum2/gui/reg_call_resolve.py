@@ -274,14 +274,14 @@ def provenance(insns, i, r):
         d, s = [x.strip() for x in w.op_str.split(",", 1)]
         if fam(d) != r:
             continue
+        if w.mnemonic == "mov" and "rip" in s:
+            return "global-load"
         if w.mnemonic == "mov" and mem_re.match(s):
             mm = mem_re.match(s)
             if mm.group(1) in ("rsp", "rbp"):
                 return "stack-slot"
             disp = int(mm.group(2), 0) if mm.group(2) else 0
             return f"vptr-load[+{disp:#x}]" if disp in DISPS else "load[reg+other]"
-        if w.mnemonic == "mov" and "rip" in s:
-            return "global-load"
         if w.mnemonic == "lea":
             return "lea"
         if w.mnemonic == "mov" and reg_re.match(s):
