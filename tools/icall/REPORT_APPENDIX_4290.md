@@ -29,12 +29,13 @@
 - `define` は chunk 間で重複しない (164 件)。
 - 同名 global の定義が矛盾するもの 2 件: `@global_var_18125eaa8` (chunk 0 は `i64`、chunk 1〜3 は `i32`) と `@global_var_1813068d8` (`local_unnamed_addr` の有無だけ)。先頭 chunk の定義を採る。cookie 型は `fa_route_build.sh` の `ir_fix_cookie.py` が i64 に直す。
 - metadata 番号 (`!N`) は chunk ごとに後ろへずらす。ずらさないと `llvm-link` が衝突で失敗する。
+- `attributes #N` と `comdat` 行は変換せず素通しで body に入る。chunk 間で `#N` や comdat の ID が衝突しても dedupe / renumber しない。現状 route が通るのは後段 (`ir_flatten` 以降) がテキスト処理だからで、統合 IR を route 外で検証できていない。
 - RetDec 出力 (chunk 0〜3) は `llvm-as` の検証を通らない (`uselistorder` の不整合・`%wide-string` の不正構文)。統合は `uselistorder` を落とし、`%wide-string` は chunk 3 にだけある。route 本体は `ir_flatten` 以降がテキスト処理のため、統合 IR のまま build できた。
 
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `18105d9fc` が `unreachable` で trap (0/8)。`oi.flat.ll` に `unreachable` は無く、wasm 側の trap 位置は未特定 | 3 関数の受入のうち 1 件が未達 | #4290 のまま (次 run) |
-| RetDec 出力 (chunk 0〜3) が `llvm-as` 検証を通らない | 統合 IR の検証を route build の外でできない | #4290 のまま (注記のみ) |
+| `18105d9fc` が `unreachable` で trap (0/8)。`oi.flat.ll` に `unreachable` は無く、wasm 側の trap 位置は未特定 | 3 関数の受入のうち 1 件が未達 | #6140 (ICALL-126) |
+| RetDec 出力 (chunk 0〜3) が `llvm-as` 検証を通らない | 統合 IR の検証を route build の外でできない | 起票なし (§3 の注記のみ) |
 | `1803b5500` `180da5f20` の `missing function` | 測定期待値 (`mismatch 8・wasm_err 8`) どおり。本 issue の範囲外 | 既存の記録どおり |
