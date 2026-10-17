@@ -61,7 +61,7 @@ for n in $(seq 1 "$REPEAT"); do
       while sleep "${S2_SAMPLE:-5}"; do
         w=$(stat -c %s "$WORKDIR/$base.wav" 2>/dev/null || echo -)
         l=$(stat -c %s "$WORKDIR/s2_run_$n.log" 2>/dev/null || echo -)
-        p=$(ps -C wine64-preloader,wine64,FL64.exe -o etimes=,cputimes=,rss= 2>/dev/null | awk '{c+=$2; r+=$3} END {printf "%s\t%s", c+0, r+0}')
+        p=$(ps -C wine64-preloader,wine64,FL64.exe -o etimes=,cputimes=,rss= 2>/dev/null | awk '{c+=$2; r+=$3} END {printf "%s\t%s", c+0, r+0}' || true)
         printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "$w" "$l" "${p:-0	0}" >> "$sample"
       done
     ) &
