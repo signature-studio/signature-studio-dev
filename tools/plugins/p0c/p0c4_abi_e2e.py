@@ -43,7 +43,7 @@ UCOMI_FIX = ['0x5e12b0']  # #3439: ucomiss の被演算子・flags を接続 (k8
 FIX18 = ['0x5de620', '0x5dea40', '0x5dec40', '0x5dedb0', '0x5dee20', '0x5dee50', '0x5df340',
          '0x5dfae0', '0x5dfbe0', '0x5dfc90', '0x5dfdb0', '0x5dffc0', '0x5dfff0', '0x5e0300',
          '0x5e0350', '0x5e03f0', '0x5e12c0', '0x5e1490']
-HB_N = 14  # k80_hand_bodies.py の BODIES 14 (#2182)
+HB_N = 13  # k80_hand_bodies.py の BODIES 13 (#2182 の 14 本から 0x5e12c0 を #3281 残件 B で外した)
 PE_N = 2  # k80_pe_globals.py の置換対象 (0x6fffb0 = (0.5, 0.5) #2182 / 0x6fc26c = 同種の i128 0 初期化 #3281)
 EXT_FUNCS = 'function_5dfc90,function_5dfbe0,function_5dfd30,function_5dfdb0'
 EXT_CHOPF = 'function_5dfbe0,function_5dfc90,function_5dfdb0'
@@ -116,6 +116,13 @@ def main():
     dfx = os.path.join(d3, 'k80.deref.ll')
     run(['python3', os.path.join(HERE, 'k80_deref_fix.py'),
          os.path.join(d3, 'k80.x87fix.ll'), dfx])
+    # #3281 残件 B (P0c-32): 0x5e12c0 の ucomisd flags を jbe に接続する一般 pass (手書き本体の代替)
+    if os.environ.get('K80_NO_UCOMI_BR') != '1':
+        ubr = os.path.join(d3, 'k80.ucomibr.ll')
+        run(['python3', os.path.join(HERE, 'k80_ucomi_br.py'), dfx, ubr,
+             '--func', 'function_5e12c0', '--cc', 'jbe',
+             '--report', os.path.join(d3, 'k80.ucomibr.json')])
+        dfx = ubr
 
     print('== [3] llvm-as + x87fix 冪等性 ==')
     run(['llvm-as', os.path.join(d3, 'k80.x87fix.ll'), '-o', os.path.join(d3, 'k80.x87fix.bc')])
@@ -169,7 +176,7 @@ def main():
     for j in (hbj, hb2j):
         n = len(json.load(open(j))['replaced'])
         if n != HB_N:
-            raise SystemExit('[FAIL] k80_hand_bodies 置換件数 %d (期待 %d = BODIES 14)' % (n, HB_N))
+            raise SystemExit('[FAIL] k80_hand_bodies 置換件数 %d (期待 %d = BODIES 13)' % (n, HB_N))
     run(['llvm-as', hb, '-o', os.path.join(d3, 'k80.hb.bc')])
 
     print('== [5] 差分試験 (native vs 修復後 IR, %d case/kernel, fork 隔離) ==' % cases)
