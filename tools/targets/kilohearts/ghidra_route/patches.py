@@ -207,6 +207,10 @@ ABI = {
         ('delay FUN_180fc6870 body fVar3 = fParam (was in_ZMM0._0_4_)', r'fVar3 = in_ZMM0\._0_4_;', 'fVar3 = fParam;'),
         ('delay 3595 FUN_180fc6870 uVar1 = FUN_180fdc6ec (xmm0 = float 入力)', r'(if \(\(f2u\(fVar3\) & _DAT_1822822a0\) == _DAT_1822822a0\) \{\n\s*)uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);', r'\1uVar1 = FUN_180fdc6ec(f2u(fVar3));'),
         ('delay 3653 FUN_180fc6870 uVar1 = FUN_180fdc6ec (xmm0 = float 入力)', r'(if \(\(f2u\(fVar3\) & 0x7f800000\) == 0x7f800000\) \{\n\s*)uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);', r'\1uVar1 = FUN_180fdc6ec(f2u(fVar3));'),
+        # #6160 (KH-181・受入 1): FUN_1802ed7f0 の 0 引数呼出し 934 行 (機械語 1802eda1e `call 180fc6870`)。xmm0 = xmm7 (movaps・1802eda1b)。
+        #   xmm7 は 1802ed936 `movss xmm7,[rcx+0xa8]` (rcx = [param_2+0x3198]) を 1802eda13 `mulss xmm7,[181563038]` した値。
+        #   [181563038] = 0x3fc90fdb = 1.5707963705062866f (π/2・float)。間に xmm7 への書込み・call は無い (1802ed936〜eda1e の直線区間)。件数 1 を assert する。
+        ('delay 934 FUN_1802ed7f0 FUN_180fc6870() xmm0 = [param_2+0x3198].+0xa8 * pi/2 (1802eda1e)', r'fVar23 = \(float\)(?:func_0x000|FUN_)180fc6870\(\);', 'fVar23 = (float)FUN_180fc6870(*(float *)(*(longlong *)(param_2 + 0x3198) + 0xa8) * 1.5707963705062866f);'),
         ('delay 3785 FUN_180fc6d70 uVar25 = FUN_180fdc844 (xmm0 = float 入力)', r'(if \(\(f2u\(fVar22\) & _DAT_182282360\) == _DAT_182282360\) \{\n\s*)uVar25 = (?:func_0x000|FUN_)180fdc844\(\);', r'\1uVar25 = FUN_180fdc844(f2u(fVar22));'),
         ('delay 3909 FUN_180fc6d70 uVar25 = FUN_180fdc844 (xmm0 = float 入力)', r'(if \(\(f2u\(fVar22\) & 0x7f800000\) == 0x7f800000\) \{\n\s*)uVar25 = (?:func_0x000|FUN_)180fdc844\(\);', r'\1uVar25 = FUN_180fdc844(f2u(fVar22));'),
         ('delay 4042 FUN_180fcce40 dVar2 = FUN_180fdc858 (xmm0 = param_1)', r'(if \(\(ulonglong\)_DAT_1822828a0 <= \(ulonglong\)dVar2\) \{\n\s*dVar2 = \(double\))(?:func_0x000|FUN_)180fdc858\(\);', r'\1FUN_180fdc858(d2u(param_1));'),
