@@ -190,3 +190,37 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
   - 直接の呼出し元 `f_1000f41e` (GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile の経路) と `f_100112e9` (LoadLibraryA の経路) は、 ゲート経路で入口から到達する。 旧記述の「fs: を使わない候補として入口に足す」は、 ゲートを通る経路では実行できないので成り立たない。
 - fail-fast 24 件: ゲート無しで静的に到達する件は 0 件。 RaiseException のみ、 ゲート経路 (`f_10007f30 > ... > f_1000adc4`) で到達する。 残り 23 件は、 どの入口からも到達しない。
 - 結論: **ゲート無しで入口から実行できるのは `HeapFree` の失敗分岐 (実行では 0 件) だけで、 残りの 12 件と RaiseException は現在の入口では実行できない**。 入口から到達させるには、 ゲート経路の host オブジェクトのモデル化 (#3917) や fs: 経路の native 対応 (#3905) が要る。 本 run は、 その依存関係を静的解析で示すところまでで止める。
+
+## 9. 文字列系 6 API の ia32 モデルの値と根拠 (#6039・受入条件 1・2)
+
+- 入力: fl-win64 の `block22434_PE.bin` (IAT: WideCharToMultiByte `0x10013094`・MultiByteToWideChar `0x100130c0`・GetStringTypeA `0x100130c4`・GetStringTypeW `0x100130c8`・LCMapStringA `0x100130cc`・LCMapStringW `0x100130d0`。 #6039 停止報告の逆アセンブル実測)。
+- 根拠の出典: (a) 定数値 = mingw-w64 `winnls.h` (CP_ACP=0・MB_PRECOMPOSED=0x1・MB_ERR_INVALID_CHARS=0x8・WC_NO_BEST_FIT_CHARS=0x400・CT_CTYPE1=1・LCMAP_* 等)。 (b) 挙動 = `tools/shimx/src/str.c` の既存実装 (CP932 表は `tools/shimx/REPORT_SHX-T8.md` §15.3 の 9,604 セル一致)。 (c) 失敗時の LastError 名 = Win32 の標準定数 (ERROR_INVALID_PARAMETER=87・ERROR_INSUFFICIENT_BUFFER=122・ERROR_NO_UNICODE_TRANSLATION=1113)。 MSDN 本文との逐語照合は未了。
+- **実機の実値は範囲外** (Linux では得られない)。 下の CP_ACP は製品判断 (PM #6039 の判断・R7) であり、実行環境での実測ではない。
+
+### 9.1 CP_ACP の扱い (未確認)
+
+| 項目 | 値 | 根拠 |
+|---|---|---|
+| PE 内の CP の読み先 | `[0x10068160]` (`.text` 内で読み出しのみ・書込み無し) | PE の逆アセンブル (#6039 停止報告) |
+| モデルの CP_ACP | **932** (Shift_JIS 系) | PM 判断 (#6039 コメント・R7)。 実行時ロケールの実値は未確認 |
+| 現行 shimx の既定 | 1252 (`str.c` の `g_acp = 1252`)。 `shimx_set_acp(932)` で切替 | `tools/shimx/src/str.c` 12 行 |
+| 差分 | shimx の既定 (1252) と PM 判断 (932) は**一致しない**。 モデルは `shimx_set_acp(932)` 相当を既定にする必要がある | 同上 |
+
+### 9.2 6 API の値モデル
+
+| API | 呼出しの引数 (PE 内の即値・由来) | モデルの値 | 失敗時 (モデル) | 根拠 |
+|---|---|---|---|---|
+| MultiByteToWideChar | CP = `[0x10068160]` か複写。 flag = `[ebp+0x20]` 非 0 → 9 / 0 → 1、 または即値 1 | 932 は `mb2wc_932`。 flag の MB_ERR_INVALID_CHARS(0x8) 有りなら無効バイトで失敗、 無しなら U+30FB に置換 | 戻り 0・LastError 1113 (無効) / 122 (`cchWc` 不足) | `str.c` 226・162-183 行 |
+| WideCharToMultiByte | CP = 同上。 flag = 即値 `0x220` (WC_COMPOSITECHECK 0x200 + WC_SEPCHARS 0x20) | 932 は `wc2mb_932`。 shimx は **WC_NO_BEST_FIT_CHARS(0x400) だけを見る**。 0x220 は往復一致の制限に効かない | 戻り 0・LastError 122 (`cbMb` 不足) / 87 (引数不正) | `str.c` 252・184-198 行 |
+| GetStringTypeW | dwInfoType = 即値 1 (CT_CTYPE1) | CT_CTYPE1 のみ実装 (C1_UPPER/LOWER/ALPHA/DIGIT/XDIGIT)。 他の型は未実装 | 引数不正で FALSE・LastError 87 | `str.c` 408-419 行 |
+| GetStringTypeA | dwInfoType (PE 内の呼出し箇所は 3905 §1 の 5 関数に含まれる) | **shimx の str.c・proctable に実装が無い** (grep 範囲) | 未決 | `tools/shimx/src` の grep |
+| LCMapStringW | flag は呼出し箇所ごとに異なる (未整理) | LCMAP_LOWERCASE(0x100)・LCMAP_UPPERCASE(0x200)。 LCMAP_SORTKEY(0x400) は **shimx 独自の擬似キー** (Windows の形式ではない) | 引数不正で 0・LastError 87 / 不足で 122 | `str.c` 377-402 行 |
+| LCMapStringA | 同上 | **shimx に実装が無い** | 未決 | 同上 |
+
+### 9.3 未了 (受入条件 1・2 の残り / 3・4)
+
+- CP_ACP の 932 が FL Studio の実行で正しいかは**未確認** (PM 判断の既定値)。 実値が 0 (CP_ACP=ASCII 扱い) と分かった時点で §9.1 の行だけ差し替える。
+- WideCharToMultiByte の flag 0x220 の意味 (WC_COMPOSITECHECK・WC_SEPCHARS) と、 shimx がそれを無視することの影響は、 MSDN との逐語照合が未了。
+- GetStringTypeA・LCMapStringA は shimx に無く、 モデル化は #4356 の範囲 (受入条件 3・4 の入力範囲と合わせて決める)。
+- LCMapStringW の呼出し flag の整理と、 SORTKEY の擬似キーを使う経路の有無は未確認。
+- 受入条件 3 (5 関数の引数の由来と入力範囲) と 4 (#4356 への引渡し) は本節では未了。
