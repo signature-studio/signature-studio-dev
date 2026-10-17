@@ -222,4 +222,13 @@ index f66f69b4d..289a1e6c1 100644
     ```
   - 既定経路の不変は、HEAD と main `972b3fa3b` の leafspec A/B (上の 6 件が一致) で示した。
 - §23.10 の「bsr は ZF を追跡しない」は、上の §23.10 の箇条で更新済み。
-- 未解決 (起票先): `shr cl`・`adc`・`cmp rcx,0` → 子 #6078〜#6080 (親 #4350)。
+- 未解決 (起票先): `shr cl` の CF → #6078 (親 #4350)。`cmp rcx,0` の SF/ZF/CF は §23.16 で検証済み (#6080)。
+
+### 23.16 LIFTLIB-32 (#6080) — cmp rcx,0 の SF/ZF/CF の検証
+- **結論**: `cmp rcx,0` の直後の `jl` (SF!=OF)・`je` (ZF)・`jb` (CF) は、既存の `cmp reg,imm` 経路 (`("int", (a, b, False, bits))`) で機械語どおりに読まれる。コード修正は不要 (不一致 0)。テストで固定した。
+- **IR 固定 (T33)**: `cmp rcx,0` → `jl` は `icmp slt i64 %rcx, 0`、`je` は `icmp eq i64 %rcx, 0`、`jb` は `icmp ult i64 %rcx, 0`。`tools/liftlib/tests/test_unit.py` の T33 で、生成 IR の述語を x86 の定義 (SF/ZF/CF/OF) と 13 個の境界値 (0, ±1, ±2, ±5, 2^63±1, 2^63, 2^64-2, 2^31-1, 2^31) で突き合わせる。
+- **実 CPU との突き合わせ**: unicorn 2.1.4 で `cmp rcx,0; pushfq` を実行し、RFLAGS の CF/ZF/SF/OF を x86 モデルと比較 (13 値)。**不一致 0 / 13**。スクリプトは `tools/liftlib/work/6080/cmp_flags_check.py` (gitignore・非 commit)。
+- **単体テスト (測定 commit `80ded5996`・`python3 tests/test_unit.py`・rc=0・所要 5 分 29 秒・load 0.6)**: `ALL UNIT TESTS PASS (36)`。T33 ok。
+- **素材**: `work-m6-ott` / `work-liftlib` / `work-icall` / `work-liftlib-targets` を展開。展開前は T1〜T4・T6・T9・T26 が素材不足で FAIL (ファイル不在)。
+- **既定経路**: 本 PR はコードを変えない (テストと REPORT の追加のみ)。leafspec の測定値は変わらない。
+- **未解決 (起票先)**: `shr reg,cl` の CF → #6078 (LIFTLIB-30・OPEN)。`adc` の flag 生成 → #6079 (LIFTLIB-31・CLOSED)。4 分岐の `icmp` 再結線 → #1948 (LIFTLIB-20)。
