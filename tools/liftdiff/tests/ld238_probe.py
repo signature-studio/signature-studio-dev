@@ -19,7 +19,7 @@ TARGETS = ['668390', '6683d0', '784520', '8e7e10', 'a965c0']
 SIG_OVERRIDE = {'784520': {'ret': 'float', 'params': ['i64', 'i64', 'float']}}
 
 
-def vmt2_line(va, name, arg, psig):
+def vmt2_line(va, name, arg, psig, blob='vmt2'):
     # arg0 は常に vmt2 の this (rcx)。テスト対象の arg (arg>0) だけ別の有効ポインタを渡す (LD-238 §7: 旧版は arg0 に整数を渡していた)。
     kinds = cases.kinds_of(psig['params'])
     toks = []
@@ -34,8 +34,8 @@ def vmt2_line(va, name, arg, psig):
             toks.append('i:a:0x%x' % cases.PTR_SLOTS[1])
         else:
             toks.append('i:0x%x' % cases.SMALL[i])
-    return 'id=%x:vmt2_%d fn=%x blob=vmt2 args=%s trace=0 xfill=%d sig=%s rt=%s' % (
-        va, arg, va, ','.join(toks), 1, ','.join(psig['params']), psig['ret'])
+    return 'id=%x:%s_%d fn=%x blob=%s args=%s trace=0 xfill=%d sig=%s rt=%s' % (
+        va, blob, arg, va, blob, ','.join(toks), 1, ','.join(psig['params']), psig['ret'])
 
 
 def main():
@@ -58,8 +58,10 @@ def main():
             lines, ids = [], []
             for arg, ty in enumerate(psig['params']):
                 if ty in ('i64', 'ptr'):
-                    lines.append(vmt2_line(va, name, arg, psig))
-                    ids.append('%s:vmt2:%d' % (h, arg))
+                    # 24 slot の vmt24 (= d7ff728d8 の vmt2 と同一バイト) を全対象で使う。既存 blob vmt2 (8 slot) は変えない。
+                    blob = 'vmt24'
+                    lines.append(vmt2_line(va, name, arg, psig, blob))
+                    ids.append('%s:%s:%d' % (h, blob, arg))
             rn = nat.run_cases(lines, ids)
             rows = []
             for tag, r in zip(ids, rn):
