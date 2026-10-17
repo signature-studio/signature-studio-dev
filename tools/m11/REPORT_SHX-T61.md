@@ -8,11 +8,11 @@
 
 ## 2. 測定条件
 
-- 測定 commit: `390061627` (コード差分の最終 commit)。
-- 差分 0 の証跡 (本 run・HEAD で確認):
+- 測定 commit: `b07e20aaf` (本 run でコードを変えた最後の commit)。
+- 差分 0 の証跡 (本 run・HEAD で確認。測定 commit から HEAD までのコード差分は 0 行):
 
 ```
-$ git diff 390061627 HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
+$ git diff b07e20aaf HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
 0
 ```
 
