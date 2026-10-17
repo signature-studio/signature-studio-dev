@@ -37,16 +37,13 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 初期化経路で使う import の戻り値・副作用 (ファイル・レジストリ・Delphi の例外機構) を実 API に近づける | 表に届かず、1 run 判定が出せない | 子 (下) |
-| 表 `[ctx-0xc0]` の実行時値そのもの | 受入 2 の本来の目的。未確定 | #4138 (親) |
+| 初期化経路で使う import の戻り値・副作用 (ファイル・レジストリ・Delphi の例外機構) を実 API に近づける | 表に届かず、1 run 判定が出せない | #5458 (Refs・残件) |
+| 表 `[ctx-0xc0]` の実行時値そのもの | 受入 2 の本来の目的。未確定 | #5458 (Refs・残件) |
 
-子の起票: §6 を参照。
+子 issue は本 run では起票していない (残件は #5458 の受入 2 として残す)。
 
-## 5. 差分と測定 commit
+## 5. 測定 commit と差分
 
-- 本付録の commit 直前の測定 commit: ハーネス `tools/python/analysis/flapi/pe_emu_entry_5458.py` の最終変更 commit (本 PR の 1 つ目の commit)。
-- 差分 0 の確認: 測定後の commit は本付録と `REPORT_PY73.md` 以外に無い。`git diff <測定 commit> HEAD -- tools/python/analysis/flapi/pe_emu_entry_5458.py` の出力を PR 本文に載せる。
-
-## 6. 子 issue の扱い
-
-- 1 PR で完結しない残りは、親 #4138 に紐づく子として扱う。起票の番号は PR 本文と issue コメントに書く。
+- 測定 commit: `db5d64e54` (ハーネス `pe_emu_entry_5458.py` と本付録を同じ commit で入れた。コードを変えた最後の commit)。
+- 測定の再現: §2 の再実行は HEAD (`db5d64e54` 以降) で同じ結果 (19,956 命令・0.02 秒・`reader hits=0`)。
+- 差分 0 の証跡: `git diff db5d64e54 HEAD -- tools/python/analysis/flapi/pe_emu_entry_5458.py` の出力は 0 行 (PR 本文に記載)。
