@@ -34,6 +34,15 @@ dump_threads() {
     done
   done >> "$out" || true
 }
+# RIP 採取: 秒の空白区切り S2_RIP_AT の時点で、FL64.exe の全 thread の rip を gdb で取る (既定 空 = 無効)。
+# 出力: $WORKDIR/s2_rip_<n>.tsv (列: 経過秒・LWP・rip)、$WORKDIR/s2_maps_<n>_<経過秒>.txt (/proc/<pid>/maps)。
+rip_sample() {
+  local out="$1" el="$2" pid
+  pid=$(ps -C FL64.exe -o pid= 2>/dev/null | head -1 || true)
+  [[ -n "$pid" ]] || return 0
+  gdb -p "$pid" -batch -ex "set pagination off" -ex "info proc mappings" -ex "thread apply all info registers rip" > "${out%.tsv}_gdb_$el.txt" 2>&1 || true
+  awk -v el="$el" '/LWP/ { match($0, /LWP [0-9]+/); lwp = substr($0, RSTART + 4, RLENGTH - 4) } /^rip/ { print el "\t" lwp "\t" $2 }' "${out%.tsv}_gdb_$el.txt" >> "$out" || true
+}
 REPEAT="${2:-3}"
 export WINEPREFIX="$ART/wineprefix" WINEARCH=win64
 if [[ "${S2_TRACE_REG:-0}" == 1 ]]; then export WINEDEBUG="+reg"; else export WINEDEBUG="${S2_WINEDEBUG:--all}"; fi
@@ -94,7 +103,18 @@ for n in $(seq 1 "$REPEAT"); do
     ) &
     tdumper=$!
   fi
+  ripdumper=""
+  if [[ -n "${S2_RIP_AT:-}" ]]; then
+    (
+      for at in $S2_RIP_AT; do
+        while (( $(date +%s) < s + at )); do sleep 1; done
+        rip_sample "$WORKDIR/s2_rip_$n.tsv" "$(( $(date +%s) - s ))"
+      done
+    ) &
+    ripdumper=$!
+  fi
   (cd "$INST" && timeout "${S2_TIMEOUT:-120}" xvfb-run -a wine64 FL64.exe /R "Z:${WINPATH}\\$NAME" > "$WORKDIR/s2_run_$n.log" 2>&1) || rc=$?
+  if [[ -n "$ripdumper" ]]; then kill "$ripdumper" 2>/dev/null || true; wait "$ripdumper" 2>/dev/null || true; fi
   if [[ -n "${tdumper:-}" ]]; then kill "$tdumper" 2>/dev/null || true; wait "$tdumper" 2>/dev/null || true; unset tdumper; fi
   if [[ -n "${sampler:-}" ]]; then kill "$sampler" 2>/dev/null || true; wait "$sampler" 2>/dev/null || true; unset sampler; fi
   e=$(date +%s)
