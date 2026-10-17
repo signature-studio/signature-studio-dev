@@ -13,7 +13,7 @@
 
 ## 2. 測定
 
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` を `tools/python/work/py5458/` (gitignore) に `*block00031_PE.bin` のみ展開。実測 1.6 秒。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tools/python/work/py5458/` (gitignore) に `*block00031_PE.bin` のみ展開。実測 1.6 秒。
 - unicorn 2.1.4 (`uv pip install unicorn`・導入 0.4 秒)。pefile・capstone も同 venv (`tools/python/work/venv5458`)。
 - ハーネス: `tools/python/analysis/flapi/pe_emu_entry_5458.py`。
   `FL_WIN64_DIR=tools/python/work/py5458 python3 tools/python/analysis/flapi/pe_emu_entry_5458.py 2000000 60`

@@ -3,7 +3,7 @@
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_emu_entry_5458.py [最大命令数] [秒上限]
 
-展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
+展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 import (全 IAT slot) は「rax=0 で呼出し元へ戻る」スタブに置き換える。実 API は動かさない。
 記録: 実行命令数・経過秒・終了理由 (上限到達 / 未マップ参照 / UcError / 正常終了)・
       0x40fb40 (表 [ctx-0xc0] の読出し関数) への到達回数・最後の RIP。
