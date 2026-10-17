@@ -56,7 +56,10 @@
 
 ### 8-7 `18787504` (0x100000002) の書込み時点 (#5280・受入 1 の残り・診断)
 
-- 計装: `trap114_g_read_5280.mjs` (boot 前後と各 unit の前後で `18787504` を読む)・`trap114_src_5280.py` + `trap114_src_read_5280.mjs` (memcpy 直前の源を読む)。測定 commit は `0c0984281` (origin/main・計装ファイルは未 commit で追加)。`ldfix_e2e.sh` rc 0・64 秒・PASS、`prod_order_3608.sh h_nor8b fix` rc 0・41 秒・872/47/22。
+- 計装: `trap114_g_read_5280.mjs` (boot 前後と各 unit の前後で `18787504` を読む)・`trap114_src_5280.py` + `trap114_src_read_5280.mjs` (memcpy 直前の源を読む)。測定 base は origin/main `0c0984281`。計装 3 ファイルは測定時には未 commit で置き、`a90515146` で commit した。**測定 commit は `a90515146`** (計装を含む最後の code commit)。`ldfix_e2e.sh` rc 0・64 秒・PASS、`prod_order_3608.sh h_nor8b fix` rc 0・41 秒・872/47/22。
+- 同一性: 測定時の計装ファイルのバイト列は残していないため、測定時との同一性は hash では確認できない。`a90515146` の 3 ファイルは測定時の内容を commit したもので、以後 HEAD まで変更していない (下の差分)。
+- 測定経路の差分 (`git diff a90515146 HEAD`): 測定が実行したファイル (`ldfix_e2e.sh`・`prod_order_3608.sh`・`stage4.sh`・`ldfix.py`・`fix_*.py`・`survey_stage4.mjs`・`m11_postjs.py` と計装 3 ファイル) の差分は 0 行。`tools/m11/ldfix/` の残りの差分は `trap114_w_*` (8-8 の計装) と REPORT だけで、8-7 の測定は実行していない。
+- `tools/m11/m11_passes.py` と `m11_setother_ptr_class.py` は `0c0984281..9ee36afa3` で main 側が変えたが、8-7 の測定経路からは呼ばれない。`m11_passes.py` を呼ぶのは `m11_gen_ir2.sh` だけで、測定は素材 `work-m11` の `tools/m11/work/boot_final3.ll` を読み、`m11_gen_ir2.sh` を再実行していない (`ldfix_e2e.sh` 1/5 の入力)。
 - 実測: boot 前 `0x0` → `entry_point` 後 `0x100000002`。942 unit の各呼出しの前後では変化 0 (halt0 8・OOB 14 の全件で pre = post = `0x100000002`)。書込みは `m11_boot_enter` の中。
 - memcpy 直前の源の計装は 0 件。B の `function_412770` (117995 行) は `412a12` (memcpy) より前で halt0 し、halt0 の unit は memcpy に届かない。
 - 結論: 受入 1 の残りの「出所」は boot (`entry_point`) 内の書込みで、unit 側の経路ではない。boot 内の書込み元 (動的ポインタ経由の store) は未特定。
