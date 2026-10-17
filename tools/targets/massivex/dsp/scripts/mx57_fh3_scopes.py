@@ -40,31 +40,19 @@ def ip_map(rd, f):
 
 
 def scopes_of(rd, fi, func_end):
-    """(try_scopes, unwind_scopes) か、棄却なら None。"""
+    """(try_scopes, unwind_scopes) を返す。try 表が棄却なら (None, None)。unwind 表だけが棄却なら (tries, None)。
+    上限判定は C 側と揃える: try 表は shimx_fh3_scopes (n_try / n_ip / n_catch)、unwind 表は shimx_fh3_unwind_scopes (max_state / n_ip)。"""
     f = fuinfo_parts(rd, fi)
-    if f is None or f['max_state'] > CAP_STATE or f['n_try'] > CAP_TRY or f['n_ip'] > CAP_STATE:
-        return None
+    if f is None or f['n_try'] > CAP_TRY or f['n_ip'] > CAP_STATE:
+        return None, None
     ips = ip_map(rd, f)
     if any(ips[i][0] < ips[i - 1][0] for i in range(1, len(ips))):
-        return None
+        return None, None
     ranges = []
     for i, (begin, state) in enumerate(ips):
         end = ips[i + 1][0] if i + 1 < len(ips) else func_end
         if end > begin:
             ranges.append((begin, end, state))
-
-    unwind = []
-    for begin, end, state in ranges:
-        cur = state
-        while 0 <= cur < f['max_state']:
-            e = rd(f['disp_unwind'] + 8 * cur, 8) or b'\0' * 8
-            prev = int.from_bytes(e[:4], 'little', signed=True)
-            act = int.from_bytes(e[4:8], 'little')
-            if act:
-                unwind.append({'begin': begin, 'end': end, 'kind': 0, 'target': act})
-            if prev >= cur:
-                break
-            cur = prev
 
     tries = []
     for t in range(f['n_try']):
@@ -73,7 +61,7 @@ def scopes_of(rd, fi, func_end):
         high = int.from_bytes(tb[4:8], 'little', signed=True)
         n_catch = int.from_bytes(tb[12:16], 'little')
         if n_catch > CAP_CATCH:
-            return None
+            return None, None
         disp_ha = int.from_bytes(tb[16:20], 'little')
         hs = []
         for h in range(n_catch):
@@ -83,6 +71,21 @@ def scopes_of(rd, fi, func_end):
         for begin, end, state in ranges:
             if low <= state <= high:
                 tries.extend({'begin': begin, 'end': end, **h} for h in hs)
+
+    unwind = None
+    if f['max_state'] <= CAP_STATE:
+        unwind = []
+        for begin, end, state in ranges:
+            cur = state
+            while 0 <= cur < f['max_state']:
+                e = rd(f['disp_unwind'] + 8 * cur, 8) or b'\0' * 8
+                prev = int.from_bytes(e[:4], 'little', signed=True)
+                act = int.from_bytes(e[4:8], 'little')
+                if act:
+                    unwind.append({'begin': begin, 'end': end, 'kind': 0, 'target': act})
+                if prev >= cur:
+                    break
+                cur = prev
     return tries, unwind
 
 
@@ -107,6 +110,7 @@ def main(pe_path, out_p):
 
     funcs = []
     rejected = 0
+    unwind_rejected = 0
     for st, (e, ui) in sorted(entries.items()):
         b = rd(ui, 4)
         if b is None or b == b'\0\0\0\0' or not (b[0] >> 3) & (P.EHANDLER | P.UHANDLER):
@@ -116,11 +120,13 @@ def main(pe_path, out_p):
         if hb is None or not handler_is_fh3(int.from_bytes(hb[:4], 'little')):
             continue
         fi = int.from_bytes(hb[4:8], 'little')
-        got = scopes_of(rd, fi, e)
-        if got is None:
+        tries, unwind = scopes_of(rd, fi, e)
+        if tries is None:
             rejected += 1
             continue
-        tries, unwind = got
+        if unwind is None:
+            unwind_rejected += 1
+            unwind = []
         funclets = sorted(fh3_funclets_capped(rd, fi) or ())
         funcs.append({'begin': '0x%x' % st, 'fi': '0x%x' % fi,
                       'try_scopes': tries, 'unwind_scopes': unwind,
@@ -129,7 +135,7 @@ def main(pe_path, out_p):
             s['begin'], s['end'], s['target'] = '0x%x' % s['begin'], '0x%x' % s['end'], '0x%x' % s['target']
 
     try_fn = [f for f in funcs if f['try_scopes']]
-    summary = {'fh3_functions': len(funcs), 'fh3_rejected': rejected,
+    summary = {'fh3_functions': len(funcs), 'fh3_rejected': rejected, 'unwind_rejected': unwind_rejected,
                'try_functions': len(try_fn),
                'try_scopes': sum(len(f['try_scopes']) for f in funcs),
                'unwind_scopes': sum(len(f['unwind_scopes']) for f in funcs)}
