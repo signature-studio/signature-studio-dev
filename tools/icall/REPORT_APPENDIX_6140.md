@@ -38,9 +38,9 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `18100cc50` が `unreachable` (wasm_err 8) | sweep の wasm のみ err 3 件のうち 1 件 | 親 #4290 へ提案 (ICALL-97 の未解決として追跡・同じ宣言不一致が原因かは未調査) |
-| `181057b38` `180c8b280` が `memory access out of bounds` | sweep の wasm のみ err | 親 #4290 へ提案 (本 issue の範囲外) |
-| `180da4030` が値の不一致 (wasm の xmm0 が 0 でない) | sweep の値の不一致 1 件 | 親 #4290 へ提案 (本 issue の範囲外) |
+| `18100cc50` が `unreachable` (wasm_err 8) | sweep の wasm のみ err 3 件のうち 1 件 | 親 #4290 へ追跡コメント (ICALL-97 の未解決として追跡・同じ宣言不一致が原因かは未調査) |
+| `181057b38` `180c8b280` が `memory access out of bounds` | sweep の wasm のみ err | 親 #4290 へ追跡コメント (本 issue の範囲外) |
+| `180da4030` が値の不一致 (wasm の xmm0 が 0 でない) | sweep の値の不一致 1 件 | 親 #4290 へ追跡コメント (本 issue の範囲外) |
 
 ## 5. 再現
 
