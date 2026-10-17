@@ -74,14 +74,22 @@
 - 候補 (未検証): `G = r13 + 0x30` (`r13 = 0x11eac80`・`m11_InitLib` が使う global)。`m11_InitLib` の `memcpy(ctx, r13, 296)` は `ctx` の範囲に G が入れば G を書く。`ctx` は引数で、本 run では値を採っていないため棄却できない。`memcpy(r13 + 0x38, tmp, 240)` は 0x11EACB8 から始まり G を含まない。`Q(r13+0x10/0x20/0)` は G に当たらない。boot 後の `r13+0x30` (= G) は `0x100000002` で、boot 前は 0。
 - 結論 (8-8 時点): G への書込みは IR store でも `m11_InitLib` の memcpy でもない。残る候補は C 側の書込み。次の手は、C 側の書込みに G の範囲判定を入れて stage4 を再ビルドすること。
 
-### 8-9 `18787504` (G = 0x11EACB0) の書込み元: C 側の `m11_InitLib` が直接書く (#5280・受入 1 の残り・解決)
+### 8-9 `18787504` (G = 0x11EACB0) の書込み元: C 側の `m11_InitLib` が直接書く (#5280・受入 1 の残り・部分: 分岐値の書込み元 `m11_InitLib` まで特定)
 
 - 測定 commit: **`a2a2200fd`** (`trap114_c_watch_5280.sh` を追加した commit。コード差分はこのスクリプトだけ)。`a2a2200fd` 以前から測定経路 (`ldfix_e2e.sh`・`stage4.sh`・`m11_ov.c`・`m11_rt.c`) のコードは変えていない。
 - 計装: 既存の `M11_WATCH_C5695` (`m11_ov.c` の `m11_cwatch`) を流用し、監視範囲を `[0x11EACB0, 0x11EACB8)` に差し替えた。`S4_EXTRA_CF="-DM11_OV_NO_450560 -DM11_WATCH_C5695=1 -DM11_WATCH_LO=0x11EACB0 -DM11_WATCH_HI=0x11EACB8" bash stage4.sh work/ldfix_fixed.ll <name>`。監視は読取りのみ。
 - 実測 (HEAD `a2a2200fd`・`trap114_c_watch_5280.sh`): stage4 rc 0・8.4 秒・`units_run` 17・`STAGE4_RESULT` の `threw` は `memory access out of bounds` (ldfix_e2e の fix 側と同じ・基準 PASS は別途)。G を含む `m11_cwatch` の hit は 2 件のみ:
   - `[a1c] line=348 addr=11eacb4 n=4 hit=1`・`m11_ov.c` 348 行 = `D(r13 + 0x34) = (u32)function_406f90();` (G+4 への書込み)
   - `[a1c] line=353 addr=11eacb0 n=1 hit=2`・`m11_ov.c` 353 行 = `B(r13 + 0x30) = (u8)(reason + 1);` (G への書込み。1 byte)
-- 解釈: `m11_InitLib` は boot (`m11_boot_enter` → `entry_point`) で `reason` = 1 として呼ばれる (`m11_rt.c` 171 行)。よって G の格納値は `reason + 1` = 2 (下位 byte)、G+4 は `function_406f90()` の戻り値 1 で、合わせて `0x100000002`。unit 側では書かれない (8-7 の結果と一致)。
+- 解釈: `m11_InitLib` は boot (`m11_boot_enter` → `entry_point`) で `reason` = 1 として呼ばれる (`m11_rt.c` 171 行)。よって G の格納値は `reason + 1` = 2 (下位 byte) (実測: hit 2 件の式からの導出)。G+4 の値 1 は **推定** (`function_406f90()` の戻り値。代入値は本 run で未測定。G の合計値 `0x100000002` からの逆算)。測るなら `D(r13+0x34)` の代入値を watch で出して記載する。unit 側では書かれない (8-7 の結果と一致)。
+- 測定鮮度: 測定 commit `a2a2200fd` から HEAD までの `tools/m11/ldfix` 差分はコメント 1 行のみ。
+  ```
+  $ git diff a2a2200fd cc46c25db -- tools/m11/ldfix
+  -#   前提: work/ldfix_fixed.ll (ldfix_e2e.sh の 1/5 の生成物)・FL_WIN64_DIR・<emsdk 絶対パス>.
+  +#   前提: work/ldfix_fixed.ll (ldfix_e2e.sh の 1/5 の生成物)・FL_WIN64_DIR・[EMSDK] (docs/REFERENCES.md §4).
+  ```
+  (`<emsdk 絶対パス>` は repo 外パスのため伏せた。旧行は emsdk の絶対パスを直書きしていた。)
+  (`trap114_c_watch_5280.sh` のコメントのみ。実行されるコードは同一のため、上記の実測値はそのまま採用する。)
 - 注意: 2 件の hit は `m11_InitLib` の `memcpy(ctx, r13, 296)` (`m11_ov.c` 341 行) の `ctx` 範囲判定とは別で、`memcpy` 由来の hit は 0 件。前 run の候補 (`ctx`) は棄却した。
 - 受入 1 の残り (boot 内の書込み元) は、この 2 行で特定された。halt0 の分岐値の出所 (`m11_InitLib` の `reason + 1`) まで。
 - 検証: `ldfix_e2e.sh` rc 0・58 秒・PASS (base/fix stage4 4/4・survey ok 136 / trap 9)。
