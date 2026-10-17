@@ -78,6 +78,16 @@
 - 読み: GetMem の関数ポインタの 0 化は、`0x15e1140` や undo 系 global の 0 化と同じ unit 209 の fill 経路で起きる。束縛関数を走らせる前に、この fill の原因 (PY-123 §2-5 と同じ経路) を解消しないと、型名の観測には届かない。
 - 結論: 受入 1 は未達のまま。型名の実行時の値は、この harness では得られない。
 
+### 2-4. 既定経路の probe (5 回目の run・HEAD で再現)
+
+- 方法: §2-2 の probe を、既定経路 (`FLE_IPP` 未指定・`FLE_EXTRA_ROOTS` 既定) で 1 回実行。`FLE_PY106_BIND=1 FLE_BOOT_TAG=py106def FLE_BOOT_RUNS=default bash tools/flelift/boot/fle6_measure.sh`。
+- 測定 commit: **`d7f0200ea`** (origin/main HEAD)。コードを変えた最後の commit。`git diff d7f0200ea HEAD -- tools/flelift tools/python` は本 REPORT と `results/` の JSON だけ。
+- 実測 (load 開始時 `1.90 1.16 0.52`): rc 0・real 3 分 15.3 秒 (lift・clang plain 97 s・boot 10 s)。boot は units 895 / 942 で `exit` (`MessageBoxA` → `exit`、code 0)。IPP 判定 ok (`ptr_15F34A0 = 0x7f10001c`)。`FLE_IPP=3` (#4033) のため §2 の 209 停止点より先に進む。
+- `FLEBOOT_PY106B`: `names_n 110`・`getproc_calls 110`・`hook_calls 1`。`head_at_stop` = `0x16b8488`。`name_of_slot_exc` = **`PyExc_RuntimeError`**。他: `PyErr_SetString` (slot `0x16b8408`)、`Py_NewInterpreterFromConfig` (`0x16b8250`)。`threw` は `unlifted` (target `0x115a6170`)。
+- 結果 JSON: `tools/flelift/boot/results/boot_summary_py106def_default_py106bind.json` (`probe.names` に 110 件の名前表)。
+- 読み: 既定経路では束縛関数が GetProcAddress と Python312 の load hook に届く (§2-2・§2-3 の 209 停止点とは違う)。読めたのは、束縛が slot `0x16b8488` に格納する**名前の文字列** (`PyExc_RuntimeError`) と、probe が返した cell の型トークン (`0x7f300045`) である。名前は束縛関数 `0xc39ceb` の `lea` が渡す静的な文字列 (§1) なので、この観測は静的判定を実行時に再現したもの。**実 Python の型オブジェクト (`PyExc_RuntimeError` の実体の値) は読めていない**。したがって受入 1 (PyExc_* の実体の観測) は未達のまま。
+- 注意: 束縛の後の `unlifted 0x115a6170` は probe 後段の停止で、boot 本体の `exit` とは別。本 REPORT では扱わない (#2909 の範囲外・PM 判断)。
+
 ## 3. RANGE (-4) と repo の写像 (受入 2)
 
 | 対象 | 写像・文言 | 出典 |
@@ -110,6 +120,7 @@
   - `tools/flelift/boot/results/boot_summary_py106_negctl.json`・`boot_summary_py106_negctl_py106bind.json`: 測定 commit の出力。
   - 既知の残り: throw (exit) の経路では `g_py_probe` が 1 のまま戻らない。後続の呼出しは無く、計測結果には影響しない。
 - 4 回目の run で変更 (測定 commit `aad243e64`): `tools/flelift/boot/fle_boot.c` (`g_py_watch` を 6 → 7 件・`0x13a5c90` を追加)、`tools/flelift/boot/fle_boot.mjs` (`FLE_PY106_MM=1` の復元と `FLEBOOT_PY106MM` 行)、`tools/flelift/boot/results/boot_summary_py106h_negctl*.json`・`boot_summary_py106hm_negctl*.json` (測定の出力)。計測のみ。
+- 5 回目の run で変更 (測定 commit `d7f0200ea`・コード変更なし): `tools/flelift/boot/results/boot_summary_py106def_default.json`・`boot_summary_py106def_default_py106bind.json` (既定経路の測定の出力)。§2-4 の記録のみ。
 - 変更なし: `provider/`・`host/`・`tests/`・`src/` (受入 3)。
 
 ## 6. 未解決 (起票先付き)
