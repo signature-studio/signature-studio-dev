@@ -85,7 +85,7 @@
 | 0x7c76b0 | 0x7c7796 | 戻る | VarDefStmtOptimizer |
 | 0x683120 | 0x6835cb | 戻る (§4c で測定。当時の表は `NORANGE`) | VarDefStmtOptimizer (§4c) |
 
-- 上表の範囲 (`lo-hi`) は本 run の `targets.txt` にあり、リポジトリに収録していない。`notloop_vardef.sh` の入力として再現するには、関数の範囲を取り直す必要がある (未収録)。
+- 上表の範囲 (`lo-hi`) は `notloop_targets.txt` に収録した (§4e で `.pdata` から取り直した値)。`notloop_vardef.sh` の入力はこの一覧を使う。
 - **VarDef 単独の disable で件数は減らない**: `notloop_vardef.sh` で、VarDefStmtOptimizer のみ disable した C の `emcc -fsyntax-only` の `not in loop` 件数は、既定 C と全 12 組で同じ (0x4166b0・0x575480・0x7c76b0 系は 4 件、0x717600 は 2 件、他は 1 件)。注釈の復帰は、この件数を変えなかった。
 - 判定 (測定の範囲に留める): 注釈の消失は VarDefStmtOptimizer 単独 (11 組) と、VarDefStmtOptimizer + WhileTrueToWhileCondOptimizer (0x44abe0) の disable で戻る。VarDef 単独の disable では `not in loop` の件数は減らない。これ以上の結論 (VarDef が原因ではない等) は、件数を減らす別の段・組み合わせを測っていないので言えない。
 - 未検証: 最小集合の C を wasm 実行して bit 一致を確認すること (未実施)。全 disable 32 種は `--backend-disabled-opts` に全名を渡しており、名前の全件が有効であることは未確認 (存在しない名前は無視される)。
@@ -100,7 +100,7 @@
 - `not in loop` を 0 にする最小集合 (旧版 `notloop_minset_err.sh`・所要 93.0 s・測定 commit `a34f768e7`): `WhileTrueToWhileCondOptimizer` 単独。**旧版の値で、未検証 (旧版)。** 旧版は RetDec 失敗時に前候補の `e.c` が残る・emcc の終了コードを見ない偽陽性の余地があった。修正版 (`885a2b627`) では未実測 (`toolchain-retdec`・`toolchain-emsdk` が素材に無いため)。
 - 修正版 (本 PR の HEAD): 候補ごとに `e.c` を消し、RetDec の終了コード・`e.c` の存在・emcc の終了コードを確認する。既定 C で `not in loop` が 0 なら中止する (正対照)。この修正版での再測定は素材 (`toolchain-retdec`・`toolchain-emsdk`) が無く未実施。修正版の分岐は偽の RetDec / emcc で確認済み (正常系・RetDec 失敗で中止・emcc 無しで中止)。
 - 判定: 未確定 (旧版の値のみ・未検証)。注釈を戻す段 (VarDef 単独) と、旧版が出した `not in loop` を消す段 (WhileTrueToWhileCond 単独) が一致するかは、修正版で再測定するまで言えない。「注釈の段 = エラーの段」という前提が成り立たないかどうかも、この時点では判断しない。
-- 未測定: 0x683120 の C を wasm 実行して bit 一致を見ること (未実施)。残り 12 組の `not in loop` の最小集合 (範囲の確定が要るため未実施。0x408770 は範囲を推定で `0x4087ff` と置いて測ったが、範囲の根拠が無いため結果は採らない)。
+- 未測定: 0x683120 の C を wasm 実行して bit 一致を見ること (未実施)。残り 12 組の `not in loop` の最小集合 (RetDec・emcc の測定が未実施。入力範囲は §4e で収録済み)。0x408770 は範囲を推定で `0x4087ff` と置いて測ったが、§4e で `.pdata` から取った範囲は `0x408770-0x4087f3` で、推定値とは末尾 12 byte (0x4087f4〜0x4087ff) の差がある。推定範囲で測った結果は採らない。
 
 ## 4d. disable 名の形式の訂正 (#5911)
 
@@ -120,12 +120,19 @@
 | 同 | snake_case 32 種 全 disable | 0 | 1 |
 | 同 | VarDefStmtOptimizer 単独 | 1 | 1 |
 
-- `notloop_minset.sh` (CamelCase 32 種・所要 75.3 s): 0x732ae0 → `EmptyStmtOptimizer,WhileTrueToWhileCondOptimizer`。0x408770 は範囲 (`lo-hi`) が未確定のため結果は採らない (§4b line 103 と同じ扱い)。
+- `notloop_minset.sh` (CamelCase 32 種・所要 75.3 s): 0x732ae0 → `EmptyStmtOptimizer,WhileTrueToWhileCondOptimizer`。0x408770 は §4e で範囲を `0x408770-0x4087f3` に確定したが、本測定は推定範囲 `0x4087ff` で行ったため結果は採らない (§4b line 103 と同じ扱い)。
 - `notloop_minset_err.sh` (CamelCase 32 種・所要 81.9 s): 0x732ae0 → `WhileTrueToWhileCondOptimizer` 単独。
 - 解釈: 注釈の消失は、CamelCase で渡せば §4b の結論どおり (0x732ae0 は 2 段の組み合わせ、0x683120 は VarDef 単独で戻る)。snake_case は無視されるので、snake_case で渡した測定は無効化が効いていない。
 - 過去の測定の有効性: 全 32 種の過去測定 (§4b の 12/12) は、渡した形式が未確定のため有効性は未確定。単一名の過去測定 (`dis_empty` = `EmptyStmtOptimizer`、`dis_wtwc` = `WhileTrueToWhileCondOptimizer`、`notloop_vardef.sh` = `VarDefStmtOptimizer`) は CamelCase で渡しており有効。VarDef 単独で注釈が戻る結果 (§4c・§4d) も、この形式で得られた。
 - 過去 PR (#5833・#5872・#5890) の diff には名前一覧が含まれず、渡した形式は diff からは確定できない。
-- 未確認: 残り 16 種 (§3 の 48 個との差) の名前。`WhileTrueToUForLoop` 等の綴りの扱いは、クラス宣言と `getId()` の両方で一致したが、RetDec の内部一覧 (`optimizerManager`) 自体は未読。12 組の入力範囲は未収録のまま。
+- 未確認: 残り 16 種 (§3 の 48 個との差) の名前。`WhileTrueToUForLoop` 等の綴りの扱いは、クラス宣言と `getId()` の両方で一致したが、RetDec の内部一覧 (`optimizerManager`) 自体は未読。12 組の入力範囲は §4e で収録済み。
+
+## 4e. 残り 12 組の入力範囲の取り直し (本 run・測定なし)
+
+- 方法: `notloop_ranges.py` が `block19091_PE.bin` の `.pdata` を `Image.func_at` で引き、飛び先 VA を含む関数の `begin-end` を出す。RetDec 出力の `// Address range` 行には依らない。
+- 結果: 13 行 (`notloop_targets.txt`) すべて範囲が引けた (`NORANGE` 0 件)。0x7c76b0 の 2 飛び先は同じ関数。
+- 素材: `fl-win64` の `extracted/block19091_PE.bin` (`$RUNNER_TEMP` に展開)。RetDec・emcc は本節では使わない。
+- 未実施: 取り直した範囲での `not in loop` の段の測定 (RetDec・emcc が必要)。§4b の表の「範囲未収録」の未解決は、この範囲取得で解消した。
 
 ## 5. 採らなかった方式
 
@@ -138,7 +145,7 @@
 |---|---|---|
 | 残り 13 組の注釈消失の段 (単独・組み合わせの disable では戻らない) | 27 件のうち 13 組の直し方が決まらない | #1954 (HB-H41) |
 | 全 optimizer 48 個のうち 32 種の外 (16 種) の探索 | 最小集合が 32 種の中でのみ成り立つ | #1954 (HB-H41) |
-| 12 組の入力範囲 (`targets.txt`) が未収録 | §4b の再現手段 | #1954 (HB-H41) |
+| 12 組の入力範囲は §4e で `.pdata` から取得・収録済み。取り直した範囲での段の測定は未実施 | §4b の再測定 | #1954 (HB-H41) |
 | VarDef 単独 disable で件数が減らない段の特定 | 27 件の直し方が決まらない | #1954 (HB-H41) |
 | 両方 disable (5 組) の C の wasm 実行 (bit 一致) | 戻した C の正しさ未検証 | #1954 (HB-H41) |
 | probe の範囲と grep の範囲の差 (0x5e5d60) | 未解決 19 組の数え方 | #1954 (HB-H41) |
