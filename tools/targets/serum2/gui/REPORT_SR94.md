@@ -121,7 +121,7 @@ SC 集合 `sc.txt` (1 行 1 アドレス・21 行) は、`receiver_this_trace.py
 ## 6. SR-100 (#5986): vtable 候補の受け手の表 (RTTI) の確定 (未解決 (a) の入口)
 
 - 測定 commit: d0dc354d7 (PR head)
-- git diff d0dc354d7 HEAD -- tools/targets/serum2/gui: `vt_head_scan.py` の堅牢化 (commit `cf941efd7`・None 判定 3 箇所と `data.index` → `data.find`) と本節の測定 commit 行の追記のみ。表の値は d0dc354d7 で測定し、HEAD での再実行は未実施 (`plugins-serum2` 素材が無いため)
+- git diff d0dc354d7 HEAD -- tools/targets/serum2/gui: `vt_head_scan.py` の堅牢化 (commit `cf941efd7`・None 判定 3 箇所と `data.index` → `data.find`) と本節の測定 commit 行の追記のみ。表の値は d0dc354d7 で測定し、HEAD `0daa23556` でも再実行して一致を確認した (下の「HEAD での再実行」)
 - 日付: 2026-10-17 / 親: #5612 / 本 issue: #5986。入力 PE の sha256 `501e7bb3…` / 19,236,864 B (§0 と一致・`plugins-serum2` から展開)。
 - 新規ツール: `vt_head_scan.py` (中間スロットの VA から表の先頭を後退探索し RTTI を付ける・静的・PE のみ)。
 - 実行: `python3 vt_head_scan.py Serum2_win64.vst3 0x180a1d8c8 0x180a1dc18 0x180a2bfd8`
@@ -132,6 +132,12 @@ SC 集合 `sc.txt` (1 行 1 アドレス・21 行) は、`receiver_this_trace.py
 | `0x180a1dc18` | `0x180a1db98` | 16 | `0x180a1f690` | `.?AVEditControllerEx1@Vst@Steinberg@@` |
 | `0x180a2bfd8` | `0x180a2bf58` | 16 | `0x180a2c800` | `.?AVSerumController@@` |
 
+- HEAD `0daa23556` での再実行 (同じ入力 PE・sha256 `501e7bb3…`・出力は上表と同一):
+  ```
+  slot 0x180a1d8c8: head 0x180a1d848 (index 16) COL 0x180a1f460 RTTI=.?AVEditController@Vst@Steinberg@@
+  slot 0x180a1dc18: head 0x180a1db98 (index 16) COL 0x180a1f690 RTTI=.?AVEditControllerEx1@Vst@Steinberg@@
+  slot 0x180a2bfd8: head 0x180a2bf58 (index 16) COL 0x180a2c800 RTTI=.?AVSerumController@@
+  ```
 - 訂正 (§3 (a) の前提): `vtable_dump.py` で `RTTI=?` と出たのは、表の中間スロット (index 16) を先頭として渡したため。先頭は上表のとおり 16 slot 手前にある (`[head-8]` が COL)。
 - setter `0x18000e310` は 3 表とも index 16 (disp `0x80`)。`disasm_range.py` で、`[rcx+0x10]` に `rdx` を格納し、旧値 `[rax+0x10]` の vptr[2] を呼ぶ。
 - slot 16 (`[reg+0x80]`) の間接 call は PE 全体で 184 箇所・98 関数 (逆アセンブル走査・所属関数は `.pdata`)。受け手 object が上表 3 表のどれかは、この 184 箇所の受け手 reg を遡って判定する必要があり、本 run では未実施。
