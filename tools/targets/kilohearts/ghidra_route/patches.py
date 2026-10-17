@@ -200,6 +200,11 @@ ABI = {
         #   FUN_180fdc858 は引数 1 件宣言 (ulonglong)。4042 (180fccf08) は入口 param_1 の bit を保持した経路 (movq rdx,xmm0・movaps xmm6,xmm0) で xmm0 = 入口 param_1 = d2u(param_1)。
         #   4136 (180fcd3da) は flag≠0 側。180fcd1a7 の jae は vmovq xmm0,r9 (180fcd1b3) より前に分岐するため、xmm0 は入口のまま = 入口 param_1 = d2u(param_1)。
         #   呼出し 6 件の機械語 (capstone): 180fc6b39・180fc6d65 (= 180fc6870 の 3595・3653 の順)・180fc7100・180fc745c (= 180fc6d70 の 3785・3909 の順)・180fccf08・180fcd3da (= 180fcce40 の 4042・4136 の順)。
+        # #6210 (KH-184): FUN_180fc6870 の入力は xmm0 の下位 4 バイトだけ (入口で movd edx,xmm0 と vmovd eax,xmm0 の 2 箇所で読む。
+        #   rcx・rdx・r8・r9・r11 は入口で読まず書いてから使う。機械語 0x180fc6870〜0x180fc6d6f 315 行で確認)。宣言を float 1 引数にし、本体の in_ZMM0 読みを引数へ置換する。
+        #   本体の param_1〜4 は従来どおり未定義の値のまま残す (142 行目の FUN_180fdc320 の第 1 引数だけが param_1 を読む)。件数 1 を assert する。
+        ('delay FUN_180fc6870 decl float fParam (xmm0 入力・4 引数 → 1 引数)', r'ulonglong FUN_180fc6870\(undefined8 param_1,undefined8 param_2,undefined8 param_3,undefined8 param_4\)\n\n\{\n', 'ulonglong FUN_180fc6870(float fParam)\n\n{\n  undefined8 param_1;\n  undefined8 param_2;\n  undefined8 param_3;\n  undefined8 param_4;\n'),
+        ('delay FUN_180fc6870 body fVar3 = fParam (was in_ZMM0._0_4_)', r'fVar3 = in_ZMM0\._0_4_;', 'fVar3 = fParam;'),
         ('delay 3595 FUN_180fc6870 uVar1 = FUN_180fdc6ec (xmm0 = float 入力)', r'(if \(\(f2u\(fVar3\) & _DAT_1822822a0\) == _DAT_1822822a0\) \{\n\s*)uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);', r'\1uVar1 = FUN_180fdc6ec(f2u(fVar3));'),
         ('delay 3653 FUN_180fc6870 uVar1 = FUN_180fdc6ec (xmm0 = float 入力)', r'(if \(\(f2u\(fVar3\) & 0x7f800000\) == 0x7f800000\) \{\n\s*)uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);', r'\1uVar1 = FUN_180fdc6ec(f2u(fVar3));'),
         ('delay 3785 FUN_180fc6d70 uVar25 = FUN_180fdc844 (xmm0 = float 入力)', r'(if \(\(f2u\(fVar22\) & _DAT_182282360\) == _DAT_182282360\) \{\n\s*)uVar25 = (?:func_0x000|FUN_)180fdc844\(\);', r'\1uVar25 = FUN_180fdc844(f2u(fVar22));'),
