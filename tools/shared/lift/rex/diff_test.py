@@ -38,7 +38,7 @@ for _ in range(n):
 
 # 書込の有無: 入力 arena・初期 .data と比べて変化した case 数。ctx 大域 (.data 内) は各 case で書き換えるので除く。
 ARENA_LO = L['arena']
-d0 = open(W + '/image_native.bin', 'rb').read()[L['data_rva']:L['data_rva'] + DATA_SZ]
+d0 = open(W + '/image_native.bin', 'rb').read()[L['data_rva']:L['data_rva'] + DATA_SZ]   # 初期 .data (DllMain 前) = 書込の有無の基準
 CTX_OFF = L['ctx_rva'] - L['data_rva']
 def data_wo_ctx(d):
     return d[:CTX_OFF] + d[CTX_OFF + 8:]
@@ -57,7 +57,7 @@ for i in range(n):
     rax_hist[struct.unpack_from('<Q', a, 0)[0]] += 1
     hit_cases += struct.unpack_from('<Q', a, 8)[0] > 0
     wa = a[16:16 + ARENA_SZ] != arenas[i]
-    wd = data_wo_ctx(a[16 + ARENA_SZ:]) != data_wo_ctx(d0)
+    wd = data_wo_ctx(a[16 + ARENA_SZ:]) != data_wo_ctx(d0)   # 書込の有無 (初期 .data 基準)
     w_arena += wa
     w_data += wd
     w_any += (wa or wd)

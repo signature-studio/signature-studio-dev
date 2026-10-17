@@ -63,6 +63,7 @@ if (isMainThread) {
   const DATA = BASE + L.data_rva, DATA_SZ = L.data_sz;
   const EXP = [BASE + L.exp_creator_rva, BASE + L.exp_info_rva];
   const img = readFileSync(`${W}/image_wasm.bin`);
+  const DLLMAIN = process.env.REX_DLLMAIN === "1";   // 1 = DllMain(reason=1) を 1 回実行した後の image を基準にする (native_ref.c と同じ手順)
   const cases = readFileSync(`${W}/cases.bin`);
   const nat = readFileSync(`${W}/res_native.bin`);
   // WASI 呼出 (libc の stdio 等) は使わない想定。念のため未実装の import は 0 を返す (値は比較に影響しない)。
@@ -83,6 +84,14 @@ if (isMainThread) {
   // trap の JS スタックの最内側 lift 関数名 (rex.wasm は --profiling-funcs で名前付き: f_<VA>) から VA を取る。名前が無ければ 0。
   const wasmTrapVA = (e) => { const m = /\bf_([0-9a-f]+) \(/.exec(String(e && e.stack)); return m ? m[1] : "0"; };
   const REC = 16 + ARENA_SZ + DATA_SZ;
+  if (DLLMAIN) {
+    const mem0 = new Uint8Array(ex.memory.buffer);
+    mem0.set(img, BASE);
+    ex.rex_reset();
+    ex.rex_run(BASE + L.dllmain_rva, BigInt(BASE), 1n, 0n, 0n);   // DllMain(hinst=BASE, reason=1, reserved=0, 0)
+    const m0 = new Uint8Array(ex.memory.buffer);
+    img.set(m0.subarray(BASE, BASE + img.length));   // 以後の case は DllMain 後の image から始める
+  }
   const dv = new DataView(cases.buffer, cases.byteOffset, cases.byteLength);
   let p = 0;
   const ncase = dv.getUint32(p, true); p += 4;

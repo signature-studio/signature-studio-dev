@@ -56,6 +56,22 @@ for idx, slot in enumerate(order):
 open(os.path.join(outdir, 'image_wasm.bin'), 'wb').write(bytes(wasm))
 open(os.path.join(outdir, 'image_native.bin'), 'wb').write(bytes(native))
 
+# DllMain 経路 (lift_x64c.sh dllmain) 用。fle_cpu.c が同名の strong 定義 (imp_*) を持つ import は、
+# fle_cpu.c のコンパイル時だけ -D で別名に退け (fle_cpu.c 本体は変えない)、rex 専用の no-op 表を唯一の定義にする。
+import re
+FLE_CPU = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'flelift', 'rt', 'fle_cpu.c')
+defined = set(re.findall(r'^void imp_(\w+)\(void\)', open(FLE_CPU).read(), re.M))
+iat_names = set(slots.values())
+open(os.path.join(outdir, 'fle_cpu_rename.flags'), 'w').write(
+    ' '.join('-Dimp_%s=rexdm_fle_imp_%s' % (n, n) for n in sorted(defined & iat_names)) + '\n')
+RGLUE = {'WaitForSingleObject', 'ReleaseMutex', 'RtlPcToFileHeader'}   # rex_glue.c が定義する 3 件
+noop = ['/* rex_image.py が生成 (DllMain 経路の no-op import 表。戻り値 0)。 */',
+        '#include "fle_cpu.h"', 'void rex_hit(void);']
+for n in sorted(iat_names - RGLUE):
+    noop.append('void imp_%s(void) { rex_hit(); R[RAX] = 0; R[RSP] += 8; }' % n)
+open(os.path.join(outdir, 'rex_imp_noop.c'), 'w').write('\n'.join(noop) + '\n')
+open(os.path.join(outdir, 'iat_slots.txt'), 'w').write(''.join('%x %s\n' % (s, slots[s]) for s in order))
+
 exports = {e.name.decode(): e.address for e in pe.DIRECTORY_ENTRY_EXPORT.symbols if e.name}
 text = next(s for s in pe.sections if s.Name.rstrip(b'\0') == b'.text')
 data = next(s for s in pe.sections if s.Name.rstrip(b'\0') == b'.data')
@@ -64,7 +80,8 @@ ctx_rva = 0x1380 + 7 + 0x48a81
 assert data.VirtualAddress <= ctx_rva < data.VirtualAddress + data.Misc_VirtualSize
 lay = {'base': BASE, 'img_size': SIZE, 'arena': 0x30100000, 'arena_sz': int(os.environ.get('REX_ARENA_SZ', '0x10000'), 0),
        'ctx_rva': ctx_rva, 'data_rva': data.VirtualAddress, 'data_sz': data.Misc_VirtualSize,
-       'exp_creator_rva': exports['REXGetCreatorInfo'], 'exp_info_rva': exports['REXGetInfo'], 'iat': {}}
+       'exp_creator_rva': exports['REXGetCreatorInfo'], 'exp_info_rva': exports['REXGetInfo'],
+       'dllmain_rva': pe.OPTIONAL_HEADER.AddressOfEntryPoint, 'iat': {}}
 for name, tag in IMPORTS_NATIVE.items():
     rva = [s for s, n in slots.items() if n == name]
     if rva:
@@ -77,7 +94,8 @@ L = ['#define REX_BASE 0x%xULL' % lay['base'],
      '#define REX_DATA_RVA 0x%x' % lay['data_rva'],
      '#define REX_DATA_SZ 0x%x' % lay['data_sz'],
      '#define REX_EXP_CREATOR_RVA 0x%x' % lay['exp_creator_rva'],
-     '#define REX_EXP_INFO_RVA 0x%x' % lay['exp_info_rva']]
+     '#define REX_EXP_INFO_RVA 0x%x' % lay['exp_info_rva'],
+     '#define REX_DLLMAIN_RVA 0x%x' % lay['dllmain_rva']]
 for name, tag in IMPORTS_NATIVE.items():
     if name in lay['iat']:
         L.append('#define REX_IAT_%s_RVA 0x%x' % (tag, lay['iat'][name]))
