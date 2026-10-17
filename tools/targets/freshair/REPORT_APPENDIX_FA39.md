@@ -100,7 +100,35 @@
 - 測定 commit: `747bab931` (`ks_filter_scen_cmp.py` に語単位の出力を足した、コードを変えた最後の commit)。§3 の数値はすべてこの commit で測定した。
 - `git diff 747bab931 HEAD -- tools/targets/freshair/ks_semantic_filter_kh.c tools/targets/freshair/ks_semantic_filter_kh.sh tools/targets/freshair/ks_semantic_filter_scen.sh tools/targets/freshair/ks_filter_scen_cmp.py tools/targets/freshair/lift2/native` の出力: 空 (以降の追加は本付録と DOC_MAP だけ)。
 
-## 6. 未解決
+## 6. 係数計算の入出力の比較 (FA-65 / #5042)
+
+係数計算関数 (SC `0x180b7fa80` ⇄ KH `0x180469d40`) の呼出し引数・入口ブロック・出口ブロックを両側で記録した (`lift2/native/coef_probe.c`・`ks_coef_scen.sh`・`ks_coef_cmp.py`)。
+同一シナリオ 200 本 (seed 0xF117E4、fma 0)。
+
+測定 commit: `aab22f608` (harness の最後のコード変更 commit)。素材: `work-liftlib-targets` (SlateCore / HeartCore)。
+再現: `bash tools/targets/freshair/ks_coef_scen.sh 200 0xF117E4 0` (出力は下、`ks_coef_cmp.py` の出力をそのまま転記)。
+
+```
+SC_DETERMINISTIC=1
+KH_DETERMINISTIC=1
+groups=598 group_count_differs=0 coef_calls=284
+input mismatch (calls): ty=0 o2=0 f=0 q=0 g=0 sr=0
+entry block (pre) mismatch calls=75 / 284
+out block mismatch calls=209 / 284; mismatched float words=2637 / 41800
+2x2 (entry same/diff x out same/diff): entry_same&out_same=75 entry_same&out_diff=134 entry_diff&out_same=0 entry_diff&out_diff=75
+out mismatch by o2: o2=0:0/37 o2=2:69/90 o2=4:40/46 o2=6:53/59 o2=8:47/52
+rel dist of mismatched words (|SC-KH|/|KH|): <=1e-6=1591 <=1e-4=404 <=1e-3=269 <=1e-2=179 >1e-2=194
+|KH| of mismatched words with rel>1e-2: |KH|<1e-20=66 1e-20<=|KH|<1e-3=10 |KH|>=1e-3=55
+first mismatched word byte offsets (offset:count): 0x10:55 0x18:52 0x20:51 0x28:54 0x30:46 0x38:51 0x40:19 0x44:12 0x48:39 0x4c:5 0x50:33 0x54:5
+first mismatch: ('out', (0, 0), 504, '8e75e40d', '8d75e40d')
+```
+
+**判定**: 引数は一致 (input mismatch 0)。入口一致でも出力が違う call が 134 件あり、係数計算側の差がある。
+入口不一致の 75 件はすべて出力も不一致で、写像側 (入口状態) の差も寄与する。
+- 入口ブロック (0x320 B) が係数計算の読む状態の全部かは**未確定**。入口一致・出口不一致の 134 件は、入口ブロック外の入力を読んでいる可能性を排除していない。
+- 式の特定は未了 (係数計算の呼出し先 `0x180d22850`・`0x180d235b0`・`0x18100c1e0` の入出力は未記録)。
+
+## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
