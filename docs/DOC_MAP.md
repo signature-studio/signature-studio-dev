@@ -714,6 +714,7 @@
 | `tools/python/REPORT_PY99_APPENDIX.md` | ~127 | PY-99 (#2874) 付録: `call 0x10469f0` の本体式 `edx + rint(2^-30·ecx·(r8d−edx))` と、その 7 件の戻り値式 (ecx は入口 edx)。後ろ向き CFG 経路列挙の節 (`[rbp+X]` 読み 171 件の到達 store)。`REPORT_PY41_APPENDIX.md` の 250 行上限のため別置き |
 | `tools/python/REPORT_PY159.md` | 134 | PY-159 (#3086): PY-88 の 65 件の `[rbp+0x5b8]` 書込みの全件表 (VA・式・未確定印)。手計算突合 (SLOT 非依存の 7 件) とネガティブコントロールを実施。結果は `REPORT_PY159.md` §4。残りの SLOT 依存 55 件と ACC 合流は #2874 (PY-99) |
 | `tools/python/REPORT_PY163.md` | 97 | PY-163 (#3135): PY-88 の VCALL 3 件の呼出し先・引数・戻り値式 (CFG 到達定義による式。呼出し先は実行時データで未確定)。結果は `REPORT_PY163.md` §1・§3〜§5。解析は `analysis/py163_vcall.py` |
+| `tools/python/REPORT_PY4852.md` | 76 | PY-4852 (#5048・親 #4140): transport jog・marker 系 4 関数 (continuousMove・continuousMovePos・markerJumpJog・markerSelJog) の PE 入口・書式・呼出し経路 (VA 表)。作用の意味論 (状態・単位) は未確認。mock/C は未着手 (#5510) |
 | `tools/python/REPORT_PY5407.md` | ~70 | PY-5407 (#5947・親 #4658): device.repeatMidiEvent (PE 0xd762f0)・stopRepeatMidiEvent (PE 0xd764a0) の VA 表と dispatch status 経路 (`task+0x60` → `*out` を PE で確定)。述語 0x11d1430 は真と仮定。C/mock は device 無し -7 のみ |
 | `tools/python/REPORT_PY5406.md` | ~80 | PY-5406 (#5838 の子・親 #5838): wine64 9.0 上の FLEngine_x64.dll 署名検証の切り分け。WinVerifyTrust は 1 回目 0x80096004・2 回目 0 (両方観測)。未対応 decoder fixme との因果は未確定。`wine_fl_probe.sh` が再現手段 |
 | `tools/python/REPORT_PY5392.md` | ~40 | PY-5392 (#5838・親 #5771): wine64 9.0 の導入可否 (導入済み)・FLEngine_x64.dll の展開同一性 (SHA-256 一致)・FL64.exe の relay での FLEngine 読込み開始。watch 0x15e4280 は未 hit (未確認)。`wine_fl_probe.sh` が再現手段 |
