@@ -73,6 +73,18 @@ python3 analysis/py64_check_expr.py work/py53/fn.txt --negctl p2   # exit 1
 - 注意: 手計算式は機械展開 (`py99_slot_paths.expand`) と同じ形に組んでいる。値の独立検算は未了。
 - 未確定: 0x104bebf (ACC の合流 0x104b954 を含む)・0x104bffa (`⚠合流@0x104bd49`・`⚠合流@0x104be63` が残る)。これら 2 地点は本表に入れていない。
 
+### 6.2 PY-6005 (#6005): 0x104b305 (G4) の値の独立検算
+
+- 対象: `analysis/py6005_g4_value_check.py` (新規)。`py88` と `ExpSlicer` を通さず、逆アセンブル (capstone) と PE の定数だけで式の値を比べる。
+- 結果: `PASS` (実行 0.179 秒・exit 0・load average 0.39)。内訳は次のとおり。
+  - 到達定義: `0x104b2f2` へ届く `[rbp+0x5b8]` の store は `0x1046d6b` の 1 本 (簡易 CFG)。
+  - edx: `0x1046a30`〜`0x1046d6b` の区間に edx・rdx を書く命令・暗黙に書く命令 (call・cdq・mul 等) は無い。
+  - 定数: `M64[0x1046a20]` = `0x3e10000000000000` (バイト列 `000000000000103e`) = 2^-30 (`9.313225746154785e-10`)。
+  - 値の突合: 0x10469f0 の命令 (`cvtsi2sd`・`mulsd`・`cvtsd2si` の丸め) を模した値と、手計算式 `0 + rint(M64[0x1046a20] · d_in · (0x3e80 − 0))` を、n=200,017 点 (境界値・ランダム) で比べて mismatch 0。
+- ネガティブコントロール (one-off・スクリプトには未組込み): 手計算式の定数を `0x3e81` に換えると、大きい d_in (±2^31・10^6 級) の 5 点中 2 点が不一致。小さい d_in では丸めで差が出ないため、負例は大きい値で見る必要がある。
+- 注意: 独立検算は**手計算式と 0x10469f0 の命令意味の一致**まで。`py99_slot_paths` の機械展開そのものを経由しない。素材は `fl-win64` の `block00031_PE.bin` (PE の ImageBase 0x400000)。
+- 再現: `cd tools/python && mkdir -p work/py64 work/py53 && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin' && python3 analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py53 && python3 analysis/py6005_g4_value_check.py work/py53/fn.txt work/py64/extracted/block00031_PE.bin`
+
 ## 7. RMW store の式化 (PY-5399 / #5904・#5312 の単位 A)
 
 - 対象: 直前の store が同じスロットへの ARITH の RMW (`shr dword ptr [rbp+0x31c], 0x10` at 0x104aaae) のとき、`py88_writes.py` の `mem_read` は `SLOT[rbp+0x31c]?` で止まり、`py99_slot_paths.py` の `store_value` は `OP:shr` を返していた。
