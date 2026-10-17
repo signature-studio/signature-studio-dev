@@ -194,7 +194,7 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 ## 9. 文字列系 6 API の ia32 モデルの値と根拠 (#6039・受入条件 1・2)
 
 - 入力: fl-win64 の `block22434_PE.bin` (IAT: WideCharToMultiByte `0x10013094`・MultiByteToWideChar `0x100130c0`・GetStringTypeA `0x100130c4`・GetStringTypeW `0x100130c8`・LCMapStringA `0x100130cc`・LCMapStringW `0x100130d0`。 #6039 停止報告の逆アセンブル実測)。
-- 根拠の出典: (a) 定数値 = mingw-w64 `winnls.h` (CP_ACP=0・MB_PRECOMPOSED=0x1・MB_ERR_INVALID_CHARS=0x8・WC_NO_BEST_FIT_CHARS=0x400・CT_CTYPE1=1・LCMAP_* 等)。 (b) 挙動 = `tools/shimx/src/str.c` の既存実装 (CP932 表は `tools/shimx/REPORT_SHX-T8.md` §15.3 の 9,604 セル一致)。 (c) 失敗時の LastError 名 = Win32 の標準定数 (ERROR_INVALID_PARAMETER=87・ERROR_INSUFFICIENT_BUFFER=122・ERROR_NO_UNICODE_TRANSLATION=1113)。 MSDN 本文との逐語照合は未了。
+- 根拠の出典: (a) 定数値 = mingw-w64 `winnls.h` (PE 由来の flag・即値の出典は #6039 停止報告 https://github.com/signature-studio/signature-studio-dev/issues/6039#issuecomment-6230794110) (CP_ACP=0・MB_PRECOMPOSED=0x1・MB_ERR_INVALID_CHARS=0x8・WC_NO_BEST_FIT_CHARS=0x400・CT_CTYPE1=1・LCMAP_* 等)。 (b) 挙動 = `tools/shimx/src/str.c` の既存実装 (CP932 表は `tools/shimx/REPORT_SHX-T8.md` §15.3 の 9,604 セル一致)。 (c) 失敗時の LastError 名 = Win32 の標準定数 (ERROR_INVALID_PARAMETER=87・ERROR_INSUFFICIENT_BUFFER=122・ERROR_NO_UNICODE_TRANSLATION=1113)。 MSDN 本文との逐語照合は未了。
 - **実機の実値は範囲外** (Linux では得られない)。 下の CP_ACP は製品判断 (PM #6039 の判断・R7) であり、実行環境での実測ではない。
 
 ### 9.1 CP_ACP の扱い (未確認)
@@ -205,6 +205,8 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 | モデルの CP_ACP | **932** (Shift_JIS 系) | PM 判断 (#6039 コメント・R7)。 実行時ロケールの実値は未確認 |
 | 現行 shimx の既定 | 1252 (`str.c` の `g_acp = 1252`)。 `shimx_set_acp(932)` で切替 | `tools/shimx/src/str.c` 12 行 |
 | 差分 | shimx の既定 (1252) と PM 判断 (932) は**一致しない**。 モデルは `shimx_set_acp(932)` 相当を既定にする必要がある | 同上 |
+| `[0x10068160]` の初期値 | .bss の 0 (= CP_ACP 相当)。 932 既定との関係: 0 のままなら CP_ACP の解決は実行時の host 値に依る (本 REPORT の 932 既定はその host 値を 932 と置いた仮定) | #6039 停止報告 (https://github.com/signature-studio/signature-studio-dev/issues/6039#issuecomment-6230794110) |
+| CP_UTF8 (65001) | `str.c` 233・259 行で直接処理 (MB→WC は `utf8_decode`、WC→MB は `shimx_utf16_to_utf8`)。 MB_ERR_INVALID_CHARS と WC_ERR_INVALID_CHARS を見る。 Windows 仕様との逐語照合は未了 | `tools/shimx/src/str.c` |
 
 ### 9.2 6 API の値モデル
 
@@ -212,7 +214,7 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 |---|---|---|---|---|
 | MultiByteToWideChar | CP = `[0x10068160]` か複写。 flag = `[ebp+0x20]` 非 0 → 9 / 0 → 1、 または即値 1 | 932 は `mb2wc_932`。 flag の MB_ERR_INVALID_CHARS(0x8) 有りなら無効バイトで失敗、 無しなら U+30FB に置換 | 戻り 0・LastError 1113 (無効) / 122 (`cchWc` 不足) | `str.c` 226・162-183 行 |
 | WideCharToMultiByte | CP = 同上。 flag = 即値 `0x220` (WC_COMPOSITECHECK 0x200 + WC_SEPCHARS 0x20) | 932 は `wc2mb_932`。 shimx は **WC_NO_BEST_FIT_CHARS(0x400) だけを見る**。 0x220 は往復一致の制限に効かない | 戻り 0・LastError 122 (`cbMb` 不足) / 87 (引数不正) | `str.c` 252・184-198 行 |
-| GetStringTypeW | dwInfoType = 即値 1 (CT_CTYPE1) | CT_CTYPE1 のみ実装 (C1_UPPER/LOWER/ALPHA/DIGIT/XDIGIT)。 他の型は未実装 | 引数不正で FALSE・LastError 87 | `str.c` 408-419 行 |
+| GetStringTypeW | dwInfoType = 即値 1 (CT_CTYPE1) | CT_CTYPE1 は実装済み (C1_UPPER/LOWER/ALPHA/DIGIT/XDIGIT/SPACE/BLANK/CNTRL/PUNCT/DEFINED)。 CT_CTYPE2 (簡易: L/EN/WS) と CT_CTYPE3 (簡易: C3_ALPHA のみ) も実装済み (完全な分類ではない)。 その他の型は引数不正で FALSE | 引数不正で FALSE・LastError 87 | `str.c` 408-427 行 |
 | GetStringTypeA | dwInfoType (PE 内の呼出し箇所は 3905 §1 の 5 関数に含まれる) | **shimx の str.c・proctable に実装が無い** (grep 範囲) | 未決 | `tools/shimx/src` の grep |
 | LCMapStringW | flag は呼出し箇所ごとに異なる (未整理) | LCMAP_LOWERCASE(0x100)・LCMAP_UPPERCASE(0x200)。 LCMAP_SORTKEY(0x400) は **shimx 独自の擬似キー** (Windows の形式ではない) | 引数不正で 0・LastError 87 / 不足で 122 | `str.c` 377-402 行 |
 | LCMapStringA | 同上 | **shimx に実装が無い** | 未決 | 同上 |
