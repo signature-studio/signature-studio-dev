@@ -1,7 +1,7 @@
 # icall #4290 (ICALL-97): リーフ 3 関数の abort 原因と route 入力の統合
 
 測定 commit: `8def758ae` (コードを変えた最後の commit。main `fe48dca85` の上)。
-本付録の commit は測定後の docs だけで、`git diff 8def758ae HEAD -- tools/icall` の出力は 0 行。
+測定後に変えたのは本付録だけ。`git diff 8def758ae HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_4290.md'` の出力は 0 行。
 
 ## 1. 結論
 
