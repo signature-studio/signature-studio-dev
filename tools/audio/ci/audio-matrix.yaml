@@ -68,7 +68,8 @@ jobs:
           path: tools/audio/build/web
       - name: 仮想オーディオ VB-CABLE を既定の再生デバイスにする (Windows・未検証)
         if: runner.os == 'Windows'
-        shell: pwsh
+        # au2.mjs は Windows PowerShell (powershell.exe) で Get-AudioDevice を呼ぶ。Install-Module も同じ host に入れないと CurrentUser のモジュール配置先が一致しない (指摘 discussion_r4281567327)
+        shell: powershell
         run: |
           choco install vb-cable -y --no-progress
           Install-Module -Name AudioDeviceCmdlets -Force -Scope CurrentUser

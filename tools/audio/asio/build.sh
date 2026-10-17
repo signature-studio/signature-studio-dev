@@ -48,7 +48,7 @@ emcc "${FLA_CLANG_FLAGS[@]}" \
   -pthread -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=12 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=67108864 \
   -sENVIRONMENT=web,worker -sERROR_ON_UNDEFINED_SYMBOLS=1 -sSTACK_SIZE=1048576 -sASSERTIONS=1 \
   -Wno-pthreads-mem-growth -DFLASIO_PROFILE_ILWASAPI=1 \
-  -sEXPORTED_FUNCTIONS=_main,_fla_ctl_ptr,_fla_layout_count,_fla_layout_off,_fla_layout_name,_com_test_done_ptr,_com_test_result_ptr,_flasio_tl_ptr,_flasio_tl_count,_flasio_tl2_ptr \
+  -sEXPORTED_FUNCTIONS=_main,_fla_ctl_ptr,_fla_layout_count,_fla_layout_off,_fla_layout_name,_com_test_done_ptr,_com_test_result_ptr,_flasio_tl_ptr,_flasio_tl_count,_flasio_tl2_ptr,_flasio_open_depth \
   -sEXPORTED_RUNTIME_METHODS=wasmMemory,UTF8ToString \
   -I"$AUDIO/src" -I"$HERE" \
   "$HERE/iasio.c" "$HERE/iasio_vreg.c" "$HERE/test/com_test.c" \

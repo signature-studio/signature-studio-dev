@@ -199,7 +199,7 @@ worker_body() { # worker_body <kind: new|note> <理由> <status json> [what: wor
   worker_status_copy "$3"
   printf '%s\n' '```' ""
   if [ "$1" = new ] && [ "$what" = demote ]; then
-    printf '%s\n' "確認すること: 降格の理由 (\`demoted_reason\`) の経緯 (同じ issue に 30 分以内の 2 件の \`/oc\`)。解除は repo の push 権限者が \`POST /demote/reset\` で行う (自動では戻らない)。解除されると (\`demoted_reason\` が null) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
+    printf '%s\n' "確認すること: 降格の理由 (\`demoted_reason\`) の経緯 (同じ issue に 30 分以内の 2 件の \`/oc\`)。解除は repo の push 権限者が \`POST /demote/reset\` で行うか、降格から 60 分を超えると tick が自動で解除する (\`auto-stale\`・CI-251)。解除されると (\`demoted_reason\` が null) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
   elif [ "$1" = new ] && [ "$what" = launch ]; then
     printf '%s\n' "確認すること: \`launch_halted.reason\` の条件 (infra/pm-worker/README.md『launch の停止と通知』の表)。止まりが解けると (\`launch_halted\` が null に戻り、\`fresh\` が true かつ \`last_tick\` が 5 分以内) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
   elif [ "$1" = new ]; then
@@ -309,7 +309,7 @@ worker_launch() { # 止まっている launch が overdue (15 分以上・着手
   launch_abnormal && [ "$launch_overdue" = true ] || return 0
   worker_down "$worker_status_json" "launch が止まっています (reason=$launch_reason、止まり始め $launch_since)" launch
 }
-# 降格 (#2340・D26): /status の demoted_reason が null でない間は launch と dispatch が dry-run になる。解除は人の手 (POST /demote/reset) だけ。
+# 降格 (#2340・D26): /status の demoted_reason が null でない間は launch と dispatch が dry-run になる。解除は人の手 (POST /demote/reset) か、降格から 60 分の時限復帰 (auto-stale・CI-251)。
 # 形が読めない値 (文字列でない) は警告だけ。起票や追記はせず、回復の close だけを止める (launch_halted と同じ規則)。
 demote_state=none demote_reason=""
 demote_parse() { # demote_parse <status json>: demoted_reason の形を読む。demote_state は none / demoted / unknown

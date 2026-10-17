@@ -141,3 +141,10 @@
 |---|---|---|
 | l2 の T が depth 6 → 12 に上がった原因 (`burst_obs` 系列が未確認。esc では説明できない) | 床後の T 上昇の見積もりが不確か | #3757 |
 | 床の下で depth 4 の初期 T を直接観測できない | depth 4/6 の振り分けは部分達成 | #3757 |
+
+## 8. 初期 depth の観測 (`open_depth`) (#6038 次の一手)
+
+- 計装: `flasio.c` が `fla_open` 直後の実効 depth を `g_open_depth` に保持し、`flasio_open_depth()` で export。`harness/com_page.mjs` が結果 JSON の `open_depth` に入れる。判定には使わない。床 (`FLA_F_T_FLOOR`) は変えていない。
+- 測定 (1 回・負荷なし・foreground・実測 63.98 秒、load 0.89): `com_ramp_b256_d2` → FAIL (underrun 1・silence 4992・`probed_burst=512`・終 T=1792)。結果 JSON の `open_depth=6`。
+- 読み: 床の下では `probed_burst=512` (式の need は 4) でも初期 depth は 6 に上がる。§7-1 の 4 の「床の下で depth 4 は初期 T に現れない」を、この 1 回で直接確認した。ただし、probed と FAIL の対応は依然として見えない (本回も FAIL だが probed は 512 で、§7 の 512 の PASS と同じ)。
+- 未解決: 床を外した条件 (depth 4 が初期 T に出る条件) の FAIL 頻度は未測定。床の値の採否は PM 判断。
