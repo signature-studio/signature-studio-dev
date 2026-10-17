@@ -28,6 +28,7 @@ P = 0x15E30F8  # .data。PE 値 = CELL。前提ゲートは [[P]+0x168] を見�
 CHUNK = 1 << 16
 X86_OP_MEM = capstone.x86.X86_OP_MEM
 X86_OP_REG = capstone.x86.X86_OP_REG
+X86_OP_IMM = capstone.x86.X86_OP_IMM
 WRITE_MNEM = ("mov", "add", "sub", "inc", "dec", "and", "or", "xor")
 
 
@@ -71,7 +72,33 @@ def fmt(ins):
     return f"{ins.address:#x} {ins.mnemonic} {ins.op_str}"
 
 
+HELPERS = {0x8683B0: "inc168", 0x868400: "dec168"}  # [reg+0x168] を add / sub する関数 (参照カウント)
+
+
+def helper_callers():
+    """(4) 増減関数 (HELPERS) の呼出し地点ごとに、直前 6 命令内で rcx に入れた値の由来を出す。
+
+    由来: `mov rcx,[C]` (= D) か、`mov rax,[P]` の後の `mov rcx,[rax]` (= [[P]] = D)。どちらも無ければ未確認。
+    """
+    hist = collections.deque(maxlen=6)  # (addr, op_str, rip 参照先)
+    out = []
+    for ins in stream():
+        if ins.mnemonic == "call" and ins.operands[0].type == X86_OP_IMM and ins.operands[0].imm in HELPERS:
+            items = list(hist)
+            src = "未確認"
+            if any(t == CELL and s.startswith("rcx,") for _, s, t in items):
+                src = "[C] (= D)"
+            elif any(t == P and s.startswith("rax,") for _, s, t in items) and any(s == "rcx, qword ptr [rax]" for _, s, _ in items):
+                src = "[[P]] (= D)"
+            out.append((HELPERS[ins.operands[0].imm], ins.address, src))
+        hist.append((ins.address, ins.op_str, rip_target(ins)))
+    print("== 4. [reg+0x168] の増減関数 (0x8683b0 inc / 0x868400 dec) の呼出し地点と rcx の由来")
+    for name, addr, src in out:
+        print(f"  {name} call@{addr:#x} rcx = {src}")
+
+
 def main():
+    helper_callers()
     v = fo(CELL)
     print(f"== 1. cell {CELL:#x} への RIP 相対参照 (全 .text)")
     print("  cell の PE 値 = " + ("bss(runtime)" if v is None else f"{int.from_bytes(RAW[v:v+8], 'little'):#x}"))

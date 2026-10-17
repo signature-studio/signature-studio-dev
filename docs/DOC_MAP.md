@@ -314,6 +314,7 @@
 |---|---:|---|
 | `tools/m11/REPORT.md` | ~229 | FLEngine_x64.dll 部分起動 PoC (stage 4/6・残 trap・次の一手)・§11 (#572, 要約のみ)・§12 survey の OOM/clobber 分離 (#513)・§13 (#516 qstore D17, 要約のみ)。§8 (LB_BASE #222)・§9 (sigfix #131)・§10 の commit 別測定表 (#132, §10a)・§10 の一部 (真因・修正 4 点・NC・次 blocker, §10b) は `REPORT_APPENDIX.md` に分割 |
 | `tools/m11/REPORT_SHX-T28.md` | ~125 | #2444 (SHX-T28, 親 #1630): 機械語から親フレーム共有 site を検出する `tools/m11/frame_share/detect.py` の結果 (閉包 7,421 関数で mov 渡し 307 site・D23 信号 301 site・親 63・callee 94)、`function_448490` の親 IR に `[rbp+0x4c]` の初期 store が無い静的観測、修復前 baseline (units_run 17・unit 18 の VirtualAlloc/MessageBoxA)。修復は子 [SHX-T40] |
+| `tools/m11/ldfix/REPORT_3677.md` | 60 | #3677 (LD-173・親 #2958): `1046a30` の命令形 10 進 VA inttoptr 73 件の番地・読み幅の突合表 (`rip_match_3677.py`・`results/rip_1046a30_3677.tsv`)。段数確定と remap は未実施 (#4498) |
 | `tools/m11/REPORT_SHX-T40.md` | ~50 | #3234 (SHX-T40, 親 #2444): `function_448490` の親 object を callee の view に合わせる修復 pass `ldfix/fix_shx_t40.py` (既定 OFF の実験)。実測で修復 ON は unit 18 で hang、+0x70 のみでは OOB。未解決は子 issue (SHX-T41 以降) |
 | `tools/m11/REPORT_SHX-T44.md` | ~70 | #4189 (SHX-T44, 親 #4123): `function_448490` の 10 mov 渡し site の機械語判定 (`frame_share/site_check.py`)。全 site で親 rbp を静的リンクとして渡し、callee が親の `[rbp+0x48]`・`[rbp+0x4c]` を読み書き。残り 291 site の callee 読み先の一括抽出 (`write_local` 121・`read_local` 106・`arg_home_only` 74)。修復 pass と OFF/ON 実測は子 [SHX-T45] #4459 |
 | `tools/m11/REPORT_SHX-T44_APPENDIX.md` | ~250 | #4189: mov 渡し 301 site の site 単位の表 (call・callee 読み先・access_class・IR 突合)。前半 (250 行まで)。REPORT_SHX-T44 §6 の付録 |
@@ -385,6 +386,7 @@
 | `tools/m11/REPORT_APPENDIX_2163.md` | ~68 | m11 #2163 (REPORT_N1415.md §8-4) の全文: ldfix 有りの再測定表 (`035274be`・`5ee72b93`・`03692a0c`・`9952e605`・`9af7827f`・`3bdae05d` 等)・merge `9952e605` の親の向きと 862→866 (`03692a0c`) の `git diff --stat`・§8-1〜§9 の値の扱い・測定手順・未解決 |
 | `tools/m11/REPORT_N1165.md` | ~110 | #1165: 旧 IR (818/21/56/77) の再現 (`d6a17b64` 手順で ok 818・oob 21・halt0 56)・ldfix の有無による差 (818 ↔ 828)・ldfix 無し build の opt-in 経路 (`M11_ALLOW_LDFIX_DISABLED=1`)・HEAD の 2×2 測定。lift 段の起点と e2e 全体は未解決 (#1165) |
 | `tools/m11/REPORT_APPENDIX_960.md` | 242 | m11 REPORT_N27 §14 (#960: `--full` を同一 HEAD・同一 PE で 2 回実行し、IR の差の段を切り分け) の全文 (250 行上限のため無変更で分割移動) と、#960 追補 §15・#1664 の §16〜§19 (RetDec drc.ll の `uselistorder` 非決定の切り分け・A7 の空行残りの特定と修正・修正後の `--full` n=3 の `ir_sha256` 一致)・#2456 の §20 (指示行の差が書き出し前の状態にあること・アドレス依存の観測。§18 の writer 段の推定は訂正) |
+| `tools/m11/REPORT_APPENDIX_6023.md` | ~40 | m11 #6023 (M11-38): LLVM fork `2a1f3d8a` の再ビルドと RetDec v5.0 (`53e55b4b`) の再リンク (部分達成)。計装パッチは未適用。ビルド手順は `tools/m11/retdec_build_6023.sh` |
 | `tools/m11/REPORT_APPENDIX_2577.md` | ~134 | m11 #2577 (REPORT_APPENDIX_960 §20 の子・RetDec uselistorder の差の段とアドレス依存): 部分達成。指示行は `--backend-no-opts` でも揺れ、指示行を除いた `.ll` は 3 回の測定 (`43ca7475f`・`c0b68d971`・`5d079357a`) の全群で 1 種。出力名長による切替は 1 回目のみで 2・3 回目は再現せず。pass 単位の段と container は未特定 (`tools/m11/uselist_stage_2577.sh`) |
 | `tools/m11/REPORT_APPENDIX_2779.md` | ~125 | m11 REPORT_N403 §9 (#2779: LB=0 / 0x10000 の後段を `M11_SKIP_LIFT_FP=1` で指紋検査を迂回して測った参考値) の全文。250 行上限のため分割移動。測定値の正本 |
 | `tools/m11/rtl/REPORT.md` | ~248 | Delphi RTL の VA 範囲確定 + RTL 帯 (System/Types/SysUtils 1,172 関数) の lifter 別 liftdiff 採点 (#129) + x64c 不一致の主因タグ分類 (§9・集計は `classify_x64c_mismatch.py`・結果は `results/x64c_mismatch_classify.txt`・#410)。§7-4 は `REPORT_APPENDIX_129.md`・§9-4 は `REPORT_APPENDIX_1721.md`・§9-5 は `REPORT_APPENDIX_1936.md` に分割 (250 行上限) |
@@ -680,6 +682,7 @@
 | `tools/audio/asio/REPORT_APPENDIX_998.md` | ~23 | asio REPORT §12-2 全文 (#998 負荷下の再現試験 L1〜L3)。250 行上限のため無変更で分割移動 |
 | `tools/audio/asio/REPORT_APPENDIX_2934.md` | ~125 | asio #2934 (AU-26): 初期目標充填 T の下限 (`FLA_F_T_FLOOR`) の baseline・同一 HEAD 20 回連続・lat_out 前後・親 e2e 実測・need→増分の式・B=128 の 5 回と基点 5 回の比較 |
 | `tools/audio/asio/REPORT_APPENDIX_4593.md` | ~70 | asio #4593 (AU-47): flasio `do_buffer` の 4 区間の最大 µs 計装と 20 回測定の付録。結論は付録 §2-1・§3 |
+| `tools/audio/asio/REPORT_APPENDIX_6037.md` | ~67 | asio #6037 (AU-50): producer/worklet/main の時系列計装 (epoch ms)・負荷下の停止の切り分け。結論は付録 §3・§4 |
 | `tools/audio/asio/REPORT_APPENDIX_3757.md` | ~45 | asio #3757 (AU-40): com_ramp_b256_d2 の producer 停止の計装 (write 時系列 pw を結果 JSON に出す)・同一 HEAD 計測 (cold 10・warm 6・負荷下 4・再測定 3)。直接経路は未特定。測定値の正本 |
 | `tools/audio/asio/REPORT_APPENDIX_2777.md` | ~150 | asio #2777 (#998 残件): 初期目標充填 T (burst probe 由来の depth 4/6) と com_ramp_b256_d2 underrun の実測 16 回・全 e2e (測定 commit `e137c4a8`)。対処 (床) は #2934 ([AU-26]) で main 済み。§7: 床の適用後の再測定 15 回 (測定 commit `c0fb6e074`)。測定値の正本。直接経路は [AU-40] #3757 |
 | `tools/audio/wl/REPORT.md` | ~75 | AU-8 (#194): ring 方式 vs worklet 直走行の遅延比較 (テスト音ミキサ代役) + FLEngine スレッド/待機面の静的見積り |
@@ -984,6 +987,7 @@
 | `tools/plugins/p0c/REPORT_APPENDIX_N.md` | ~55 | p0c §27 (#3281 残件 B: 0x5e12c0 の ucomisd flags を jbe に接続する一般 pass `k80_ucomi_br.py` と、手書き本体の削減 14→13・負論対照・測定) |
 | `tools/plugins/p0c/REPORT_APPENDIX_M.md` | ~65 | p0c §26 (#5832 E7: x86_fp80 ↔ i80 bitcast の展開。`f80b_rt/run.sh` の bit 一致・subnormal carry の修正前後の固定ベクタ・19165 の測定 (測定 commit `ce3872372`)) |
 | `tools/plugins/p0c/REPORT_APPENDIX_M2.md` | ~110 | p0c §26 付録 M の鮮度の証跡: `git diff ce3872372 HEAD -- tools/plugins/p0c` の全文 |
+| `tools/plugins/p0c/REPORT_APPENDIX_O.md` | ~130 | p0c §28 (#6046): 手書き本体 14 → 9 の置換 (x87fix の対象に 5 本を追加)。根本原因 (x87fix の `--funcs` 未登録)・10 本の判定 (5 本 fixed・5 本 skip 4 種)・負論対照・測定 (commit `ecadfb82d`) |
 | `tools/plugins/dynamics/REPORT_APPENDIX.md` | ~102 | dynamics §E ([PLG-F3-15] #1778): 19252 の残 helper `vmovsd` store の宛先 (spill → B1 の 0 埋め) の原因実測。 方式は DECISIONS D16。 dynamics REPORT §4 の「脱落の原因 (#1412)」の全文 (250 行上限のため分割移動。 静的検出 (`statically linked function`) による `.pdata` define 脱落 208 件の内訳と切替実測) |
 | `tools/plugins/sampler/REPORT.md` | ~245 | PLG-G3 (#208) sampler 8 本: lift 前提の実測。 engine lift 鎖の根本原因と `emcc -c` gate・NC。 §2b (#537 推移閉包) は REPORT_INDIRECT.md (#208 / #540) |
 | `tools/plugins/sampler/REPORT_APPENDIX.md` | ~60 | sampler REPORT §6 の旧版 (§A 検証起点 53c2eb6、§B 82a99ac/7de96e0、§C 7ffab50) と §D (RetDec C 出力段の経緯) の全文 (250 行上限のため分割移動) |

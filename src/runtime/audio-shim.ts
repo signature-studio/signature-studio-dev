@@ -113,7 +113,7 @@ export class FlAudioShim {
   workletErrors: string[] = [];
   /** clock_jump 1 件ごと (上限 256 件)。ct = AudioContext.currentTime、pn = performance.now() (main thread の受信時。worklet に performance は無い)、rx = Date.now() (受信時。rx − ms が受信遅延)、cb = producer の bufferSwitch 通し番号 */
   clockJumpLog: { q: number; d: number; frame: number; prev: number; ms: number; ct: number; pn: number; rx: number; cb: number }[] = [];
-  underrunLog: ConsumerUnderrun[] = [];
+  underrunLog: (ConsumerUnderrun & { ms?: number })[] = [];
   commandsHandled = 0;
   private refPts: { x: number; y: number }[] = [];
 
@@ -295,7 +295,7 @@ export class FlAudioShim {
       const d = e.data as { type: string; message?: string; q?: number; d?: number; frame?: number; prev?: number; ms?: number; ct?: number; cb?: number; p?: number; consumed?: number; rebuf?: number; recs?: number[][] };
       if (d.type === "error") { this.workletErrors.push(d.message ?? "?"); this.log(`worklet error: ${d.message}`); }
       if (d.type === "clock_jump") this.clockJumpLog.push({ q: d.q ?? -1, d: d.d ?? 0, frame: d.frame ?? -1, prev: d.prev ?? -1, ms: d.ms ?? 0, ct: d.ct ?? -1, pn: performance.now(), rx: Date.now(), cb: d.cb ?? -1 });
-      if (d.type === "underrun_trace") this.underrunLog.push({ p: d.p ?? -1, consumed: d.consumed ?? -1, rebuf: d.rebuf ?? -1, recs: d.recs ?? [] });
+      if (d.type === "underrun_trace") this.underrunLog.push({ p: d.p ?? -1, consumed: d.consumed ?? -1, rebuf: d.rebuf ?? -1, recs: d.recs ?? [], ms: d.ms });
     };
     node.connect(ctx.destination);
     this.node = node;

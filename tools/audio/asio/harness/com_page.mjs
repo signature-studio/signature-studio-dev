@@ -16,6 +16,19 @@ const logEl = document.getElementById("log");
 const shimLines = [];
 const log = (s) => { logEl.textContent += s + "\n"; console.log(s); if (/\[audio-shim\]/.test(s)) shimLines.push(s); };
 
+// main thread の heartbeat (診断): 20 ms 超の間隔を epoch ms で記録する (main thread の停止 = プロセス全体の停止の候補)
+window.__hb_gaps = [];
+{
+  let last = performance.timeOrigin + performance.now();
+  const tick = () => {
+    const now = performance.timeOrigin + performance.now();
+    if (now - last > 20 && window.__hb_gaps.length < 512) window.__hb_gaps.push([last, now - last]);
+    last = now;
+    setTimeout(tick, 5);
+  };
+  setTimeout(tick, 5);
+}
+
 window.__done = new Promise((resolveAll, rejectAll) => {
   let shim = null, ver = null;
   const stderr = [];
@@ -81,6 +94,18 @@ window.__done = new Promise((resolveAll, rejectAll) => {
           result.pw = { pw_n: n, first_index: first, trace, burst_hist: Array.from(u32.subarray(16772 / 4, 16772 / 4 + 32)) };
         }
         // probed_burst (shim の OPEN 行) を結果に残す。判定には使わない。
+        // 診断計装 (判定に使わない): producer 周期の時系列 (flasio_tl) と main thread の heartbeat 間隔 (hb_gaps: 20ms 超の間隔の
+        // [開始 epoch ms, 間隔 ms])。すべて fla_now_ms と同じ epoch ms の時計 (performance.timeOrigin + now)。
+        {
+          const n = M._flasio_tl_count();
+          const f64 = new Float64Array(M.wasmMemory.buffer, M._flasio_tl_ptr(), 2048 * 7);
+          const rows = [];
+          for (let i = 0; i < n; i++) rows.push(Array.from(f64.subarray(i * 7, i * 7 + 7)));
+          result.tl = { n, cols: ["notify_ms", "fill", "underruns", "wake", "cb0", "cb1", "wr"], rows };
+        }
+        result.hb_gaps = window.__hb_gaps ?? [];
+        // recs = worklet の直近 64 quantum: [p, rd, wr, wl, dms (前 quantum からの Date.now 差)]
+        result.ul_ms = (shim.underrunLog ?? []).map((u) => ({ ms: u.ms ?? null, p: u.p, consumed: u.consumed, recs: u.recs }));
         result.shim_open = shimLines.filter((s) => /OPEN |burst probe/.test(s));
         result.workletErrors = shim.workletErrors;
         result.cfg = cfg;
