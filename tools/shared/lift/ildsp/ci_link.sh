@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CreateInstance (0x1aa290) の ci_lift.sh 出力 (ci.rs_norm.ll・ci_helpers.c) を wasm にリンクし、未解決シンボルを数える (T-SH-152 #5748)。
 # 入力: ci_lift.sh の出力 (tools/shared/work/lift/ci/)。census FAIL で ci_lift.sh が rc 1 のとき ci.rs_norm.ll・ci_helpers.c は無いので、REPORT_CI.md §9-1 の 2 行 (ir_normalize.py・gen_helpers.py) を先に流す。emsdk は EMSDK_ENV (既定は [EMSDK] の emsdk_env.sh。docs/REFERENCES.md §1)。
-# 処理: uselistorder 行を除く (emcc の LLVM が読めない) -> @global_var_1803f6610 を画像内の絶対アドレス化 -> ci.o -> helpers.o -> 検査用 shim (@0 のみ) -> IAT stub (ci_iat.o)・trap (ci_traps.o) をリンク -> wasm-ld。
+# 処理: (uselistorder は ci_lift.sh の ir_normalize 段で除去済み・残っていたら exit 1) -> @global_var_1803f6610 を画像内の絶対アドレス化 -> ci.o -> helpers.o -> 検査用 shim (@0 のみ) -> IAT stub (ci_iat.o)・trap (ci_traps.o) をリンク -> wasm-ld。
 # 出力: tools/shared/work/lift/ci-link/ (gitignore)。
 # 注意: @0 (__unnamed_1) の shim は「リンクが通るための仮置き」。画像上の意味は未検証 (REPORT_CI.md §9-2)。絶対アドレスの値 (0x303f6610) の画像上の意味確認は #3320。
 # usage: bash tools/shared/lift/ildsp/ci_link.sh   (exit 0 = 未解決の集合が期待集合と一致 / exit 1 = 想定外の未解決 / exit 2 = 入力が無い)
@@ -15,7 +15,8 @@ source "${EMSDK_ENV:?EMSDK_ENV を設定 ([EMSDK] の emsdk_env.sh)}" >/dev/null
 
 # global_var_1803f6610 は画像内の cell (RVA 0x3f6610・wc_image.py の BASE 0x30000000 基準) に敷設する (REPORT_CI §9-2)。
 IMG_BASE=0x30000000; CELL_RVA=0x3f6610
-grep -v -e '^  uselistorder' -e '^@global_var_1803f6610 = external global i64$' "$IN/ci.rs_norm.ll" | sed "s/@global_var_1803f6610/inttoptr (i64 $((IMG_BASE + CELL_RVA)) to ptr)/g" > "$W/ci.ll"
+if grep -q '^  uselistorder' "$IN/ci.rs_norm.ll"; then echo "[ci-link] uselistorder が残っている (ir_normalize --drop-uselistorder の段で除く。REPORT_CI §9-3)"; exit 1; fi
+grep -v -e '^@global_var_1803f6610 = external global i64$' "$IN/ci.rs_norm.ll" | sed "s/@global_var_1803f6610/inttoptr (i64 $((IMG_BASE + CELL_RVA)) to ptr)/g" > "$W/ci.ll"
 cat > "$W/shim.c" <<'EOF'
 #include <stdint.h>
 /* 検査用の仮置き (意味は未検証)。ret 値用の cell (@0 = __unnamed_1) のみ。画像敷設は未決 (REPORT_CI §9-2)。 */

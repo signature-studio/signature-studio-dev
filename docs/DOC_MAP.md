@@ -425,6 +425,7 @@
 | `tools/m11/trap_triage/REPORT_APPENDIX_4885.md` | ~90 | #4885: 証拠表の行 67・68・71〜74 の件ごとの判定 (母数 13・真陽性 6・偽陽性 0・保留 7)。REPORT_718 §4l の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5389.md` | ~40 | #5389: 証拠表の行 78・81〜84 の保留 5 件の判定理由 (真陽性 0・偽陽性 0・保留 5・機械語と IR の照合・未解決)。REPORT_718 §4o の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5845.md` | ~60 | #5845: 証拠表の行 78・81・82 の保留 3 件の判定理由 (確定 0・保留 3・機械語と IR の SSA 対応の深掘り・未解決)。REPORT_718 §4o の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_6208.md` | ~50 | #6208: 証拠表の行 78 の判定 (確定 0・保留 1・機械語 3 段 deref と IR 2 段の対応・count==0 到達が未解決)。REPORT_718 §4o の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5660.md` | ~90 | #5660: 証拠表の行 119〜158 (母数 40) の件ごとの突合表。判定 0 件・保留 40 (保留の型 (i)〜(iv))。REPORT_718 §4l の行 119〜158 の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_1654.md` | ~30 | #1654・#1655: REPORT_718 §4c (証拠表の行 99〜193) と §4e (行 194〜288) の全文。250 行上限のため分割移動 (削除していない)。REPORT_718 §4c・§4e の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_6211.md` | ~60 | #6211: 証拠表の行 224・225 (母数 2) の件ごとの判定 (真陽性 0・偽陽性 0・保留 2。機械語と IR の count 源の段数が不一致)。REPORT_718 §4p の正本 |
@@ -1102,6 +1103,7 @@
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_2529.md` | ~60 | ildsp vtable slot 4 (0x1aa3a0) の lift と native 差分 (#2529) の全文 (REPORT §6 から分割移動): 手順 (`lift.sh`)・選定根拠・closure 規模・実測・ネガティブコントロール・未解決の起票先。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_3401.md` | ~110 | ildsp #3401 (T-SH-75・縮小して完了) の付録: PSOLA_CreateInstance の規模の定義 (vtable 経由 closure 82 関数・4,601 命令・間接 18)・CreateInstance + slot 0・2・4・5 の x64c lift の対象 (§8 は slot 0・4・5、§9 で slot 2 を追加)・native 対 wasm 差分・slot 1・3 の native 落ち原因・slot 4 の戻り値を畳み込まない理由・未解決と起票先。測定値は各節 (§8-5・§9-5) が正本 |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_4170.md` | ~40 | ildsp T-SH-100 (#4170) の付録: WaveformColouring CreateInstance + vtable slot 0–5 の全呼出の native 対 wasm 差分 (`lift_wc6.sh`・slot 1・4 の最小引数・slot 4 の戻り値を畳み込まない理由)・既定引数で native が落ちる実測・neg-cmp 結果。測定値の正本 |
+| `tools/shared/lift/ildsp/REPORT_APPENDIX_6235.md` | ~40 | ildsp T-SH-164 (#6235) の付録: `uselistorder` の除去を `ir_normalize.py --drop-uselistorder` (正規化段) へ移し、`ci_link.sh` の `grep -v` を guard に置換した。除去前後の `ci.emc.ll`・`ci.o` 未定義・`ci_link.sh` の実測 (n=3) と NC。REPORT_CI §9-5 の全文 (250 行上限のため分割移動) |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_6184.md` | 41 | ildsp T-SH-161 (#6184) の付録: CreateInstance の計算ジャンプ表 (0x442000・n = 1〜16) の 17 経路を RetDec が `ret` に化かす原因、`ci_restore_jump_table.py` による `switch` への復元、x86 との書込み照合 (34 件一致)、NC、census・ci_link の実測。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_5162.md` | 52 | ildsp T-SH-139 (#5162・部分達成) の付録: PSOLA 差分の 1 case 目 HeapAlloc 13 件目 (slot 1・native 71368 / wasm 70088) の呼出元 (`0x161561`・`N+0x48`)、差の入力 `[0x3f5b80]` (native 4 / wasm 0)、`cpuid_model` 仮説と実験の結果。サイズ式 0x500 は未達。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_4302.md` | 138 | ildsp T-SH-114 (#4302・部分達成) の付録: PSOLA slot 1・3 の鍵 `[0x3f7ad0]` を設定する host 初期化 `0x1b7d80` の特定 (書き込みは `0x1b6f44` のみ・呼出元は `0x1b7d80` 1 件)・arena 不足と `RDX≠0` が落ちる原因の訂正・差分 harness の slot 別引数 (native 64/64 完走・wasm は slot 1 で trap・受入 3 未達)・再現コマンド。測定値の正本 |
