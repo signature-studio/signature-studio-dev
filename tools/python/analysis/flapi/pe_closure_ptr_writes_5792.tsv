@@ -1,0 +1,548 @@
+func	site	base	disp	index	insn	target	dead_suspect
+0x409470	0x4094b4	rbx	0x0	0	mov qword ptr [rbx], rsi	未確認 (実行時 object 状態)	0
+0x409470	0x4094da	rbx	0x0	0	mov qword ptr [rbx], rsi	未確認 (実行時 object 状態)	0
+0x4094f0	0x409558	rsi	0x18	0	mov byte ptr [rsi + 0x18], 1	未確認 (実行時 object 状態)	0
+0x4094f0	0x40956d	rax	0x0	0	add dword ptr [rax], 1	未確認 (実行時 object 状態)	0
+0x4094f0	0x409570	rsi	0x0	0	mov qword ptr [rsi], 0	未確認 (実行時 object 状態)	0
+0x4094f0	0x409577	rsi	0x10	0	mov qword ptr [rsi + 0x10], 0	未確認 (実行時 object 状態)	0
+0x4094f0	0x40957f	rsi	0x8	0	mov qword ptr [rsi + 8], 0	未確認 (実行時 object 状態)	0
+0x4095a0	0x4095dc	rbx	0x18	0	mov byte ptr [rbx + 0x18], 0	未確認 (実行時 object 状態)	0
+0x4095a0	0x4095f1	rax	0x0	0	sub dword ptr [rax], 1	未確認 (実行時 object 状態)	0
+0x411ea0	0x411eba	rax	0x10	0	mov qword ptr [rax + 0x10], 0	未確認 (実行時 object 状態)	0
+0x411ef0	0x411f1c	rsi	0x0	0	mov qword ptr [rsi], rax	未確認 (実行時 object 状態)	0
+0x411ef0	0x411f27	rbx	0x10	0	mov qword ptr [rbx + 0x10], 0	未確認 (実行時 object 状態)	0
+0x411ef0	0x411f6f	r13	0x0	0	mov qword ptr [r13], rax	未確認 (実行時 object 状態)	0
+0x411ef0	0x411f91	rax	0x8	0	mov qword ptr [rax + 8], rdi	未確認 (実行時 object 状態)	0
+0x411ef0	0x411f95	rax	0x10	0	mov qword ptr [rax + 0x10], rsi	未確認 (実行時 object 状態)	0
+0x411ef0	0x411fb0	rbx	0x0	0	mov qword ptr [rbx], rcx	未確認 (実行時 object 状態)	0
+0x411ef0	0x411fb3	rax	0x0	0	mov qword ptr [rax], rbx	未確認 (実行時 object 状態)	0
+0x411ef0	0x411fed	rsi	0x0	0	mov qword ptr [rsi], rax	未確認 (実行時 object 状態)	0
+0x412d60	0x412d74	rbx	0x0	0	mov qword ptr [rbx], 0	未確認 (実行時 object 状態)	0
+0x412e40	0x412e53	rsi	0x0	0	mov qword ptr [rsi], 0	未確認 (実行時 object 状態)	0
+0x4133f0	0x413443	rbx	0x0	0	mov qword ptr [rbx], rsi	未確認 (実行時 object 状態)	0
+0x413480	0x4134a2	rcx	0x0	0	mov qword ptr [rcx], rdx	未確認 (実行時 object 状態)	0
+0x418190	0x4181a4	rbx	0x0	0	mov qword ptr [rbx], 0	未確認 (実行時 object 状態)	0
+0x418210	0x41824e	rbx	0x0	0	mov qword ptr [rbx], rsi	未確認 (実行時 object 状態)	0
+0x4394e0	0x43952a	rcx	0x0	0	mov word ptr [rcx], r8w	未確認 (実行時 object 状態)	0
+0x47d960	0x47da29	r8	0x0	0	mov qword ptr [r8], rdx	未確認 (実行時 object 状態)	0
+0x47d960	0x47da34	rax	0x0	0	add qword ptr [rax], 1	未確認 (実行時 object 状態)	0
+0x4f2990	0x4f2993	rax	0x0	0	mov dword ptr [rax], edx	未確認 (実行時 object 状態)	0
+0x4f2990	0x4f2995	rax	0x4	0	mov dword ptr [rax + 4], r8d	未確認 (実行時 object 状態)	0
+0x4f2990	0x4f2999	rax	0x8	0	mov dword ptr [rax + 8], r9d	未確認 (実行時 object 状態)	0
+0x4f2990	0x4f29a1	rax	0xc	0	mov dword ptr [rax + 0xc], ecx	未確認 (実行時 object 状態)	0
+0x663d80	0x663dca	rax	0x20	0	mov dword ptr [rax + 0x20], ecx	未確認 (実行時 object 状態)	0
+0x663d80	0x663dd6	rax	0x18	0	mov byte ptr [rax + 0x18], cl	未確認 (実行時 object 状態)	0
+0x664040	0x66407a	rcx	0x0	1	mov qword ptr [rcx + rdx*8], rax	未確認 (実行時 object 状態)	0
+0x664040	0x66407e	rbx	0x10	0	add dword ptr [rbx + 0x10], 1	未確認 (実行時 object 状態)	0
+0x666780	0x6667a6	rax	0x10	0	mov qword ptr [rax + 0x10], rsi	未確認 (実行時 object 状態)	0
+0x666780	0x6667aa	rax	0x18	0	mov qword ptr [rax + 0x18], rdi	未確認 (実行時 object 状態)	0
+0x666780	0x6667ae	rax	0x20	0	mov qword ptr [rax + 0x20], r13	未確認 (実行時 object 状態)	0
+0x666780	0x6667c6	rax	0x18	0	mov qword ptr [rax + 0x18], rcx	未確認 (実行時 object 状態)	0
+0x6667f0	0x66682d	rcx	0x20	0	mov qword ptr [rcx + 0x20], r13	未確認 (実行時 object 状態)	0
+0x6667f0	0x666880	rax	0x10	0	mov qword ptr [rax + 0x10], rsi	未確認 (実行時 object 状態)	0
+0x6667f0	0x666884	rax	0x18	0	mov qword ptr [rax + 0x18], rdi	未確認 (実行時 object 状態)	0
+0x6667f0	0x666888	rax	0x20	0	mov qword ptr [rax + 0x20], r13	未確認 (実行時 object 状態)	0
+0x6667f0	0x6668a0	rax	0x18	0	mov qword ptr [rax + 0x18], rcx	未確認 (実行時 object 状態)	0
+0xbd68e0	0xbd68fc	r8	0x0	1	mov byte ptr [r8 + rax], 0	未確認 (実行時 object 状態)	0
+0xe391b0	0xe3920b	rbx	0xb1c	0	mov dword ptr [rbx + 0xb1c], esi	未確認 (実行時 object 状態)	0
+0xe391b0	0xe3924f	rbx	0xb1c	0	mov dword ptr [rbx + 0xb1c], eax	未確認 (実行時 object 状態)	0
+0xe39560	0xe395c2	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe3ef60	0xe3f428	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe3ef60	0xe3f434	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe3ef60	0xe3f438	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe3ef60	0xe3f43a	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe3ef60	0xe3f43c	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe3ef60	0xe3f43e	rax	-0x66	0	adc byte ptr [rax - 0x66], al	未確認 (実行時 object 状態)	1
+0xe3ef60	0xe3f448	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe3ef60	0xe3f44a	rcx	0x48	0	add byte ptr [rcx + 0x48], al	未確認 (実行時 object 状態)	1
+0xe4ea50	0xe4eb62	rdx	0x0	0	mov dword ptr [rdx], ecx	未確認 (実行時 object 状態)	0
+0xe4ea50	0xe4eb8e	rdx	0x8	0	mov dword ptr [rdx + 8], ecx	未確認 (実行時 object 状態)	0
+0xe4ea50	0xe4ebaf	rdx	0x8	0	mov dword ptr [rdx + 8], ecx	未確認 (実行時 object 状態)	0
+0xe4ea50	0xe4ec01	rcx	0x4	0	mov dword ptr [rcx + 4], eax	未確認 (実行時 object 状態)	0
+0xe4ea50	0xe4ec14	rcx	0xc	0	mov dword ptr [rcx + 0xc], eax	未確認 (実行時 object 状態)	0
+0xe4ea50	0xe4ec3e	rax	0x0	0	mov dword ptr [rax], 0xffffffff	未確認 (実行時 object 状態)	0
+0xe4ea50	0xe4ec44	rax	0x8	0	mov dword ptr [rax + 8], 0xffffffff	未確認 (実行時 object 状態)	0
+0xe4ea50	0xe4ec5c	rax	0x4	0	mov dword ptr [rax + 4], 0xffffffff	未確認 (実行時 object 状態)	0
+0xe4ea50	0xe4ec63	rax	0xc	0	mov dword ptr [rax + 0xc], 0xffffffff	未確認 (実行時 object 状態)	0
+0xe50b50	0xe50deb	rax	0xe4	1	mov byte ptr [rax + rbx*4 + 0xe4], 1	未確認 (実行時 object 状態)	0
+0xe59e90	0xe5a328	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe59e90	0xe5a32a	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe59e90	0xe5a32c	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe59e90	0xe5a32e	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe59e90	0xe5a331	rax	0x0	0	add byte ptr [rax], ah	未確認 (実行時 object 状態)	1
+0xe59e90	0xe5a333	r8	0x0	0	add byte ptr [r8], al	未確認 (実行時 object 状態)	1
+0xe59e90	0xe5a336	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe59e90	0xe5a338	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe59e90	0xe5a344	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe59e90	0xe5a346	rax	-0x34	0	add byte ptr [rax - 0x34], al	未確認 (実行時 object 状態)	1
+0xe5a350	0xe5a500	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe5a350	0xe5a502	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe5a350	0xe5a504	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe5a350	0xe5a506	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe5afb0	0xe5b1d8	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe5afb0	0xe5b1da	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0xe5afb0	0xe5b1dc	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1016ca0	0x1016d17	rax	0x1c	0	mov dword ptr [rax + 0x1c], edx	未確認 (実行時 object 状態)	0
+0x1016ca0	0x1016d3a	rcx	0x24	0	mov dword ptr [rcx + 0x24], eax	未確認 (実行時 object 状態)	0
+0x1016ca0	0x1016d3d	rcx	0x20	0	mov dword ptr [rcx + 0x20], 0	未確認 (実行時 object 状態)	0
+0x1019b70	0x1019bb4	rax	0x0	1	mov qword ptr [rax + rdi*8], rsi	未確認 (実行時 object 状態)	0
+0x1019da0	0x1019dba	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1019da0	0x1019dbc	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1019da0	0x1019dbe	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1019da0	0x1019dc0	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1019da0	0x1019dc2	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1019e30	0x1019e6c	rax	0x48	0	mov dword ptr [rax + 0x48], 0	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019e77	rax	0x64	0	mov byte ptr [rax + 0x64], 0	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019e7f	rax	0x7c	0	mov byte ptr [rax + 0x7c], 0	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019e87	rax	0x7d	0	mov byte ptr [rax + 0x7d], 0	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019e8f	rax	0x7e	0	mov byte ptr [rax + 0x7e], 0	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019e97	rax	0x7f	0	mov byte ptr [rax + 0x7f], 0	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019e9f	rax	0x35	0	mov byte ptr [rax + 0x35], 1	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019ea7	rax	0x34	0	mov byte ptr [rax + 0x34], 0	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019ec0	rcx	0xc	0	mov qword ptr [rcx + 0xc], rax	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019ed6	rcx	0x14	0	mov qword ptr [rcx + 0x14], rax	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019ef7	rcx	0x40	0	mov qword ptr [rcx + 0x40], rax	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019eff	rax	0x68	0	mov qword ptr [rax + 0x68], 0	未確認 (実行時 object 状態)	0
+0x1019e30	0x1019f6e	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101b780	0x101b801	rax	0x28	0	mov dword ptr [rax + 0x28], ecx	未確認 (実行時 object 状態)	0
+0x101b780	0x101b849	rax	0x0	0	mov byte ptr [rax], 0xb	未確認 (実行時 object 状態)	0
+0x101b780	0x101b853	rax	0x1	0	mov byte ptr [rax + 1], 0xd	未確認 (実行時 object 状態)	0
+0x101b780	0x101b85e	rax	0x2	0	mov byte ptr [rax + 2], 0x23	未確認 (実行時 object 状態)	0
+0x101b780	0x101ba65	rcx	0x0	1	mov qword ptr [rcx + rdx*8], rax	未確認 (実行時 object 状態)	0
+0x101b780	0x101bb51	rax	0x0	0	mov byte ptr [rax], 6	未確認 (実行時 object 状態)	0
+0x101b780	0x101bb5b	rax	0x1	0	mov byte ptr [rax + 1], 7	未確認 (実行時 object 状態)	0
+0x101b780	0x101bb66	rax	0x2	0	mov byte ptr [rax + 2], 9	未確認 (実行時 object 状態)	0
+0x101b780	0x101bb71	rax	0x3	0	mov byte ptr [rax + 3], 0x2d	未確認 (実行時 object 状態)	0
+0x101b780	0x101bb7c	rax	0x4	0	mov byte ptr [rax + 4], 0x30	未確認 (実行時 object 状態)	0
+0x101b780	0x101bb87	rax	0x5	0	mov byte ptr [rax + 5], 0x32	未確認 (実行時 object 状態)	0
+0x101b780	0x101bd53	rax	0x0	1	add byte ptr [rax + rax], al	未確認 (実行時 object 状態)	1
+0x101b780	0x101bd56	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101b780	0x101bd58	rcx	0x0	0	add byte ptr [rcx], al	未確認 (実行時 object 状態)	1
+0x101b780	0x101bd5a	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101b780	0x101bd5c	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101b780	0x101bd5e	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101b780	0x101bd60	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101b780	0x101bd62	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101d180	0x101d2bc	rax	0x0	0	mov qword ptr [rax], 0	未確認 (実行時 object 状態)	0
+0x101d180	0x101d42b	rax	0x0	0	mov qword ptr [rax], 0	未確認 (実行時 object 状態)	0
+0x101d180	0x101d442	rax	0x70	0	mov dword ptr [rax + 0x70], 0xffffffff	未確認 (実行時 object 状態)	0
+0x101d180	0x101d47a	rax	0x54	0	mov qword ptr [rax + 0x54], rcx	未確認 (実行時 object 状態)	0
+0x101d180	0x101d87d	rax	0x8	0	mov dword ptr [rax + 8], ecx	未確認 (実行時 object 状態)	0
+0x101d180	0x101d887	rax	0x0	0	mov byte ptr [rax], 0	未確認 (実行時 object 状態)	0
+0x101d180	0x101d8ca	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101d180	0x101d8ce	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101d180	0x101d8d2	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101d180	0x101d8d4	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101d180	0x101d8d6	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101d180	0x101d8d8	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x101d180	0x101d8da	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x102bb20	0x102bb62	rdi	0x0	0	mov qword ptr [rdi], rcx	未確認 (実行時 object 状態)	0
+0x102bb20	0x102bb67	rdi	0x0	0	mov qword ptr [rdi], 0	未確認 (実行時 object 状態)	0
+0x1046780	0x10467b4	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x1046780	0x10467dd	rax	0x0	0	mov dword ptr [rax], ebx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1046f16	rax	0x4	0	mov dword ptr [rax + 4], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1046f26	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1047119	rax	0x0	0	mov dword ptr [rax], 0	未確認 (実行時 object 状態)	0
+0x1046a30	0x104724d	rax	0x0	1	mov qword ptr [rax + rcx*8], rdx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104725c	rax	0x0	0	add dword ptr [rax], 1	未確認 (実行時 object 状態)	0
+0x1046a30	0x10473f2	rax	0x0	0	mov dword ptr [rax], 0	未確認 (実行時 object 状態)	0
+0x1046a30	0x1047405	rax	0x4	0	mov dword ptr [rax + 4], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1047415	rax	0x8	0	mov dword ptr [rax + 8], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1047745	rax	0x4	0	mov dword ptr [rax + 4], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1047995	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1047c50	rax	0xc	1	mov dword ptr [rax + rcx*4 + 0xc], edx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1047dc4	rax	0x174	0	mov dword ptr [rax + 0x174], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1047f6e	rax	0x180	0	mov dword ptr [rax + 0x180], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104805a	rax	0x1f0	0	mov dword ptr [rax + 0x1f0], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1048184	rax	0x32e	0	mov byte ptr [rax + 0x32e], cl	未確認 (実行時 object 状態)	0
+0x1046a30	0x1048605	rax	0x258	0	mov dword ptr [rax + 0x258], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x10488c0	rax	0x2c4	0	mov dword ptr [rax + 0x2c4], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1048aa9	rax	0x2d0	0	mov dword ptr [rax + 0x2d0], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1048baf	rax	0x21c	0	mov dword ptr [rax + 0x21c], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1048d0a	rax	0x220	0	mov dword ptr [rax + 0x220], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x10493f7	rax	0x0	1	mov dword ptr [rax + rcx*4], edx	未確認 (実行時 object 状態)	0
+0x1046a30	0x10496c5	rax	0x8	1	mov dword ptr [rax + rcx*4 + 8], edx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1049826	rax	0x200	1	mov dword ptr [rax + rcx*4 + 0x200], edx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1049bdb	rax	0x2b4	0	mov dword ptr [rax + 0x2b4], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1049bf0	rax	0x2e0	0	mov dword ptr [rax + 0x2e0], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1049c0c	rax	0x2ac	1	mov dword ptr [rax + rcx*4 + 0x2ac], edx	未確認 (実行時 object 状態)	0
+0x1046a30	0x1049f5e	rax	0x0	1	mov dword ptr [rax + rcx*4], edx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104a170	rax	0x30	0	mov dword ptr [rax + 0x30], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104a195	rax	0xd0	1	mov dword ptr [rax + rcx*4 + 0xd0], edx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104a544	rax	0x0	1	mov dword ptr [rax + rcx*4], edx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104a9e2	rax	0xa0	0	mov dword ptr [rax + 0xa0], 0	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ac7c	rax	0x148	0	mov byte ptr [rax + 0x148], cl	未確認 (実行時 object 状態)	0
+0x1046a30	0x104b3bc	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104b4f1	rax	0x4	0	mov dword ptr [rax + 4], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104b8fa	rax	0x384	1	mov dword ptr [rax + rcx*4 + 0x384], edx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104bf8f	rax	0x0	1	mov dword ptr [rax + rcx*4], edx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104c335	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104c3ca	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104c6ea	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104c9c0	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cb89	rax	0x0	1	mov qword ptr [rax + rcx*8], rdx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cb98	rax	0x0	0	add dword ptr [rax], 1	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cc10	rax	0x0	1	mov qword ptr [rax + rcx*8], rdx	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cc1f	rax	0x0	0	add dword ptr [rax], 1	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cc4e	rax	0x0	0	mov dword ptr [rax], 1	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ccd0	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104ccd2	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104ccd4	rax	-0x71	0	add byte ptr [rax - 0x71], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104ccd7	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104ccda	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104ccdc	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104ccde	rsi	0x0	0	adc byte ptr [rsi], bh	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cce0	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cce2	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cce4	rax	-0x61	0	add byte ptr [rax - 0x61], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cce7	rax	0x0	0	add byte ptr ds:[rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104ccea	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104ccf8	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104ccfa	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104ccfc	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd03	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd05	rax	0x0	0	add byte ptr [rax], dl	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd08	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd0a	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd0c	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd0f	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd12	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd14	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd18	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd1a	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd1c	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd1f	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd22	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd24	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd27	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd2a	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd2c	rax	0x404c	0	add byte ptr [rax + 0x404c], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd32	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd34	rax	-0x72b7bf85	0	add byte ptr [rax - 0x72b7bf85], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd3c	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cd3e	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cdbb	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	1
+0x1046a30	0x104cdcf	rdx	0x0	0	add byte ptr [rdx], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cdd5	rax	0x0	0	add byte ptr [rax], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cdd8	rax	0x0	0	add byte ptr gs:[rax], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cddb	rax	0x61	1	add byte ptr [rax + rax + 0x61], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cddf	rdx	0x0	0	add byte ptr [rdx], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cde2	ebp	0x0	0	add byte ptr [ebp], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cde8	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cdeb	rcx	0x0	0	add byte ptr [rcx], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cdf0	rdx	0x0	0	add byte ptr gs:[rdx], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cdf4	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cdfb	rbx	0x0	0	add byte ptr [rbx], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce01	rdi	0x0	0	add byte ptr [rdi], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce04	rax	0x0	0	add byte ptr [rax], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce07	rax	0x68	1	add byte ptr [rax + rax + 0x68], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce0b	rcx	0x0	0	add byte ptr [rcx], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce10	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce19	rsi	0x0	0	add byte ptr [rsi], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce1c	rax	0x20	1	add byte ptr gs:[rax + rax + 0x20], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce21	rbx	0x0	0	add byte ptr [rbx], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce25	rsi	0x0	0	add byte ptr [rsi], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce29	rdi	0x0	0	add byte ptr [rdi], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce2e	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce34	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce37	rcx	0x0	0	add byte ptr [rcx], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce3b	rbx	0x0	0	add byte ptr [rbx], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce3e	rax	0x20	1	add byte ptr gs:[rax + rax + 0x20], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce43	rax	0x0	0	add byte ptr [rax], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce45	rax	0x69	1	add byte ptr [rax + rax + 0x69], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce4c	rax	0x0	0	add byte ptr fs:[rax], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce4f	rax	0x6f	1	add byte ptr [rax + rax + 0x6f], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce53	rax	0x0	0	add byte ptr [rax], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce55	rcx	0x0	0	add byte ptr [rcx], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce59	rax	0x0	0	add byte ptr [rax], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce5b	rcx	0x0	0	add byte ptr [rcx], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce5f	rbx	0x0	0	add byte ptr [rbx], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce6d	rax	0x20	1	add byte ptr [rax + rax + 0x20], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce71	rax	0x72	1	add byte ptr [rax + rax + 0x72], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce75	rcx	0x0	0	add byte ptr [rcx], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce7d	rsi	0x0	0	add byte ptr [rsi], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce7f	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce81	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce83	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce8b	rcx	0x0	0	inc dword ptr [rcx]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce8d	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce8f	rdx	0x0	0	add byte ptr [rdx], bh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce91	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce93	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce9b	rdx	0x0	0	inc dword ptr [rdx]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce9d	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ce9f	rdx	0x0	0	add byte ptr [rdx], bh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cea1	rax	0x0	0	add byte ptr [rax], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cea3	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cea5	rcx	0x0	0	add byte ptr [rcx], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cea7	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ceaf	rbx	0x0	0	inc dword ptr [rbx]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ceb1	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ceb3	rdi	0x0	0	add byte ptr [rdi], cl	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ceb6	rsi	0x0	0	add byte ptr [rsi], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ceba	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cec3	rcx	0x0	0	inc dword ptr [rcx]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cec5	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cec7	rax	0x0	0	add byte ptr [rax], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cec9	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cecb	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ced3	rax	0x0	0	dec dword ptr [rax]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ced5	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ced7	rax	0x0	0	add byte ptr [rax], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cedc	rbx	0x0	0	add byte ptr gs:[rbx], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cee0	rdx	0x0	0	add byte ptr gs:[rdx], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cee6	rax	0x0	0	add byte ptr gs:[rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cee9	rdi	0x0	0	add byte ptr [rdi], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104ceeb	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cef3	rax	0x0	1	inc dword ptr [rax + rax]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cef6	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cef8	rdi	0x0	0	add byte ptr [rdi], bpl	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cefd	rax	0x0	1	add byte ptr [rax + rax], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf01	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf03	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf0b	rcx	0x0	0	dec dword ptr [rcx]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf0d	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf0f	rax	0x0	0	add byte ptr [rax], dl	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf1c	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf23	rcx	0x0	0	add byte ptr [rcx], cl	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf26	rcx	0x0	0	rol dword ptr [rcx], 0	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf2a	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf33	rdx	0x0	0	inc dword ptr [rdx]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf35	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf37	rax	0x42	1	add byte ptr [rax + rax + 0x42], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf3b	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf3d	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf3f	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf47	rdx	0x0	0	inc dword ptr [rdx]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf49	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf4b	rax	0x0	0	add byte ptr [rax], cl	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf50	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf52	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf5b	rcx	0x0	0	inc dword ptr [rcx]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf5d	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf6b	rdx	0x0	0	inc dword ptr [rdx]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf6d	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf6f	rax	0x0	0	add byte ptr [rax], ah	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf71	rax	0x0	0	add byte ptr [rax], ch	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf73	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf75	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf77	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf7f	rax	0x0	1	inc dword ptr [rax + rax]	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf82	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf84	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf86	rdx	0x0	0	add byte ptr [rdx], dil	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf8a	rax	0x0	0	sub dword ptr [rax], eax	未確認 (実行時 object 状態)	0
+0x1046a30	0x104cf8c	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x105f390	0x105f3cc	rax	0x30	0	mov dword ptr [rax + 0x30], 0x80000001	未確認 (実行時 object 状態)	0
+0x105f460	0x105f4a0	rax	0x10	0	mov dword ptr [rax + 0x10], 0xc	未確認 (実行時 object 状態)	0
+0x105f460	0x105f4ab	rax	0x43	0	mov byte ptr [rax + 0x43], 1	未確認 (実行時 object 状態)	0
+0x105f460	0x105f4b3	rax	0x40	0	mov byte ptr [rax + 0x40], 0	未確認 (実行時 object 状態)	0
+0x105f460	0x105f4c0	rax	0x41	0	mov byte ptr [rax + 0x41], cl	未確認 (実行時 object 状態)	0
+0x105f460	0x105f4c7	rax	0x42	0	mov byte ptr [rax + 0x42], 0	未確認 (実行時 object 状態)	0
+0x105f540	0x105f550	rbx	0x40	0	mov byte ptr [rbx + 0x40], 0	未確認 (実行時 object 状態)	0
+0x105f540	0x105f57a	rbx	0x42	0	mov byte ptr [rbx + 0x42], 1	未確認 (実行時 object 状態)	0
+0x105f540	0x105f57e	rbx	0x40	0	mov byte ptr [rbx + 0x40], 1	未確認 (実行時 object 状態)	0
+0x10601e0	0x106021c	rax	0x10	0	mov dword ptr [rax + 0x10], 0x18	未確認 (実行時 object 状態)	0
+0x1060950	0x10609c7	rax	0x13	0	or byte ptr [rax + 0x13], 0x80	未確認 (実行時 object 状態)	0
+0x10609f0	0x1060a17	rax	0x13	0	and byte ptr [rax + 0x13], 0x3f	未確認 (実行時 object 状態)	0
+0x10609f0	0x1060a26	rbx	0x48	0	mov dword ptr [rbx + 0x48], 0	未確認 (実行時 object 状態)	0
+0x1060d20	0x1060d2a	rbx	0x48	0	mov dword ptr [rbx + 0x48], 0	未確認 (実行時 object 状態)	0
+0x1060d20	0x1060d57	rbx	0x48	0	add dword ptr [rbx + 0x48], 1	未確認 (実行時 object 状態)	0
+0x1062200	0x1062200	rdx	0xc	0	mov word ptr [rdx + 0xc], r8w	未確認 (実行時 object 状態)	0
+0x1062310	0x106234c	rax	0x10	0	mov dword ptr [rax + 0x10], 0x58	未確認 (実行時 object 状態)	0
+0x1063a20	0x1063a5c	rax	0x54	0	mov byte ptr [rax + 0x54], 0	未確認 (実行時 object 状態)	0
+0x1063a20	0x1063a64	rax	0x50	0	mov dword ptr [rax + 0x50], 1	未確認 (実行時 object 状態)	0
+0x1065ab0	0x1065ac9	rbx	0x20	0	mov dword ptr [rbx + 0x20], 0	未確認 (実行時 object 状態)	0
+0x1065ab0	0x1065b0e	rbx	0x20	0	mov dword ptr [rbx + 0x20], eax	未確認 (実行時 object 状態)	0
+0x1065ab0	0x1065b63	rcx	0x0	0	mov dword ptr [rcx], edi	未確認 (実行時 object 状態)	0
+0x1065ab0	0x1065b69	rcx	0x4	0	mov dword ptr [rcx + 4], eax	未確認 (実行時 object 状態)	0
+0x1065ab0	0x1065bcd	rax	0x0	0	mov dword ptr [rax], 0x80000002	未確認 (実行時 object 状態)	0
+0x1065ab0	0x1065bd5	rax	0x0	0	mov dword ptr [rax], edi	未確認 (実行時 object 状態)	0
+0x1065ab0	0x1065bdb	rax	0x8	0	mov dword ptr [rax + 8], ecx	未確認 (実行時 object 状態)	0
+0x1065ab0	0x1065be2	rax	0x4	0	mov dword ptr [rax + 4], ecx	未確認 (実行時 object 状態)	0
+0x11c8b10	0x11c8b21	rax	0x10	0	sub dword ptr [rax + 0x10], 1	未確認 (実行時 object 状態)	0
+0x11c8b10	0x11c8b52	rax	0x10	0	sub dword ptr [rax + 0x10], 1	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d4e33	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d4e50	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d4ea0	rsi	0x398	0	mov qword ptr [rsi + 0x398], 0	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d4eab	rsi	0x3a0	0	mov qword ptr [rsi + 0x3a0], 0	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d4f42	rsi	0x3a0	0	mov qword ptr [rsi + 0x3a0], rax	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d4f50	rsi	0x398	0	mov qword ptr [rsi + 0x398], rax	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d5059	rax	0x4	0	mov dword ptr [rax + 4], 0xbf800000	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d5146	rcx	0x4	0	mov dword ptr [rcx + 4], 0xbf800000	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d5251	rax	0x4	0	mov dword ptr [rax + 4], 0xbf800000	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d5305	rax	0x4	0	mov dword ptr [rax + 4], 0xbf800000	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d5453	rax	0x4	0	mov dword ptr [rax + 4], 0xbf800000	未確認 (実行時 object 状態)	0
+0x11d4df0	0x11d54a0	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54a5	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54a7	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54a9	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54ab	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54ad	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54af	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54b1	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54b3	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54c6	rdi	0x0	0	sar byte ptr [rdi], cl	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54c8	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54ca	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54cc	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54ce	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54d0	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54d2	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54d4	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54d6	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54dc	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11d4df0	0x11d54de	rax	0x2060	0	add byte ptr [rax + 0x2060], al	未確認 (実行時 object 状態)	1
+0x11e6c00	0x11e6c4f	r13	0x68	0	mov dword ptr [r13 + 0x68], eax	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6c6b	rax	0xd0	1	mov dword ptr [rax + rdi*4 + 0xd0], ecx	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6c7f	r13	0x68	0	mov dword ptr [r13 + 0x68], eax	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6cf6	rax	0x0	1	mov qword ptr [rax + rcx*8], r14	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6cfa	rdi	0x10	0	add dword ptr [rdi + 0x10], 1	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6cfe	rbx	0x38	0	mov dword ptr [rbx + 0x38], 0	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6d1c	rbx	0x38	0	mov dword ptr [rbx + 0x38], eax	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6d8c	rax	0x0	1	mov qword ptr [rax + rcx*8], rdi	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6d90	rbx	0x10	0	add dword ptr [rbx + 0x10], 1	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6ddf	rax	0x0	1	mov qword ptr [rax + rcx*8], rdi	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6de3	r14	0x10	0	add dword ptr [r14 + 0x10], 1	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6df9	rbx	0x24	0	mov dword ptr [rbx + 0x24], eax	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6dff	r13	0x6c	0	mov dword ptr [r13 + 0x6c], eax	未確認 (実行時 object 状態)	0
+0x11e6c00	0x11e6e03	r13	0x70	0	mov dword ptr [r13 + 0x70], esi	未確認 (実行時 object 状態)	0
+0x11e6e20	0x11e6ed9	rcx	0x0	0	mov qword ptr [rcx], rdx	未確認 (実行時 object 状態)	0
+0x11e6e20	0x11e6ee0	rcx	0x0	0	mov qword ptr [rcx], rax	未確認 (実行時 object 状態)	0
+0x11e6e20	0x11e7040	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x11e6e20	0x11e7042	rsi	-0x34	0	or byte ptr [rsi - 0x34], 0xcc	未確認 (実行時 object 状態)	1
+0x11e7360	0x11e7389	rax	0x9c	0	mov dword ptr [rax + 0x9c], ecx	未確認 (実行時 object 状態)	0
+0x11e7360	0x11e738f	rax	0xf4	0	mov dword ptr [rax + 0xf4], 0x80000001	未確認 (実行時 object 状態)	0
+0x11e7360	0x11e73ac	rax	0x0	0	mov byte ptr [rax], 0	未確認 (実行時 object 状態)	0
+0x11e7360	0x11e7407	rax	0xf4	0	mov dword ptr [rax + 0xf4], ecx	未確認 (実行時 object 状態)	0
+0x11e7430	0x11e74ce	rax	0x6c	0	mov dword ptr [rax + 0x6c], 0x80000001	未確認 (実行時 object 状態)	0
+0x11e7430	0x11e74d5	rax	0x70	0	mov dword ptr [rax + 0x70], 0x7fffffff	未確認 (実行時 object 状態)	0
+0x11e7430	0x11e7527	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x11e7430	0x11e75c9	rax	0x38	0	mov dword ptr [rax + 0x38], ecx	未確認 (実行時 object 状態)	0
+0x11e7430	0x11e7625	rax	0x30	0	mov dword ptr [rax + 0x30], ecx	未確認 (実行時 object 状態)	0
+0x11e7430	0x11e7632	rax	0x38	0	mov dword ptr [rax + 0x38], 0	未確認 (実行時 object 状態)	0
+0x11e7430	0x11e7747	rdi	0x20	0	mov dword ptr [rdi + 0x20], 0	未確認 (実行時 object 状態)	0
+0x11e7430	0x11e775e	rdi	0x29	0	mov byte ptr [rdi + 0x29], 1	未確認 (実行時 object 状態)	0
+0x11e7430	0x11e7764	rdi	0x20	0	mov dword ptr [rdi + 0x20], 0	未確認 (実行時 object 状態)	0
+0x11e7430	0x11e778d	rdi	0x29	0	mov byte ptr [rdi + 0x29], al	未確認 (実行時 object 状態)	0
+0x1274240	0x1274244	rcx	0xc	0	mov byte ptr [rcx + 0xc], 0	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c815c	rax	0x38	0	mov dword ptr [rax + 0x38], 0	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c8167	rax	0x50	0	mov dword ptr [rax + 0x50], 0	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c8172	rax	0x3c	0	mov dword ptr [rax + 0x3c], 0	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c81b6	rax	0x20	0	mov qword ptr [rax + 0x20], rcx	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c81c8	rax	0x28	0	mov qword ptr [rax + 0x28], rcx	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c81de	rcx	0x48	0	mov qword ptr [rcx + 0x48], rax	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c81e6	rax	0x40	0	mov dword ptr [rax + 0x40], 0xffffffff	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c81f1	rax	0x54	0	mov qword ptr [rax + 0x54], 0	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c81fd	rax	0x10	0	mov qword ptr [rax + 0x10], 0	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c8217	rcx	0x8	0	mov qword ptr [rcx + 8], rax	未確認 (実行時 object 状態)	0
+0x12c8100	0x12c8270	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12c8100	0x12c8272	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12c92e0	0x12c932c	rdi	0x88	0	mov qword ptr [rdi + 0x88], rax	未確認 (実行時 object 状態)	0
+0x12c92e0	0x12c9343	rax	0x0	0	mov dword ptr [rax], ebx	未確認 (実行時 object 状態)	0
+0x12c92e0	0x12c935e	rax	0x0	0	mov dword ptr [rax], esi	未確認 (実行時 object 状態)	0
+0x12ca770	0x12ca7c3	rdi	0x0	0	add dword ptr [rdi], eax	未確認 (実行時 object 状態)	0
+0x12ca770	0x12ca80d	rdi	0x4	0	mov dword ptr [rdi + 4], 0xffffffff	未確認 (実行時 object 状態)	0
+0x12ca770	0x12ca819	rdi	0x0	0	sub dword ptr [rdi], esi	未確認 (実行時 object 状態)	0
+0x12ca770	0x12ca82f	rdi	0x0	0	mov dword ptr [rdi], eax	未確認 (実行時 object 状態)	0
+0x12ca770	0x12ca89a	rdi	0x0	0	mov dword ptr [rdi], eax	未確認 (実行時 object 状態)	0
+0x12ca770	0x12ca8fa	rdi	0x0	0	mov dword ptr [rdi], eax	未確認 (実行時 object 状態)	0
+0x12ca770	0x12ca985	rdi	0x8	0	mov dword ptr [rdi + 8], ecx	未確認 (実行時 object 状態)	0
+0x12ca770	0x12ca9ec	rdi	0x0	0	mov dword ptr [rdi], eax	未確認 (実行時 object 状態)	0
+0x12ca770	0x12caa5d	rdi	0x4	0	mov dword ptr [rdi + 4], 0xffffffff	未確認 (実行時 object 状態)	0
+0x12ca770	0x12caa70	rdi	0x8	0	mov dword ptr [rdi + 8], 0	未確認 (実行時 object 状態)	0
+0x12ca770	0x12caa77	rdi	0x0	0	add dword ptr [rdi], esi	未確認 (実行時 object 状態)	0
+0x12ca770	0x12caa93	rcx	0x88	0	mov dword ptr [rcx + 0x88], eax	未確認 (実行時 object 状態)	0
+0x12cab20	0x12cad5a	rax	0x0	1	mov qword ptr [rax + rcx*8], rbx	未確認 (実行時 object 状態)	0
+0x12cab20	0x12cad5e	rsi	0x10	0	add dword ptr [rsi + 0x10], 1	未確認 (実行時 object 状態)	0
+0x12cab20	0x12caf4e	rax	0x4	0	mov dword ptr [rax + 4], ecx	未確認 (実行時 object 状態)	0
+0x12cab20	0x12caf68	rax	0x8	0	mov dword ptr [rax + 8], ecx	未確認 (実行時 object 状態)	0
+0x12cab20	0x12caf89	rax	0x0	0	mov dword ptr [rax], ecx	未確認 (実行時 object 状態)	0
+0x12cab20	0x12caf8d	rax	0x4	0	mov dword ptr [rax + 4], ecx	未確認 (実行時 object 状態)	0
+0x12cab20	0x12caf98	rax	0x8	0	mov dword ptr [rax + 8], ecx	未確認 (実行時 object 状態)	0
+0x12cab20	0x12cb1d2	rax	0x6ee	0	mov byte ptr [rax + 0x6ee], 0	未確認 (実行時 object 状態)	0
+0x12cab20	0x12cb297	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb299	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb29b	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb29d	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb29f	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb2a7	rsi	0x0	0	dec dword ptr [rsi]	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb2a9	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb2ab	rdx	0x0	0	add byte ptr [rdx], dh	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb2ae	rbx	0x0	0	add byte ptr gs:[rbx], ah	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb2b3	rdx	0x0	0	add byte ptr [rdx], dh	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb2ba	rax	0x0	0	add byte ptr fs:[rax], ah	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb2bd	rcx	0x0	0	add byte ptr [rcx], ch	未確認 (実行時 object 状態)	1
+0x12cab20	0x12cb2c8	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x12cab20	0x12cb2cc	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x12cab20	0x12cb2ce	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x12cab20	0x12cb2d0	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x12cb2e0	0x12cb4a0	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cb2e0	0x12cb4a8	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cb2e0	0x12cb4aa	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cb2e0	0x12cb4ac	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cb2e0	0x12cb4ae	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cb2e0	0x12cb4b0	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cb2e0	0x12cb4b2	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12cb2e0	0x12cb4b4	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12d0090	0x12d0454	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12d0090	0x12d0456	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12d0090	0x12d0485	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12d0090	0x12d0487	rax	0x5e	1	add byte ptr [rax + rax + 0x5e], bh	未確認 (実行時 object 状態)	1
+0x12d0090	0x12d048b	rax	0x5e	1	add byte ptr [rax + rax + 0x5e], ah	未確認 (実行時 object 状態)	1
+0x12d0090	0x12d048f	rsi	0x0	0	add byte ptr [rsi], bl	未確認 (実行時 object 状態)	1
+0x12d0090	0x12d0498	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d049b	rdi	0x0	0	add byte ptr [rdi], ch	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d049f	rax	0x0	0	add byte ptr [rax], dh	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04a2	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04a7	rcx	0x0	0	add byte ptr [rcx], ch	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04ab	rax	0x0	1	add byte ptr [rax + rax], dh	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04af	rax	-0xfffdfc	0	add byte ptr [rax - 0xfffdfc], dh	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04b7	rax	0x0	1	dec dword ptr [rax + rax]	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04ba	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04bc	rdi	0x0	0	add byte ptr [rdi], r13b	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04c0	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04c6	rax	0x0	0	add byte ptr gs:[rax], dh	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04cc	rax	0x0	0	and byte ptr [rax], al	未確認 (実行時 object 状態)	0
+0x12d0090	0x12d04d0	rax	0x0	1	add byte ptr gs:[rax + rax], dh	未確認 (実行時 object 状態)	0
+0x12d1620	0x12d165a	rdi	0x20	0	mov qword ptr [rdi + 0x20], rax	未確認 (実行時 object 状態)	0
+0x12d1620	0x12d165e	rax	0x3c	0	mov dword ptr [rax + 0x3c], ebx	未確認 (実行時 object 状態)	0
+0x12d16a0	0x12d16d7	rdi	0x28	0	mov qword ptr [rdi + 0x28], rax	未確認 (実行時 object 状態)	0
+0x12d16a0	0x12d16db	rax	0x3c	0	mov dword ptr [rax + 0x3c], ebx	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d17ba	rdi	0x5c	0	mov dword ptr [rdi + 0x5c], 0x7fffffff	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d17c1	rdi	0x60	0	mov dword ptr [rdi + 0x60], 0x80000001	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1841	rdi	0x5c	0	mov dword ptr [rdi + 0x5c], ecx	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1855	rdi	0x60	0	mov dword ptr [rdi + 0x60], ecx	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1a21	rax	0x0	0	sub dword ptr [rax], edx	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1a2e	rax	0x0	0	mov dword ptr [rax], ebx	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1a33	rax	0x0	0	add dword ptr [rax], edx	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1a5a	rdi	0x48	0	mov dword ptr [rdi + 0x48], eax	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1a75	rdi	0x4c	0	mov dword ptr [rdi + 0x4c], eax	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1ac5	rdi	0x44	0	mov dword ptr [rdi + 0x44], eax	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1ae3	rdi	0x44	0	mov dword ptr [rdi + 0x44], 0	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1aea	rdi	0x84	0	mov byte ptr [rdi + 0x84], 1	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1afa	rdi	0x5c	0	mov dword ptr [rdi + 0x5c], 0x3c	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1b04	rdi	0x60	0	mov dword ptr [rdi + 0x60], eax	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1b17	rdi	0x64	0	mov dword ptr [rdi + 0x64], eax	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1b1c	rdi	0x64	0	mov dword ptr [rdi + 0x64], 0	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1b4e	rdi	0x50	0	mov dword ptr [rdi + 0x50], eax	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1b66	rax	0x0	0	or dword ptr [rax], 0x400	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1c3d	rdi	0x54	0	mov dword ptr [rdi + 0x54], eax	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1c60	rdi	0x58	0	mov dword ptr [rdi + 0x58], eax	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1c65	rdi	0x58	0	mov dword ptr [rdi + 0x58], ebx	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1ced	rdi	0x90	0	mov dword ptr [rdi + 0x90], eax	未確認 (実行時 object 状態)	0
+0x12d1760	0x12d1d00	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12d1760	0x12d1d02	rax	0x0	0	add byte ptr [rax], al	未確認 (実行時 object 状態)	1
+0x12d1760	0x12d1d04	rax	-0x71	0	add byte ptr [rax - 0x71], al	未確認 (実行時 object 状態)	1
+0x12d2df0	0x12d2e8d	rcx	0x8	0	mov dword ptr [rcx + 8], eax	未確認 (実行時 object 状態)	0
+0x12d2df0	0x12d2eac	rcx	0x8	0	mov dword ptr [rcx + 8], eax	未確認 (実行時 object 状態)	0
+0x12d2df0	0x12d2efa	rax	0x8	0	mov dword ptr [rax + 8], ecx	未確認 (実行時 object 状態)	0
+0x12ddaa0	0x12ddac3	rcx	0x0	0	add byte ptr [rcx], al	未確認 (実行時 object 状態)	1
+0x12ddb20	0x12ddb98	rax	0x0	0	add qword ptr [rax], 1	未確認 (実行時 object 状態)	0
+0x12df090	0x12df09c	rbx	0x14	0	mov dword ptr [rbx + 0x14], 0	未確認 (実行時 object 状態)	0
+0x12df090	0x12df0c0	rcx	0x18	0	mov dword ptr [rcx + 0x18], eax	未確認 (実行時 object 状態)	0
+0x12df160	0x12df160	rcx	0x20	0	mov dword ptr [rcx + 0x20], 0	未確認 (実行時 object 状態)	0
+0x12df160	0x12df167	rcx	0x1c	0	mov dword ptr [rcx + 0x1c], 0	未確認 (実行時 object 状態)	0
+0x12df210	0x12df234	rbx	0x0	0	mov dword ptr [rbx], 0	未確認 (実行時 object 状態)	0
+0x12df210	0x12df27d	rbx	0x0	0	mov dword ptr [rbx], edi	未確認 (実行時 object 状態)	0
+0x12df210	0x12df281	rbx	0x0	0	mov dword ptr [rbx], edi	未確認 (実行時 object 状態)	0
