@@ -2,7 +2,8 @@
  *  - 域を PROT_NONE にし、アクセスごとに SIGSEGV で 1 ページ開け、TF 単歩の SIGTRAP で閉じ直す。
  *  - 1 回の呼出しで (access VA, RIP) の組を重複除去して出力する: "ACC <addr> <rip> <count>"。
  *  - ロード・MS ABI 呼出しは ott_native.c をそのまま使う (native 参照と同一経路)。
- * 用法: slot_trace <SlateCore.core_64> <FN_VA hex> [heap 引数は 0 埋めの 0x400 バイト ×4, xmm0 = 1.5]
+ * 用法: slot_trace <SlateCore.core_64> <FN_VA hex> [heap 引数は 0 埋めの 0x400 バイト ×4 (SLOT_* のいずれかを指定すると 0x1000 バイト), xmm0 = 1.5]
+ *  - SLOT_U32_R0 は SLOT_U32_R0_VAL、SLOT_F32_R0 は SLOT_F32_R0_VAL の指定が必須 (省くと exit 2)。
  */
 #include "../../ott/native/ott_native.c"
 
@@ -115,8 +116,33 @@ int main(int argc, char** argv) {
     if (ott_load(argv[1]) != 0) return 3;
     uint64_t fn = strtoull(argv[2], NULL, 16);
     uint64_t gpr[4], xmm[4] = {0, 0, 0, 0}, out[2] = {0, 0};
-    for (int i = 0; i < 4; i++) g_gpr[i] = gpr[i] = (uint64_t)heap_alloc(0x400, 1);
+    int big = getenv("SLOT_U32_R0") || getenv("SLOT_F32_R0") || getenv("SLOT_PTR_R1") || getenv("SLOT_SET_R1");
+    for (int i = 0; i < 4; i++) g_gpr[i] = gpr[i] = (uint64_t)heap_alloc(big ? 0x1000 : 0x400, 1);
     double x = 1.5; memcpy(&xmm[0], &x, 8);
+    if (getenv("SLOT_U32_R0")) {
+        if (!getenv("SLOT_U32_R0_VAL")) { fprintf(stderr, "[slot_trace] SLOT_U32_R0 には SLOT_U32_R0_VAL が必要\n"); return 2; }
+        unsigned off = (unsigned)strtoul(getenv("SLOT_U32_R0"), NULL, 0);
+        uint32_t v = (uint32_t)strtoul(getenv("SLOT_U32_R0_VAL"), NULL, 0);
+        memcpy((uint8_t*)gpr[0] + off, &v, 4);
+    }
+    if (getenv("SLOT_F32_R0")) {
+        if (!getenv("SLOT_F32_R0_VAL")) { fprintf(stderr, "[slot_trace] SLOT_F32_R0 には SLOT_F32_R0_VAL が必要\n"); return 2; }
+        unsigned off = (unsigned)strtoul(getenv("SLOT_F32_R0"), NULL, 0);
+        float v = strtof(getenv("SLOT_F32_R0_VAL"), NULL);
+        memcpy((uint8_t*)gpr[0] + off, &v, 4);
+    }
+    if (getenv("SLOT_PTR_R1")) {
+        unsigned off = (unsigned)strtoul(getenv("SLOT_PTR_R1"), NULL, 0);
+        memcpy((uint8_t*)gpr[1] + off, &gpr[2], 8);
+    }
+    if (getenv("SLOT_SET_R1")) {
+        uint64_t* arr = (uint64_t*)heap_alloc(16, 1);
+        arr[0] = gpr[0] + strtoull(getenv("SLOT_SET_R1"), NULL, 16);
+        uint8_t* s = (uint8_t*)gpr[1];
+        s[0] = 0;
+        *(uint64_t*)(s + 8) = (uint64_t)arr;
+        *(uint64_t*)(s + 0x10) = 1;
+    }
     struct sigaction sa; memset(&sa, 0, sizeof sa);
     sa.sa_sigaction = on_acc; sa.sa_flags = SA_SIGINFO; sigemptyset(&sa.sa_mask);
     if (getenv("SLOT_ENC_INIT")) {
