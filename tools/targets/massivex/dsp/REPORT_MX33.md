@@ -114,7 +114,7 @@
 | 工程 | 結果 (MX-6 §1 との比較) |
 |---|---|
 | NC (MX-6・5 件) | 5/5 PASS (MX-6 と同じ) |
-| NC (MX-33・15 件) | 15/15 PASS (#3774 後。前版は 9/9) |
+| NC (MX-33・17 件) | 17/17 PASS (MX-64 後。#3774 後は 15/15・前版 9/9) |
 | RTTI + 入口面 | REPORT_MX6.md §1 と一致 (測定 commit の step 2/7 の出力) |
 | vectorcall (MX-6) | seeds: pdata 始点 livein xmm4/5 = 0 (REPORT_MX6.md §2 と一致) |
 | 受入 1 (MX-33) | 17 件: scalar 1 / 128 bit 0 / 判定不能 16 (§2・#3774 後。前版 #3032 は 0 / 0 / 17) |
