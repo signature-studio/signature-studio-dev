@@ -1042,9 +1042,21 @@ def t32():
     assert res is True, res
     assert "call i64 @llvm.ctlz.i64(i64 %src, i1 true)" in text, text
     assert "icmp eq i64 %src, 0" in text and "select i1" in text, text
-    assert st["fl"] == ("int", ("%src", "0", False, 64)), st["fl"]
+    assert st["fl"] == ("bsrzf", ("%src", 64)), st["fl"]
     assert any(isinstance(l, str) and l.startswith("declare i64 @llvm.ctlz.i64") for l in mod.items), mod.items[:2]
-    print("T32 ok (bsr r64: ctlz + select(src==0 で dst 保持), ZF は flag=int(src,0))")
+    stub._flag_zf_i1 = lambda *a: p1.Region._flag_zf_i1(stub, *a)
+    stub._flag_cc_i1 = lambda *a: p1.Region._flag_cc_i1(stub, *a)
+    stub._flag_cf_i1 = lambda *a: p1.Region._flag_cf_i1(stub, *a)
+    o2 = []
+    c = stub._flag_cc_i1(st, "e", o2, 0x1000, "")
+    assert c is not None and "icmp eq i64 %src, 0" in "\n".join(o2), o2
+    for bad in ("b", "l", "s", "a"):
+        try:
+            stub._flag_cc_i1(st, bad, [], 0x1000, "")
+        except p1.Unsupported:
+            continue
+        raise AssertionError("bsr の直後の cc %s は Unsupported のはず" % bad)
+    print("T32 ok (bsr r64: ctlz + select(src==0 で dst 保持), ZF は bsrzf(src,64)、e/ne 以外の cc は Unsupported)")
 
 
 if __name__ == "__main__":

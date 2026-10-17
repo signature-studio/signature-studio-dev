@@ -1090,6 +1090,10 @@ class Region:
         if fl[0] == "rcrcf":
             _cf, _bits, prev = fl[1]
             return self._flag_zf_i1({**st, "fl": prev}, out, va, tag)
+        if fl[0] == "bsrzf":
+            src, bits = fl[1]
+            out.append("  %s = icmp eq i%d %s, 0%s" % (n, bits, src, tag))
+            return n
         a, b, is_test, bits = fl[1]
         if is_test:
             t = self.nm(va, "ta")
@@ -1104,6 +1108,14 @@ class Region:
         fl = st.get("fl")
         if fl is None:
             raise Unsupported("flag state cleared")
+        if fl[0] == "bsrzf":
+            if cc not in ("e", "z", "ne", "nz"):
+                raise Unsupported("bsr flag: cc %s は ZF 以外 (CF/SF/OF 未定義) @%x" % (cc, va))
+            src, bits = fl[1]
+            pred = "eq" if cc in ("e", "z") else "ne"
+            n = self.nm(va, "fc")
+            out.append("  %s = icmp %s i%d %s, 0%s" % (n, pred, bits, src, tag))
+            return n
         if fl[0] != "rcrcf":
             return None                          # 通常経路 (comis/int) は各 handler で処理
         cf, bits, prev = fl[1]
@@ -1136,6 +1148,8 @@ class Region:
             raise Unsupported("flag state cleared")
         if fl[0] == "rcrcf":
             return fl[1][0]
+        if fl[0] == "bsrzf":
+            raise Unsupported("bsr flag: CF は未定義 @%x" % va)
         n = self.nm(va, "cf")
         if fl[0] in ("comis", "site"):
             fa, fb, ty = self._cmp_operands(fl, out, va, tag)
@@ -1465,8 +1479,7 @@ class Region:
             self.used("shift")
             return True
         # --- bsr r, r (LIFTLIB-26): ZF = (src==0)。src==0 のとき dst は前値を保つ (Intel 未定義・実装依存の扱いを固定)。
-        #     flag 状態は ("int", (src, 0)) とし ZF を icmp eq src,0 で読む。CF/SF は bsr で未定義のため、
-        #     機械語側では直後の jne (ZF) だけが消費する (REPORT_APPENDIX_E §23.10 の表)。
+        #     flag 状態は専用種別 "bsrzf" (ZF だけを読める)。CF/SF/OF は bsr で未定義のため、e/ne/z/nz 以外の cc は Unsupported。
         if m == "bsr" and len(ops) == 2 and ops[0][0] == "reg" and ops[1][0] == "reg" and not mem:
             bits = it._ci.operands[0].size * 8
             if bits not in (32, 64):
@@ -1488,7 +1501,7 @@ class Region:
             out.append("  %s = select i1 %s, %s %s, %s %s%s" % (n, cz, ity, old, ity, ix, tag))
             st[dst] = (n, ity if bits < 64 else "i64")
             st["__w"].add(dst)
-            st["fl"] = ("int", (src, "0", False, bits))
+            st["fl"] = ("bsrzf", (src, bits))
             self.used("bsr")
             return True
         # --- cmp / test (整数フラグ生成。値は flag 状態に記録)
