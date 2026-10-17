@@ -132,3 +132,15 @@
 - **回帰 (HEAD・実測)**: `tests/test_ld207_obj_pattern.py` PASS (rc=0)。
 - **未実行 (正直に記録)**: 本 run の作業ツリーには `tools/liftdiff/work/` (m11 IR `work/ld288/boot3_40c420_tr.ll`・`work/m11/boot_state.json`) が無く、`ld_native` のビルドと `ld238_probe.py` が走らない。ld199・ld200・ld203・ld253・ld259・ld211・ld238 probe の HEAD 実測は未実施。§8 の数値は `d7ff728d8` (入力バイトは `vmt24` と同一) の測定で、HEAD 上の再測定ではない。
 - **測定 commit**: §8 の実測は `d7ff728d8`。§9 は入力バイトの同一性 (上記) の確認で、HEAD 上の probe 再測定はしていない。`git diff d7ff728d8 HEAD -- tools/liftdiff/ldlib tools/liftdiff/tests` は `cases.py`・`ld238_probe.py` の 2 ファイルのみ。
+
+## 10. 追補 (review round 3: HEAD 上の再測定の要求に対する状態)
+
+- **判定**: HEAD (`4bab3a0d0`) 上の再測定は本 run では未実施。素材が無いため実行できない。
+  - 本 run の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ。`work-m11`・`work-liftdiff`・`toolchain-emsdk` は無い (`ls` で確認)。
+  - 作業ツリーに `tools/liftdiff/work/`・`tools/m11/work/` が無い。`tests/ld288_40c420_xmm0.py` の入力 (`boot_final3.ll`) も無いため、m11 IR (`work/ld288/boot3_40c420_tr.ll`) を生成できない。
+- **測定 commit は据え置き**: 実測をしていないので、測定 commit を HEAD に進めない。§8 の実測は `d7ff728d8` のまま。
+- **HEAD までのコード差分** (`git diff d7ff728d8 HEAD -- tools/liftdiff/ldlib tools/liftdiff/tests`): 下記 2 ファイル。REPORT 以外の差分はこれだけ。
+  - `ldlib/cases.py`: `VMT_SLOTS` 8 (既存 blob 用)・`VMT_SLOTS_WIDE` 24 (`vmt24` 専用)・`make_blob_vmt24` の追加。`make_blob_vmt2` に `nslots` 引数。
+  - `tests/ld238_probe.py`: `vmt2_line` の `blob` 引数化。5 関数は `vmt24` を使う。
+- **既存 blob の入力**: §9 のとおり、`vm` / `vmt` / `vmt2` / `u16` / `vmtf` は `a34610a8b` と HEAD でバイト一致 (sha256)。`vmt24` は `d7ff728d8` の 24 slot `vmt2` と一致。したがって §8 の入力は `d7ff728d8` と同一。ただし、HEAD で走らせた結果ではない。
+- **未実施 (次の run で必要)**: `tests/ld238_probe.py` (5 関数・`vmt24`)、`ld199`・`ld200`・`ld203`・`ld253`・`ld259`・`ld211` の HEAD 実測。`oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff` が要る。これが揃ったら、測定 commit を HEAD の最終 code commit に更新し、再測定の結果が §8 と違えばその数値を訂正する。
