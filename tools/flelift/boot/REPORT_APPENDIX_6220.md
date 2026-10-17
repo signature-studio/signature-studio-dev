@@ -16,7 +16,7 @@
 |---|---|
 | 測定 commit | `2dd69b94b` (main 取り込み merge。コードを変えた最後の commit。`git diff 2dd69b94b HEAD -- tools/flelift/boot` の `.c`・`.py`・`.sh` は空) |
 | base | `ca8500c7b` (origin/main。取り込み元。#5415 の `py_watch(9, ...)` と `InitContext.InitTable` の slot を含む) |
-| 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開。`toolchain-emsdk` は `$HOME/artifacts` に無いため、上流 emsdk 6.0.12 を REFERENCES §4 の手順で `$RUNNER_TEMP/emsdk-src` に取得 (repo 外) |
+| 素材 | `fl-win64` ([WIN64]) を展開。`toolchain-emsdk` は素材に無かったため、上流 emsdk 6.0.12 を REFERENCES §4 の手順で取得し [EMSDK] に置いて使用 |
 | 工程 (diag_shim・既存 `fle6_measure.sh`・HEAD 再測定) | 全体 2 分 57 秒: lift 69 s / clang 80 s / boot 21 s。開始時 load 1.16 |
 | 監視版 build (`wval_measure.sh`・`WVAL_OBJWATCH=1`・HEAD 再測定) | build 75 s / 全体 1 分 39 秒。`[wobj*]` 系 9 行 (`[wobj]` 書込み 1 件・`[wobj-set]` 1 件・`[wobj-getmem]` 2 件・`[wobj-free]` 5 件) |
 | diag_shim (既定 `FLE_IPP=1` の監視版) | units_run **209** / stopped_at 209 / `unlifted`・`[wobj]` 1 件 (`v=0`)・`[wval]` 6 件 |
