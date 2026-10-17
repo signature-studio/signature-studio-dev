@@ -85,6 +85,8 @@ def seh_catch(uc_, frames, ib):
     # 戻り番地 v の slot を s とすると、その呼出し元 (call 命令) の rsp は s+8 で rbp と一致する。
     # 戻り番地 v-1 (call 命令) が scope の try 範囲内で kind=2 なら、jump 先へ rsp=rbp=s+8 で再開する。
     # 戻り値を捨てる後続の epilogue は、landing pad 側の `pop rbp; ret` で既存どおり動く。
+    # 同じ戻り番地に複数の scope が一致する場合は、最初に一致したもの (スタックで最も内側のフレーム) を採る。
+    # 経路上の中間フレームが push した callee-saved (rbx など) は復元しない (eh_frames は push なしの関数だけを扱う)。
     rsp = uc_.reg_read(UC_X86_REG_RSP)
     for i in range(0x400):
         s = rsp + 8 * i
