@@ -94,12 +94,12 @@
 - 変更: worklet の `underrun_trace` 通知に `T = depth × buffer_frames` を載せ、shim の `ConsumerUnderrun.T` と e2e の判定行 `cw_T=` に出す。SAB レイアウト・wasm は不変。
 - 測定 commit: `a11946b16` (本番向けのコードのみ。`git diff --stat 03627cab5 a11946b16 -- public/worklets src/runtime tools/audio/integration` = 3 files, 7 insertions, 4 deletions。`03627cab5` は origin/main)。
 - 判定 (clean): `e2e.sh` 15/15 PASS・exit 0 (7.8 s)。`prod_target_fill=1536`・underrun 0 件のため `cw_at_underrun=[none]` (`cw_T` は出ない)。
-- 再現手順 (PR 内で再現可能): 検証専用の commit `720a29118` (`public/worklets/fl-audio-worklet.js` に `if (p === 25600) consumed = 0;` の 1 行を入れたもの。PR ブランチには入れず、detached worktree `ws-863-forced` の `HEAD` = `1e21a61a1` の上に作った。branch・origin へは push していない)。`TMPDIR=$RUNNER_TEMP EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh bash tools/audio/integration/e2e.sh` を foreground で 1 回実行 (emsdk 6.0.12 は上流から導入)。
-- 結果 (強制 underrun・`720a29118`・1 回): 11/15 PASS・exit 1・9.3 s。dev / preview とも `underruns=1`・`first_underrun_frame=25600`・`cw_p=25600 cw_consumed=0 cw_rebuf=256 cw_T=1792` (dev) / `cw_T=1536` (preview)。同 run の `prod_target_fill` は dev 1792 / preview 1792。`cw_at_underrun` の末尾は `25600/25600/26880/2/0` (`p = rd`・`wr - rd = 1280` が一致)。
+- 再現手段: なし。1 回限りの観測・commit 未保存・再現手段なし。強制 underrun に使った検証用 commit (`fl-audio-worklet.js` に `if (p === 25600) consumed = 0;` の 1 行を入れたもの) は repo にも origin にも残っていない。PR ブランチには入れていない。
+- 結果 (強制 underrun・1 回観測・再現なし): 11/15 PASS・exit 1・9.3 s。dev / preview とも `underruns=1`・`first_underrun_frame=25600`・`cw_p=25600 cw_consumed=0 cw_rebuf=256 cw_T=1792` (dev) / `cw_T=1536` (preview)。同 run の `prod_target_fill` は dev 1792 / preview 1792。`cw_at_underrun` の末尾は `25600/25600/26880/2/0` (`p = rd`・`wr - rd = 1280` が一致)。
 - 読み: `cw_T` (underrun 時点) と `prod_target_fill` (verify 時点) は、dev では一致 (1792) し、preview では一致しなかった (1536 と 1792)。`fill_trace` と `prod_target_fill` の差から、run 途中で T が変わった可能性がある。ただし 1 run の観測で、原因は未検証。
 - 旧版 (`a11946b16` 時点) の記述 (dev 1536 / preview 1792・dev のみ不一致) は、この再現では一致しなかった。旧 run の出力は残っていないため、旧値は再現できないものとして扱う。
 - clean 実行 (強制なし・HEAD `1e21a61a1`・`TMPDIR=$RUNNER_TEMP`・foreground): 15/15 PASS・exit 0・10 s (`uptime` load 1.77)。`prod_target_fill=1536`・`cw_at_underrun=[none]`。
-- 注意: 強制 underrun 版の `e2e.sh` は `git archive HEAD` を検証するため、検証用 commit を入れた detached worktree で実行した。本番向け branch は作っていない (`863-au15-underrun-T-clean` は origin に存在しない)。
+- 注意: 強制 underrun 版の観測は、検証用 commit を入れた detached worktree で 1 回行った (`e2e.sh` は `git archive HEAD` を検証するため)。その commit は保存していないため、再現はできない。本番向け branch は作っていない (`863-au15-underrun-T-clean` は origin に存在しない)。本番の失敗で `cw_T` が出ることは未確認。
 
 ### 通算
 
