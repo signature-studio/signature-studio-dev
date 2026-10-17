@@ -41,6 +41,10 @@ if (stack) {   // wasm-function[N] を export 名で注釈 (--export-all のた�
   } catch (_) {}
 }
 const num = (f) => { try { return Number(f()); } catch (_) { return null; } };
+// #5855 (SHX-T61) 計装: IR に @fx61_buf があるときだけ読む。上限超えの trap 後でも wasm メモリから読める
+const fx61 = typeof mod._fx61_count === 'function'
+  ? { count: num(mod._fx61_count), self: num(mod._fx61_self), c4c: num(mod._fx61_c4c), c48: num(mod._fx61_c48) }
+  : null;
 const initCount = mod.HEAPU32[(0x11eac98 + Number(process.env.M11_LB_BASE || 0)) >> 2];
 const units = [];
 const stubs = [];
@@ -51,7 +55,7 @@ const res = {
   units_total: num(mod._m11_units_total), units_run: num(mod._m11_units_run),
   va_calls: num(mod._m11_va_calls), va_used: num(mod._m11_va_used),
   icall_ok: num(mod._m11_icall_ok), icall_miss: num(mod._m11_icall_miss),
-  dllmain_done, longjmp_hit: num(mod._m11_longjmp_hit), boot_rc: rc === null ? null : String(rc), threw, stack,
+  dllmain_done, longjmp_hit: num(mod._m11_longjmp_hit), boot_rc: rc === null ? null : String(rc), threw, stack, fx61,
   m11_stub_total: num(mod._m11_stub_total), m11_stub_hits: stubs,
   last_stderr: stderrLines.slice(-12),
 };

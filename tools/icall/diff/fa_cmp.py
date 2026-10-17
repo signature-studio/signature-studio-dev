@@ -41,7 +41,7 @@ def ptr_norm(h):
 def blk_xmm0_out():
     # ICALL-78 (#2508): BLK+0x88 = ott_xmm0 が読む出力スロット。ott_run は入力 xmm0 を BLK+0x28 にだけ置くので、
     # xmm0 を素通しする関数 (native は入力のまま返す) で出力が未初期化の 0 になる。native と同じく入力で初期化してから呼ぶ。
-    blk = json.load(open(os.path.join(T, 'icall', 'work', 'rt_freshair-core', 'map.json')))['blk']
+    blk = json.load(open(os.environ.get('FA_MAP', os.path.join(T, 'icall', 'work', 'rt_freshair-core', 'map.json'))))['blk']
     return blk - 0x180000000 + 0x30000000 + 0x88
 
 

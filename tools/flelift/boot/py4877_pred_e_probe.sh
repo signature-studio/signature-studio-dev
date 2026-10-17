@@ -31,8 +31,12 @@ mk_fn_probe() { echo '{ static int n_; if (n_++ < 32) fprintf(stderr, "[PY4877-'
 # 0x12de002 = 0x12d0cc0 の呼出し直後 (既定経路で観測された唯一の呼出し・呼出元 0x12ddffd)。呼出し後の E[0..999] の非 0 行を数える。
 AFTER_PROBE='{ static int a_; if (a_++ < 1) { int nz_ = 0; for (int i_ = 0; i_ <= 999; i_++) { uint64_t e_ = 0x193fce0ULL + (uint64_t)i_ * 0xc0ULL; uint8_t b84_ = LD8(e_ + 0x84), b14_ = LD8(e_ + 0x14); uint32_t d10_ = LD32(e_ + 0x10); uint64_t q20_ = LD64(e_ + 0x20), q28_ = LD64(e_ + 0x28); if (b84_ || b14_ || d10_ || q20_ || q28_) { nz_++; if (nz_ <= 40) fprintf(stderr, "[PY4877-AFTER] i=%d p84=%02x p10=%08x p14=%02x p20=%llx p28=%llx\n", i_, b84_, d10_, b14_, (unsigned long long)q20_, (unsigned long long)q28_); } } fprintf(stderr, "[PY4877-AFTER-N] nonzero_rows=%d\n", nz_); } }'
 
+# patternCount 内の間接 call 0xd64d78 (call [rax], rax = [0x15e4280]) の直前: 変換スロットの指す先と呼出し先を出す。
+ICALL_PROBE='{ static int c_; if (c_++ < 2) { uint64_t s_ = LD64(0x15e4280ULL); uint64_t f_ = s_ ? LD64(s_) : 0; fprintf(stderr, "[PY4877-ICALL] n=%d slot=%llx [slot]=%llx\n", c_, (unsigned long long)s_, (unsigned long long)f_); } }'
+
 rm -rf "$DBG" && cp -r "$LIFT" "$DBG"
 for k in 0 1 2 3 4 5 6 7; do
+  python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0xd64d78 --c "$ICALL_PROBE" || true
   python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0x12de002 --c "$AFTER_PROBE" || true
   python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c"  --at 0x12d8d30 --c "$PC_PROBE" || true
   python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0x12d0cc0 --c "$(mk_fn_probe 0cc0)" || true

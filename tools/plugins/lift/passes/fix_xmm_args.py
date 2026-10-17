@@ -115,7 +115,10 @@ def split_args(s):
 
 
 # #2762: 呼出し側の xmm 値を変換して渡すと survey が退行する callee (unit 149・158)。原因未特定のため変換を外し、arity 不一致のまま skip する (原因の特定は #2902)
-NO_CONV = {'function_40c650'}
+NO_CONV = set()
+# #4748 (N211): 変換してよい callee で、呼出し側の xmm 値を 0.0 のまま残す site (IR 順の 1 始まり番号)。
+# function_40c650 は 3・4 番目 (function_662e50 内) を 0.0 のまま、他 14 site を実値で渡すと survey 基準差 0 (a8906a4c3 で実測)。
+CONV_ZERO_SITES = {'function_40c650': {3, 4}}
 
 
 def conv_ok(xs, n, sites):
@@ -276,6 +279,7 @@ def main():
         n = nparams[fn]
         lines = res.split('\n')
         rebuilt = []
+        site = 0
         for ln in lines:
             if ln.startswith('define '):
                 rebuilt.append(ln)
@@ -289,7 +293,10 @@ def main():
                     raise SystemExit('unbalanced call to %s: %s' % (fn, ln[:120]))
                 args = ln[m.end():e]
                 al = split_args(args)
-                if cvt[fn] and len(al) == n + len(extra):
+                is_site = len(al) == n + len(extra)
+                if is_site:
+                    site += 1
+                if cvt[fn] and is_site and site not in CONV_ZERO_SITES.get(fn, ()):
                     # #2762: 呼出し側の枠の i128 (xmm 実値) を float/double 枠へ変換して渡す (枠は変換済みの値)
                     vs = []
                     for j, p in enumerate(extra):
@@ -302,6 +309,10 @@ def main():
                         vs.append('%s %s.f' % (ty, t))
                     new.append(ln[pos:m.end()] + ', '.join(al[:n] + vs))
                     cv_sites += 1
+                elif is_site and cvt[fn]:
+                    # #4748: 除外 site は枠を 0.0 に置く (RetDec の i128 xmm 値は捨てる)
+                    new.append(ln[pos:m.end()] + ', '.join(al[:n] + [zs]))
+                    zero += 1
                 else:
                     new.append(ln[pos:m.end()] + (args + ', ' if args.strip() else '') + zs)
                     zero += 1

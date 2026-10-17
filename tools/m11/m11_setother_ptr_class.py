@@ -125,6 +125,62 @@ def load_def(cs, ins, idx, base, d, width, tg):
     return ('未決', 'ptr_entry', None)
 
 
+def base_writer(ins, idx, base, tg):
+    """読込 ins[idx] の基底 base を書き換える直前の命令を直線区間で探す → (k, None) / (None, 理由)。"""
+    k = idx - 1
+    while k >= 0:
+        if ins[k + 1].address in tg:
+            return None, 'base_merge'
+        if ins[k].mnemonic in ('call', 'ret', 'jmp'):
+            return None, 'base_call'
+        if not (ins[k].mnemonic.startswith('j') or ins[k].mnemonic in NOWRITE) and writes_reg(ins[k], base):
+            return k, None
+        k -= 1
+    return None, 'base_entry'
+
+
+def base_origin(cs, ins, idx, base, tg):
+    """ptr_base_def の基底値の出所を分類 → (分類, 理由)。値は決めない (実値化は今回 0 件)。
+
+    分類の定義: 実値化 = 基底の値が定数と決まり、読込番地が確定する (今回の実装では該当なし)。
+    復元不能 = 基底の値が実行時のレジスタ値に依存する (イメージから定数を取り出せない)。
+    未決 = 直線区間では出所が決まらない (合流・呼出し・先頭到達・グローバル・複写・定数スロット)。
+    """
+    k, why = base_writer(ins, idx, base, tg)
+    if k is None:
+        return '未決', why
+    w = ins[k]
+    dst, src = split_ops(w.op_str)
+    if w.mnemonic == 'mov' and IMM.fullmatch(src):
+        return '未決', 'base_const_imm'
+    if w.mnemonic != 'mov' or '[' not in src:
+        return '未決', 'base_copy_or_other'
+    mem = mem_of(src)
+    if mem is None:
+        return '未決', 'base_other_mem'
+    width, sbase, sd = mem
+    if sbase == 'rip' or 'rip' in src:
+        return '未決', 'base_global'
+    if sbase != 'rbp':
+        return '未決', 'base_ptr_load'
+    j = k - 1
+    while j >= 0:
+        if ins[j + 1].address in tg:
+            return '未決', 'base_slot_merge'
+        if ins[j].mnemonic in ('call', 'ret', 'jmp'):
+            return '未決', 'base_slot_call'
+        for mo in ldmach.memops_of(cs, ins[j]):
+            if mo['kind'] in ('store', 'rmw') and mo['write'] and mo['base'] == 'rbp' and mo['disp'] == sd:
+                sdst, ssrc = split_ops(ins[j].op_str)
+                if ins[j].mnemonic == 'mov' and IMM.fullmatch(ssrc):
+                    return '未決', 'base_slot_const'
+                if ins[j].mnemonic == 'mov' and ssrc in FAM:
+                    return '復元不能', 'base_slot_reg'
+                return '未決', 'base_slot_other'
+        j -= 1
+    return '未決', 'base_slot_none'
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('rows'); ap.add_argument('--pe', required=True); ap.add_argument('--out', required=True)
@@ -136,6 +192,7 @@ def main():
     fcache = {}
     out_rows = []
     cnt = collections.Counter()
+    bcnt = collections.Counter()
     for r in rows_in:
         cva = int(r['caller'].split('_')[1], 16)
         if cva not in fcache:
@@ -154,11 +211,17 @@ def main():
                 cls, why, val = '未決', 'frame_base', None
             else:
                 cls, why, val = load_def(cs, ins, idx, base, d, width, tg)
+        bcls, bwhy = None, None
+        if why == 'ptr_base_def':
+            bcls, bwhy = base_origin(cs, ins, idx, base, tg)
         if val is not None:
             val = hex(val)
         cnt[(cls, why)] += 1
+        if bcls is not None:
+            bcnt[(bcls, bwhy)] += 1
         out_rows.append({'caller': r['caller'], 'callee': r['callee'], 'k': r['k'], 'pos': r['pos'],
                          'ledger': r['ledger'], 'prev_reason': r['reason'], 'class': cls, 'reason': why,
+                         'base_class': bcls, 'base_reason': bwhy,
                          'value': val, 'def': r['def'], 'def_insn': ins[idx].mnemonic + ' ' + ins[idx].op_str
                          if idx is not None else r['def_insn']})
     print('[ptr-class] 対象 %d 件 (load_ptr・chain>load_ptr)' % len(out_rows))
@@ -168,6 +231,9 @@ def main():
     print('  未分類   %d' % (len(out_rows) - tot['実値化'] - tot['復元不能'] - tot['未決']))
     print('[ptr-class] 理由別')
     for (cls, why), v in sorted(cnt.items()):
+        print('  %-8s %-22s %d' % (cls, why, v))
+    print('[ptr-class] ptr_base_def の基底出所 (%d 件)' % sum(bcnt.values()))
+    for (cls, why), v in sorted(bcnt.items()):
         print('  %-8s %-22s %d' % (cls, why, v))
     json.dump(out_rows, open(a.out, 'w'), ensure_ascii=False, indent=1)
 
