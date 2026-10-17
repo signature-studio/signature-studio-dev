@@ -191,6 +191,10 @@ ABI = {
         ('delay 4694 FUN_180fd0ac8 rcx=param_1 (FUN_180fd099c 内)', r'(\(piVar3\[0x3e\] != 0\)\)\)\) \{\n      )FUN_180fd0ac8\(param_1\);\n    \}\n  \}\n  auStackX_20\[0\] = 0;', r'\1FUN_180fd0ac8(param_1,0,0,0);\n    }\n  }\n  auStackX_20[0] = 0;'),
         ('delay 4727 FUN_180fd0ac8 rcx=param_1 (FUN_180fd0a64 内)', r'(    TerminateProcess\(uVar2,param_1\);\n  \}\n  )FUN_180fd0ac8\(param_1\);', r'\1FUN_180fd0ac8(param_1,0,0,0);'),
         ('delay 4801 FUN_180fd0ac8 rcx=param_1 (FUN_180fd0b50 内)', r'(\(piVar3\[0x3e\] != 0\)\)\)\) \{\n    )FUN_180fd0ac8\(param_1\);\n  \}\n  auStackX_20\[0\] = 0;', r'\1FUN_180fd0ac8(param_1,0,0,0);\n  }\n  auStackX_20[0] = 0;'),
+        # #5401 (KH-160): FUN_180fe5f00 (MXCSR へ ecx を書く・1 引数 undefined4) の引数なし呼出し 1 件 (FUN_180fd622c 内 5723 行)。
+        #   機械語: 180fd626e `call 180fe5f00` の直前で ecx = uVar2 のまま (180fd6256〜25a で計算・260〜26c の分岐で ecx は書き換わらない)。
+        #   callee 180fe5f00 は入口 `mov [rsp+8],ecx; ldmxcsr` で ecx を読む。よって引数は uVar2。
+        ('delay 5723 FUN_180fe5f00 ecx=uVar2 (180fd626e・FUN_180fd622c の else)', r'(\n  else \{\n    )(?:func_0x000|FUN_)180fe5f00\(\);(\n  \}\n  return uVar1;)', r'\1func_0x000180fe5f00(uVar2);\2'),
         # #5384 (KH-158): stereo ABI 族の前半 3 callee の呼出し 6 件。callee は入力を xmm0 のビット列で読む (入口 movd/movq・movaps xmm1,xmm0)。
         #   FUN_180fdc6ec・FUN_180fdc844 は引数 1 件宣言 (uint)。呼出し直前の xmm0 は入口 float (fVar) のまま = f2u(fVar)。
         #   FUN_180fdc858 は引数 1 件宣言 (ulonglong)。4042 (180fccf08) は入口 param_1 の bit を保持した経路 (movq rdx,xmm0・movaps xmm6,xmm0) で xmm0 = 入口 param_1 = d2u(param_1)。

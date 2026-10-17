@@ -4,14 +4,18 @@
 呼出し回数 n と this+0x4c (IR 名 -28 の書込み index)・this+0x48 (IR 名 -32 の count) を、
 @fx61_buf (i32 の配列) に書く。関数呼出しは使わない (genstubs が IR の declare を stub 化し、
 名前衝突するため)。C 側の fx61_read (shimx_link/fx61_rec.c) が配列を読んで標準エラーへ出す。
+呼出し回数が FX61_LIMIT (既定 100000) を超えたら unreachable で trap し、JS 側 (run_trace.mjs) が
+_fx61_* を読む (hang しても記録を読めるようにするため)。
 計装は callee の IR だけに入れる。親 function_448490 の IR・既定の IR は変えない。
 想定と違う入力は assert で止める (fail-closed)。
 
 使い方: python3 fix_shx_t61.py IN.ll OUT.ll
 """
+import os
 import re
 import sys
 
+LIMIT = int(os.environ.get('FX61_LIMIT', '100000'))   # 呼出し回数の上限。超えたら unreachable で trap し、JS 側で記録を読む
 DEF = re.compile(r'^define i64 @function_4483f0\(ptr %arg1, i16 %arg2\) local_unnamed_addr \{\n', re.M)
 ENTRY = 'dec_label_pc_4483f0:\n'
 DATALAYOUT = re.compile(r'^target datalayout = [^\n]*\n', re.M)
@@ -31,7 +35,12 @@ PROBE = (ENTRY +
          '  %fx61b2 = getelementptr i8, ptr @fx61_buf, i64 8\n'
          '  store i32 %fx61v76, ptr %fx61b2, align 4\n'
          '  %fx61b3 = getelementptr i8, ptr @fx61_buf, i64 12\n'
-         '  store i32 %fx61v72, ptr %fx61b3, align 4\n')
+         '  store i32 %fx61v72, ptr %fx61b3, align 4\n'
+         '  %fx61over = icmp sgt i32 %fx61n1, ' + str(LIMIT) + '\n'
+         '  br i1 %fx61over, label %fx61trap, label %fx61cont\n'
+         'fx61trap:\n'
+         '  unreachable\n'
+         'fx61cont:\n')
 
 
 def patch(src):

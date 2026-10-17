@@ -7,8 +7,8 @@ import fs from 'fs';
 const S4 = new URL('./', import.meta.url).pathname.replace(/\/$/, '');
 const M11 = S4 + '/work/stage4/' + (process.env.S4_NAME || 't114');
 const BASE = 0x11FF8200;
-const SLOT = { entry: 0, g0: 8, g1: 16, g2: 24, siteA: 32, siteB: 40, last: 48 };
-const SPAN = 56;
+const SLOT = { entry: 0, g0: 8, g1: 16, g2: 24, siteA: 32, siteB: 40, last: 48, hit4129be: 56, v4129be: 64, v412904: 72, v412978: 80 };
+const SPAN = 88;
 const m2 = await import(M11 + '/m11_boot.cjs');
 const mod = await m2.default({ printErr: () => {} });
 mod.HEAPU8.set(fs.readFileSync(process.env.S4_IMAGE || (M11 + '/m11_image.bin')), 0);
@@ -23,6 +23,10 @@ const read = () => {
     site_A_hits: Number(u('siteA')),
     site_B_hits: Number(u('siteB')),
     last_site: { 0n: 'none', 1n: 'A', 2n: 'B' }[u('last')] ?? String(u('last')),
+    br_4129be_hits: Number(u('hit4129be')),
+    i8_18787504_at_4129be: Number(u('v4129be')),
+    i8_18787504_at_412904: Number(u('v412904')),
+    i8_18787504_at_412978: Number(u('v412978')),
   };
 };
 mod._m11_set_survey(1);
