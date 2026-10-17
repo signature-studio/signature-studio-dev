@@ -4,7 +4,7 @@
 > **付録 (分割移動・内容は削除していない)**: [`REPORT_APPENDIX_A.md`](REPORT_APPENDIX_A.md) (§10〜§12)・
 > [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) (§13〜§16)・[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§17・§18)・[`REPORT_APPENDIX_C.md`](REPORT_APPENDIX_C.md) (§19)・[`REPORT_APPENDIX_D.md`](REPORT_APPENDIX_D.md) (§22)。 節番号は全ファイルで通し番号 (本体の §N 参照は付録の同番号節を指す)。
 > #2128 (ott_getparam leaf への icall runtime 配線・測定 commit `f8bd2ea0`・部分達成): [`REPORT_APPENDIX_2128.md`](REPORT_APPENDIX_2128.md)。
-> #2181 (ott_getparam F=281 の SSA dominance 修復・部分達成・leafspec の測定 commit `b1c2d148`・probe 表の測定 commit `3870e0afc`): [`REPORT_APPENDIX_2181.md`](REPORT_APPENDIX_2181.md)。 #2861 (iargs unbound の rip `lea` 合成・部分達成): [`REPORT_APPENDIX_2861.md`](REPORT_APPENDIX_2861.md)。
+> #2181 (ott_getparam F=281 の SSA dominance 修復・部分達成・測定 commit `e05270d33` (leafspec 200/200・probe 表の両方)): [`REPORT_APPENDIX_2181.md`](REPORT_APPENDIX_2181.md)。 #2861 (iargs unbound の rip `lea` 合成・部分達成): [`REPORT_APPENDIX_2861.md`](REPORT_APPENDIX_2861.md)。
 > #3067 (`legacy_p1` の repmap を挿入前の行へ適用): [`REPORT_APPENDIX_3067.md`](REPORT_APPENDIX_3067.md)。 #294 (dir64 gate の `FL_WIN64_DIR` を env.sh 経由に置換・実測。gate `[1]` は既存 FAIL): [`REPORT_APPENDIX_294.md`](REPORT_APPENDIX_294.md)。
 
 - 日付: 2026-10-11 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒 + leaf spec 約 4 分, `--fresh` で FA/KH を RetDec lift から約 1 分)
