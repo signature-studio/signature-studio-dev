@@ -14,9 +14,13 @@ from ldlib import cases
 from ldlib.session import Session
 
 TARGETS = ['668390', '6683d0', '784520', '8e7e10', 'a965c0']
+# IR 由来の署名が実引数と合わない関数の上書き (逆アセンブルで確認)。
+# 784520: rcx=this・rdx=arg1・xmm2=単精度 float (arg2)、戻りは xmm0 の float。IR は float を落とし i128 としていた。
+SIG_OVERRIDE = {'784520': {'ret': 'float', 'params': ['i64', 'i64', 'float']}}
 
 
 def vmt2_line(va, name, arg, psig):
+    # arg0 は常に vmt2 の this (rcx)。テスト対象の arg (arg>0) だけ別の有効ポインタを渡す (LD-238 §7: 旧版は arg0 に整数を渡していた)。
     kinds = cases.kinds_of(psig['params'])
     toks = []
     for i, k in enumerate(kinds):
@@ -24,8 +28,10 @@ def vmt2_line(va, name, arg, psig):
             toks.append('d:0x%x' % cases.FP_D[i % 4])
         elif k == 'f':
             toks.append('f:0x%x' % cases.FP_F[i % 4])
-        elif i == arg:
+        elif i == 0:
             toks.append('i:a:0x%x' % cases.PTR_SLOTS[0])
+        elif i == arg:
+            toks.append('i:a:0x%x' % cases.PTR_SLOTS[1])
         else:
             toks.append('i:0x%x' % cases.SMALL[i])
     return 'id=%x:vmt2_%d fn=%x blob=vmt2 args=%s trace=0 xfill=%d sig=%s rt=%s' % (
@@ -47,9 +53,10 @@ def main():
             name = sess.prefix + h
             va = int(h, 16)
             sig = sess.sigs[name]
-            psig = {'ret': 'i64', 'params': sig['params'], 'defined': True}
+            ov = SIG_OVERRIDE.get(h)
+            psig = {'ret': ov['ret'], 'params': ov['params']} if ov else {'ret': 'i64', 'params': sig['params'], 'defined': True}
             lines, ids = [], []
-            for arg, ty in enumerate(sig['params']):
+            for arg, ty in enumerate(psig['params']):
                 if ty in ('i64', 'ptr'):
                     lines.append(vmt2_line(va, name, arg, psig))
                     ids.append('%s:vmt2:%d' % (h, arg))
