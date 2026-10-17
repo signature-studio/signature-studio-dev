@@ -11,6 +11,7 @@ global の初期値 (@global_var_6fffb0 の PE 値など) は k80_pe_globals.py 
 
 差し替えの根拠 (REPORT_APPENDIX_H §19):
   0x5dfff0  : 引数 a(xmm2)/b(xmm3) の参照が入れ替わる + (1±a)*b を 80-bit で丸める
+  (0x5e12c0 は #3281 残件 B で k80_ucomi_br.py の一般 pass に置換し、本体を外した)
   0x5e0300  : out[k] = f32((in[2k]+in[2k+1]) * c)。80-bit 中間値
   0x5e0350  : out[2k+j] = f32((in[..]+in[..]) * c)。80-bit 中間値
 """
@@ -109,32 +110,6 @@ dec_label_pc_5de63b:
   %c = icmp ult i64 %k1, %arg3
   br i1 %c, label %dec_label_pc_5de63b, label %dec_label_pc_5de64b
 dec_label_pc_5de64b:
-  ret i64 0
-}
-''',
-    'function_5e12c0': '''define i64 @function_5e12c0(i64 %arg1, i64 %arg2) local_unnamed_addr {
-dec_label_pc_5e12c0:
-  %n = trunc i64 %arg2 to i32
-  %n64 = zext i32 %n to i64
-  %pos = icmp sgt i32 %n, 0
-  br i1 %pos, label %dec_label_pc_5e12d9, label %dec_label_pc_5e1311
-dec_label_pc_5e12d9:
-  %k = phi i64 [ 0, %dec_label_pc_5e12c0 ], [ %k1, %dec_label_pc_5e12d9 ]
-  %cf = load float, float* @global_var_6fff7c, align 4
-  %cd = fpext float %cf to double
-  %ia = mul i64 %k, 8
-  %ip = add i64 %arg1, %ia
-  %ipt = inttoptr i64 %ip to i64*
-  %bits = load i64, i64* %ipt, align 8
-  %masked = and i64 %bits, 9223372036854775807
-  %v = bitcast i64 %masked to double
-  %gt = fcmp ogt double %cd, %v
-  %nv = select i1 %gt, i64 0, i64 %bits
-  store i64 %nv, i64* %ipt, align 8
-  %k1 = add i64 %k, 1
-  %c = icmp ult i64 %k1, %n64
-  br i1 %c, label %dec_label_pc_5e12d9, label %dec_label_pc_5e1311
-dec_label_pc_5e1311:
   ret i64 0
 }
 ''',

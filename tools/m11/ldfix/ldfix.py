@@ -1792,6 +1792,9 @@ def fix_f3c_use(fn, fv, rep, ctr):
         first = min(u[1] for u in derefs)
         raws = [u for u in uses if u[0] == 'raw' and u[2] == n]
         if not all(u[3] == 64 for u in derefs):
+            # 32bit deref は門で棄却する (#6067)。置換対象の %argN は store の宛先ポインタ (`store i32 %x, ptr (inttoptr %argN)`) で、
+            # 機械語の deref はその直前の store の読み直し。門を開けると宛先を `*argN` の内容に置換してしまう (REPORT_3195 §6)
+            rep['f3c_use_w32'] = rep.get('f3c_use_w32', 0) + 1
             continue
         ptrarg = pty.get(n, 'i64') != 'i64'
         argre = re.compile(r'(?<![\w.$-])%arg' + str(n) + r'(?![\w.$-])')
