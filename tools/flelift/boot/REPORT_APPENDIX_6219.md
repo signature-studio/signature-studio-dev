@@ -41,7 +41,7 @@ KPI (起動に関わる PR): FLEngine 起動の units_run は **前 209 / 後 20
 
 ## D. 限界
 
-- 1 run・n=1 (診断 route・既定 route とも)。同一 commit の再実行は未測定で、「決定的 boot のため同値」は推定であり測定ではない。
+- 既定 route は 2 回測定した (n=2): 取り込み前 (測定 commit `6e2c7ec49`) と取り込み後 (HEAD `949ec634a`・main の #5415 の監視 slot を含む)。両方とも units 895 / `[wobj]` 0 件 / 入口フック 0 件。診断 route は n=1。「決定的 boot のため同値」は推定であり、測定ではない。
 - 既定 route では `0x40d300` は出ていない。ただし既定 route は `f_6ba1f0` の入口 (`[wval-enter]`) にも届いていない (`[wval-enter]` 0 件) ため、「既定 route で `f_6cd520` / `0x6bc010` に届いていない」ことの根拠は、入口フックの 0 件 (`run_wval_default_6219.log`) である。`f_40fb40` の入口は `wval_lift.py` の `ENTER_FN` 対象外のため、既定 route で `f_40fb40` / `0x40d300` に届いたかは、この測定では判定できない (monitor の対象外)。既定経路での mode の設定元は未測定 (#4806 の IPP 判定が先)。
 - ホスト側 C (`fle_boot.c`・shimx・`rt/fle_glue.c`) の書込みは監視していない (前回 §E と同じ)。確保領域の getmem (FastMM) の 0 埋めの有無はホスト側のため見えていない。
 - `f_40fb40` の呼出元 (`NewInstance` の段) の VA は本付録の対象外。
