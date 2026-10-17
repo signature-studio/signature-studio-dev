@@ -1060,43 +1060,6 @@ def t32():
 
 
 def t33():
-    """[LIFTLIB-30 / #6078] p1 `shr r64,cl`: CF を flag 種別 "shrcf" に載せる。count==0 のとき CF は前値を保つ。
-
-    合成機械語 `48 d3 e8` (shr rax,cl) → 直後の jae の CF 読みが i1 の select を経由すること、ZF/SF 読みは Unsupported。"""
-    from types import SimpleNamespace as NS
-    from liftlib.passes import p1
-    from liftlib import ir as IR
-
-    mod = IR.Module.parse("define void @function_1000() {\nentry:\n  ret void\n}\n")
-    out = []
-    st = {"__w": set(), "rax": ("%old", "i64"), "rcx": ("%cnt", "i64"), "fl": ("rcrcf", ("%pcf", 64, None))}
-    it = NS(va=0x1000, mnem="shr", op_str="rax, cl", mem=None, is_call=False,
-            ops=[NS(type=1, reg="rax"), NS(type=1, reg="rcx")],
-            _ci=NS(operands=[NS(size=8), NS(size=1)]))
-    stub = NS(mod=mod, nm=lambda va, t: "%%%s_%d" % (t, len(out)), used=lambda k: None,
-              _GPR_ALU=p1.Region._GPR_ALU, _gpr_val=lambda st_, reg, va, o, bits=64: st_[reg][0],
-              _flag_cf_i1=lambda *a: p1.Region._flag_cf_i1(stub, *a),
-              _flag_cc_i1=lambda *a: p1.Region._flag_cc_i1(stub, *a))
-    res = p1.Region.lift_data_insn(stub, it, [("reg", "rax"), ("reg", "rcx")], st, out, "")
-    text = "\n".join(out)
-    assert res is True, res
-    assert "and i64 %cnt, 63" in text and "lshr i64 %old, " in text, text
-    assert "select i1 " in text and st["fl"][0] == "shrcf" and st["fl"][1][1] == 64, st["fl"]
-    cf_name = st["fl"][1][0]
-    o2 = []
-    c = stub._flag_cc_i1(st, "ae", o2, 0x1000, "")
-    assert c is not None and "xor i1 %s, true" % cf_name in "\n".join(o2), o2
-    assert p1.Region._flag_cc_i1(stub, st, "b", [], 0x1000, "") == cf_name
-    for bad in ("e", "ne", "s", "a"):
-        try:
-            stub._flag_cc_i1(st, bad, [], 0x1000, "")
-        except p1.Unsupported:
-            continue
-        raise AssertionError("shr cl の直後の cc %s は Unsupported のはず" % bad)
-    print("T33 ok (shr r64,cl: count&63 で CF を select、count==0 は前 CF 保持、CF 以外の cc は Unsupported)")
-
-
-def t34():
     """[LIFTLIB-31 / #6079] p1 `adc r64,imm`: dst = dst + imm + CF。入力 CF は flag 状態から読み、CF を作れない経路は Unsupported。
 
     合成機械語 `48 83 d0 00` (adc rax,0) を lift_data_insn に通す。直前の整数 cmp (ult) の CF を zext して加算することを固定する。
@@ -1130,12 +1093,119 @@ def t34():
         except p1.Unsupported:
             continue
         raise AssertionError("CF を作れない flag 状態 %s は Unsupported のはず" % bad)
-    print("T34 ok (adc r64,imm: CF を flag 状態から zext して加算、CF 無し・bsr 由来は Unsupported)")
+    print("T33 ok (adc r64,imm: CF を flag 状態から zext して加算、CF 無し・bsr 由来は Unsupported)")
+
+
+def t34():
+    """[LIFTLIB-32 / #6080] `cmp rcx,0` の直後の jl (SF/OF) / je (ZF) / jb (CF) の IR を固定し、x86 の定義どおりの値になることを確認する。
+
+    x86 の cmp a,b: 結果 r = a-b (mod 2^bits)。ZF=(r==0), SF=(r の最上位 bit), CF=(a <u b), OF=符号付き溢れ。
+    jl = SF!=OF, je = ZF, jb = CF。生成 IR の icmp 述語を Python で評価し、上の定義と全サンプルで一致することを見る。"""
+    import re
+    from types import SimpleNamespace as NS
+    from liftlib.passes import p1
+    from liftlib import ir as IR
+
+    mod = IR.Module.parse("define void @function_1000() {\nentry:\n  ret void\n}\n")
+    out = []
+    st = {"__w": set(), "rcx": ("%rcx", "i64"), "fl": None}
+    stub = NS(mod=mod, nm=lambda va, t: "%%%s_%d" % (t, len(out)), used=lambda k: None,
+              _GPR_ALU=p1.Region._GPR_ALU, _gpr_val=lambda st_, reg, va, o, bits=64: st_[reg][0])
+    stub._flag_zf_i1 = lambda *a: p1.Region._flag_zf_i1(stub, *a)
+    stub._flag_cc_i1 = lambda *a: p1.Region._flag_cc_i1(stub, *a)
+    stub._flag_cf_i1 = lambda *a: p1.Region._flag_cf_i1(stub, *a)
+    cmp_it = NS(va=0x1000, mnem="cmp", op_str="rcx, 0", mem=None, is_call=False,
+                ops=[NS(type=1, reg="rcx"), NS(type=2, imm=0)],
+                _ci=NS(operands=[NS(size=8), NS(size=8)]))
+    res = p1.Region.lift_data_insn(stub, cmp_it, [("reg", "rcx"), ("imm", 0)], st, out, "")
+    assert res is True and st["fl"] == ("int", ("%rcx", "0", False, 64)), st["fl"]
+
+    def jcc_ir(cc):
+        o = []
+        c = p1.Region._int_jcc_cond(stub, NS(cc=cc), st, o, 0x1001, "")
+        return c, "\n".join(o)
+
+    def pred_eval(ir, a, bits=64):
+        m = re.search(r"icmp (\w+) i%d %%rcx, (-?\d+)" % bits, ir)
+        assert m, ir
+        p, b = m.group(1), int(m.group(2))
+        mask = (1 << bits) - 1
+        sa, sb = a & mask, b & mask
+        if p in ("slt", "sge", "sle", "sgt"):
+            sg = lambda v: v - (1 << bits) if v >> (bits - 1) else v
+            sa, sb = sg(sa), sg(sb)
+        return {"slt": sa < sb, "sge": sa >= sb, "sle": sa <= sb, "sgt": sa > sb,
+                "ult": sa < sb, "uge": sa >= sb, "ule": sa <= sb, "ugt": sa > sb,
+                "eq": sa == sb, "ne": sa != sb}[p]
+
+    def x86_flags(a, bits=64):
+        mask = (1 << bits) - 1
+        ra, rb = a & mask, 0
+        r = (ra - rb) & mask
+        sign = 1 << (bits - 1)
+        sa = ra - (1 << bits) if ra & sign else ra
+        sr = r - (1 << bits) if r & sign else r
+        zf = r == 0
+        sf = bool(r & sign)
+        cf = ra < rb
+        of = (sa - 0) != sr
+        return {"zf": zf, "sf": sf, "cf": cf, "of": of}
+
+    samples = [0, 1, -1, 2, -2, 5, -5, (1 << 63) - 1, 1 << 63, (1 << 63) + 1, (1 << 64) - 2, 0x7FFFFFFF, 0x80000000]
+    c_l, ir_l = jcc_ir("l")
+    assert "icmp slt i64 %rcx, 0" in ir_l, ir_l
+    c_e, ir_e = jcc_ir("e")
+    assert "icmp eq i64 %rcx, 0" in ir_e, ir_e
+    c_b, ir_b = jcc_ir("b")
+    assert "icmp ult i64 %rcx, 0" in ir_b, ir_b
+    for a in samples:
+        f = x86_flags(a)
+        assert pred_eval(ir_l, a) == (f["sf"] != f["of"]), ("jl", a)
+        assert pred_eval(ir_e, a) == f["zf"], ("je", a)
+        assert pred_eval(ir_b, a) == f["cf"], ("jb", a)
+    print("T34 ok (cmp rcx,0: jl=icmp slt(SF!=OF), je=icmp eq(ZF), CF は常に 0 (x86 の定義と %d 値で一致))" % len(samples))
+
+
+def t35():
+    """[LIFTLIB-30 / #6078] p1 `shr r64,cl`: CF を flag 種別 "shrcf" に載せる。count==0 のとき CF は前値を保つ。
+
+    合成機械語 `48 d3 e8` (shr rax,cl) → 直後の jae の CF 読みが i1 の select を経由すること、ZF/SF 読みは Unsupported。"""
+    from types import SimpleNamespace as NS
+    from liftlib.passes import p1
+    from liftlib import ir as IR
+
+    mod = IR.Module.parse("define void @function_1000() {\nentry:\n  ret void\n}\n")
+    out = []
+    st = {"__w": set(), "rax": ("%old", "i64"), "rcx": ("%cnt", "i64"), "fl": ("rcrcf", ("%pcf", 64, None))}
+    it = NS(va=0x1000, mnem="shr", op_str="rax, cl", mem=None, is_call=False,
+            ops=[NS(type=1, reg="rax"), NS(type=1, reg="rcx")],
+            _ci=NS(operands=[NS(size=8), NS(size=1)]))
+    stub = NS(mod=mod, nm=lambda va, t: "%%%s_%d" % (t, len(out)), used=lambda k: None,
+              _GPR_ALU=p1.Region._GPR_ALU, _gpr_val=lambda st_, reg, va, o, bits=64: st_[reg][0],
+              _flag_cf_i1=lambda *a: p1.Region._flag_cf_i1(stub, *a),
+              _flag_cc_i1=lambda *a: p1.Region._flag_cc_i1(stub, *a))
+    res = p1.Region.lift_data_insn(stub, it, [("reg", "rax"), ("reg", "rcx")], st, out, "")
+    text = "\n".join(out)
+    assert res is True, res
+    assert "and i64 %cnt, 63" in text and "lshr i64 %old, " in text, text
+    assert "select i1 " in text and st["fl"][0] == "shrcf" and st["fl"][1][1] == 64, st["fl"]
+    cf_name = st["fl"][1][0]
+    o2 = []
+    c = stub._flag_cc_i1(st, "ae", o2, 0x1000, "")
+    assert c is not None and "xor i1 %s, true" % cf_name in "\n".join(o2), o2
+    assert p1.Region._flag_cc_i1(stub, st, "b", [], 0x1000, "") == cf_name
+    for bad in ("e", "ne", "s", "a"):
+        try:
+            stub._flag_cc_i1(st, bad, [], 0x1000, "")
+        except p1.Unsupported:
+            continue
+        raise AssertionError("shr cl の直後の cc %s は Unsupported のはず" % bad)
+    print("T35 ok (shr r64,cl: count&63 で CF を select、count==0 は前 CF 保持、CF 以外の cc は Unsupported)")
 
 
 if __name__ == "__main__":
     import traceback
-    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31, t32, t33, t34)
+    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31, t32, t33, t34, t35)
     fails = []
     for f in tests:
         try:

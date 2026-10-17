@@ -113,3 +113,37 @@ L9 では producer の wake 間隔 62.5 ms に加えて、-139.9 ms の 41.7 ms 
   - 負荷下の失敗頻度は母数が小さく、確定しない。HEAD `570f76617` では 2/5 で再現している (§3-3)。§2-1 の計装途中版の 3/12 とは別集計。
   - JS 側 bufferSwitchTimeInfo の独立した呼出しログは追加していない (§3-2)。
   - 床の値 (`FLA_F_T_FLOOR`) は変えていない (PM 判断)。
+
+## 5. 待ち記録の計装と本 run の再測定 (run 3・受入 1 の残件・受入 2)
+
+計装: `fla_out_wait_fill_le` の wait32 1 回ごとに [開始 ms, 終了 ms, rc, 待ち入り時の fill, max_fill] を `flasio_wt_*` で記録 (判定に使わない)。rc: 0=通知、1=値変化で即戻り、2=timeout。commit: `9d9305f20` (記録) → `c525b67cb` (fill 記録の版)。
+
+**注 (差し戻し対応)**: `c525b67cb` は `fla_wait_trace_hook` の宣言 (3 引数) と定義 (5 引数) が食い違い、C がビルドできない (clang: `redefinition ... with a different type`)。そのため `c525b67cb` と `9d9305f20` の測定は、どのビルド成果物で取ったかを確認できない。以下 r10・r11 の PASS は根拠にしない。fill の記録は、食い違いを直した `52b5a68d1` で初めて実装どおり動いた。
+
+修正 commit: `52b5a68d1` (宣言・`wt_note`・harness の列を 5 引数 / 5 列に揃えた)。`git diff c525b67cb 52b5a68d1 -- tools/audio/src tools/audio/asio/harness tools/audio/asio/build.sh` の差分は 3 ファイル 7 行 (`flaudio.h` 1 行・`flasio.c` 3 行・`com_page.mjs` 3 行)。build.sh は差分に含まれないが、本体の `node_modules` の `tsc` を参照して完走させた (worktree の `node_modules` は symlink で、commit していない)。
+
+測定: `yes` × 4 (PID 指定で停止)・`run_com.mjs --quick --only com_ramp_b256_d2`。測定 commit: `52b5a68d1` (ビルド OK・emsdk 6.0.12)。
+
+| 試行 | 結果 | 備考 |
+|---|---|---|
+| r9_1 (`9d9305f20`) | FAIL: underruns=1 silence=5760 | 上の注のとおり、ビルド不可の commit。停止の時間帯 [-130, +113] ms。wait は [-130, -30] で rc=0 が続く。producer の書き込みは -29.7 ms、次の書き込みは +113.5 ms |
+| r9_2・r9_4 (`9d9305f20`) | PASS ×2 | ビルド不可の commit (注) |
+| r9_3 (`9d9305f20`) | FAIL: underruns=1 | ビルド不可の commit (注)。`wait_timeouts=1`。wait [-53.9, -2.8] は rc=2 (timeout 50 ms) |
+| r10_1〜8 (`c525b67cb`) | 8/8 PASS | ビルド不可の commit (注)。根拠にしない |
+| r11_1 (`c525b67cb`) | PASS | ビルド不可の commit (注)。根拠にしない |
+| e2e `--quick` (`c525b67cb`) | exit 0・3/3 PASS・73 秒 | ビルド不可の commit (注)。根拠にしない |
+| e2e `--quick` (`52b5a68d1`) | exit 1・2/3 PASS・77 秒 | node check 126/126 PASS。`com_ramp_b256_d2` FAIL (underruns=1 silence=1024・ramp 114560/144256)。負荷なし (load avg 0.72) |
+| rl_1 (`52b5a68d1`・負荷) | FAIL: underruns=1 | wait 335 件 (rc 0=331・1=2・2=2)。`wait_timeouts=2` |
+| rl_2 (`52b5a68d1`・負荷) | FAIL: underruns=2 | wait 464 件 (rc 0=461・1=2・2=1)。`wait_timeouts=1` |
+| rl_3〜rl_8 (`52b5a68d1`・負荷) | 6/6 PASS | underruns 0 |
+
+rl_1〜8 は `work/load_trial.cjs 8` で取った (`yes` × 4 を全 8 試行の間で 1 度立て、終了後に PID 指定で停止)。8 回中 FAIL 2 (rl_1・rl_2)。
+
+- rl_1 の timeout 2 件: 52.9 ms (fill 2176・max_fill 2048)・50.3 ms (fill 2304・max_fill 2048)。どちらも待ち入り時 fill が max_fill を超えたまま timeout に入っている。
+- rl_2 の timeout 1 件: 50.1 ms (fill 1664・max_fill 1536)。同じ形。
+
+読み:
+
+- `52b5a68d1` (実装どおりに fill を記録する版) で、無負荷 e2e 1 回の underrun と、負荷下 8 回中 2 回の underrun を再現した。`c525b67cb` の 8/8 PASS (r10) は、ビルド不可の commit での測定のため根拠にならない。
+- 失敗時の wait 記録は、待ち入り時 fill が max_fill を上回ったまま 50 ms の timeout に入った形。producer の通知が届かない (out_read が wake_target に達しても notify されない) か、worklet が追いつく前に producer が寝た形のどちらとも、この記録だけでは区別できない。
+- 直接経路 (producer の preempt か、wait 返りの遅れか、通知の欠落か) は特定できなかった。
