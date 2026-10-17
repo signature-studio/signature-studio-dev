@@ -210,7 +210,7 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
   - 非分岐命令の即値・RIP 相対で候補を指す命令: **0 件**。
   - `call 0x12d0bb0` の飛び先 (絶対形 0xed0bb0 と一致): 8 件。これは関数 0x12d0bb0 への直接 call で、vptr の格納ではない。
   - `.pdata` の 4 byte 値 0xed0bb0 (`0x1aa9ef4`): 1 件。`.pdata` エントリ 55615 の begin (関数開始 RVA) で、0x12d0bb0 の unwind 情報。vptr ではない。
-  - `.data`・`.rdata`・その他のセクションの 4 byte 値: 0 件。`.data`・`.rdata` の 8 byte 値 (絶対・相対): 0 件。
+  - `.data`・`.rdata`・その他のセクションの 4 byte 値: 0 件 (スクリプトの検査)。8 byte 値 (絶対・相対) は、同じ候補で別の one-off 走査を流して 0 件 (スクリプトには含めていない)。
 - 判定: 0xed0bb0 を vptr として格納する静的な経路 (即値・RIP 相対・データ領域) は 0 件。関数をまたぐ値・メモリ経由の動的な経路は未検査 (上の未解決表のまま)。
 
 | 未解決 | 影響 | 起票先 |
