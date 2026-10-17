@@ -152,18 +152,18 @@ A	tools/flelift/boot/rsi_zero_variant.sh
 
 ## 19. 陽性対照が既定経路で 0 件になる理由 (#6213・測定 commit `02d46f1fc`)
 
-- 結論: 既定経路 (`FLE_IPP` 未指定・mode 3) で `0x5ac308`・`0x11f6100` が 0 件なのは、監視が効かないからではなく、**この 2 slot を書く処理が mode 3 では走らないから**。差は `FLE_IPP` の mode (3 と 1) だけで、root (`0x1375990` の有無) と寛容起動 (`FLE_TOLERANT`) は原因ではない。
+- 結論: 既定経路 (`FLE_IPP` 未指定・mode 3) で `0x5ac308`・`0x11f6100` が 0 件なのは、mode 3 の boot 停止時に 2 slot の値が初期値のまま (mode 1 では 0) で、監視の範囲で書込みが出なかったため。差は `FLE_IPP` の mode (3 と 1) だけで、root (`0x1375990` の有無) と寛容起動 (`FLE_TOLERANT`) は原因ではない。「mode 3 では書込み処理が走らない」は仮説で、未解決側に置く。
 - 同じ build (`FLE_EXTRA_CCF` で `0x5ac308`・`0x11f6100` を監視) の boot 停止時の値 (`FLEBOOT_SLOT6213`・`fle_boot.mjs` に読取りを追加):
 
 | 条件 | 停止 unit | `0x5ac308` | `0x11f6100` | 監視の出力 |
 |---|---|---|---|---|
-| 既定 (mode 3) | 895 | `0x40f960` (PE 値のまま) | `0x4820498b48000000` (不変) | 0 件 |
+| 既定 (mode 3) | 895 | `0x40f960` (mode 3 の停止時の値) | `0x4820498b48000000` (mode 3 の停止時の値) | 0 件 |
 | `FLE_IPP=1` (4464 条件) | 209 | `0x0` | `0x0` | 2 件 (unit 209 の同じ 16B 書込み) |
 
 - root 差の確認: mode 3 で root を `0x6a7b70,0x1375990` にしても 0 件 (`pcA`)。mode 1 で root を `0x6a7b70` だけにしても 2 件 (`pcB`)。
-- mode 3 の監視で 0 件になるのは、既定経路で slot の値が変わらないため (`FLEBOOT_SLOT6213` が PE 値・初期値のまま)。監視の空振りではない。
-- 書込み元 (受入 2): `FLE_WWATCH_JS` の build (`pcF`・mode 1) で、2 slot を 0 にする書込みの呼出し連鎖は `fle_wwatch` ← `STX` ← **`f_6a7b70`** ← `ott_dispatch` ← `f_6c7610` ← `f_815050` ← `f_815e10`。§17 の書込み元と一致する。`f_6a7b70` は既定経路でも root 化されている (`FLE_EXTRA_ROOTS=0x6a7b70`) が、mode 3 では受け手を覆う書込みが出ない。
-- 未解決 (起票先: #5337): mode 1 と mode 3 で `f_6a7b70` の呼出し引数 (`dst`・`cnt`) がどう違うか。mode 3 で `f_6a7b70` が呼ばれて別の範囲を塗るのか、呼ばれないのかは未計測。`0x6a7b70` の root 化は本件の範囲外 (PM 判断 blocklist) のまま。
+- mode 3 の監視は 0 件。停止時の 2 slot の値は mode 3 では初期値のまま (`0x5ac308`=`0x40f960`・`0x11f6100` 不変) で、mode 1 では 0 (`FLEBOOT_SLOT6213` の読取り)。
+- 書込み元 (受入 2・rc 3 の診断 run での観測 = `pcF`・mode 1 (shim)): 2 slot を 0 にする書込みの呼出し連鎖は `fle_wwatch` ← `STX` ← **`f_6a7b70`** ← `ott_dispatch` ← `f_6c7610` ← `f_815050` ← `f_815e10`。§17 の書込み元と一致する。`f_6a7b70` は既定経路でも root 化されている (`FLE_EXTRA_ROOTS=0x6a7b70`)。
+- 未解決 (起票先: #5337): (a) mode 3 で `f_6a7b70` が呼ばれて別の範囲を塗るのか、呼ばれないのかは未計測。mode 3 の監視で 0 件だったことは、呼ばれないことを意味しない。(b) mode 1 と mode 3 で `f_6a7b70` の呼出し引数 (`dst`・`cnt`) がどう違うか。`0x6a7b70` の root 化は本件の範囲外 (PM 判断 blocklist) のまま。
 
 測定 (いずれも `fle6_measure.sh`・`FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs"`・rc は各 run の結果。所要は各 run の `time`):
 
@@ -173,7 +173,6 @@ A	tools/flelift/boot/rsi_zero_variant.sh
 | 4464 tol | mode 1・寛容・root `0x6a7b70,0x1375990` | 0 | 3 分 46 秒 |
 | pcA | mode 3・root `0x6a7b70,0x1375990` | 0 | 3 分 35 秒 |
 | pcB | mode 1・寛容・root `0x6a7b70` | 0 | 3 分 51 秒 |
-| pcC | mode 3・監視 4 slot (`0x15e1c78` 等を含む) | 0 | 3 分 38 秒 |
 | pcD | mode 3・読取り probe (`FLEBOOT_SLOT6213`) | 0 | 3 分 19 秒 |
 | pcE | mode 1 (shim)・監視 2 slot | 3 | 3 分 53 秒 |
 | pcF | mode 1 (shim)・`FLE_WWATCH_JS` | 3 | 3 分 47 秒 |
