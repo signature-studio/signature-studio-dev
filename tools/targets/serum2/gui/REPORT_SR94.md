@@ -87,10 +87,33 @@ trace の ARG / ARG-CHILD 行を、所属関数 F の証拠で分ける。直接
 |---|---|---|
 | (a) vtable 候補 (disp のみの照合) の受け手の型 (reg の指す object の class) を確定する。型が決まれば、F の所属 class と一致するかで確定・非確定を分けられる | 受入 1 の確定 0 件の理由。確定件数を出すための前提 | #5612 (本 issue 残) |
 | (b) 呼出元の SC 判定 (SerumController の関数集合) の境界 | SC 19 件・14 箇所の母集団 | #4930 (親・REPORT_SR82 §6 (b)) |
-| (c) 証拠なし 236 行の扱い (呼出元が見つからない行が SC 由来かは未判定) | 確定件数の上界は 308 のまま | #5612 (本 issue 残) |
+| (c) 証拠なし 236 行: SC 証拠は 0 件。ただし「SC の呼出元が見つからない」ことの判定で、非 SC の確定ではない (§5) | 確定件数の上界は 308 のまま | #5612 (本 issue 残・#5987 で §5 の判定済み) |
 
 ## 4. 測定 commit と差分
 
 - 測定 commit: `9754af068` (origin/main。§2 の 4 ツールと `arg_row_join.py` の出力は、この版の入力で得た)。
 - 測定 commit 以降の変更: `arg_row_join.py` (新規) と本 REPORT のみ。既存の測定ツールは変えていない。
 - 鮮度の証跡: `git diff --quiet 9754af068 HEAD -- tools/targets/serum2/gui/receiver_this_trace.py tools/targets/serum2/gui/arg_caller_types.py tools/targets/serum2/gui/arg_vt_indirect.py tools/targets/serum2/gui/arg_vt_args.py` は 0 (差分 0 バイト・終了コード 0)。`git diff 9754af068 HEAD -- tools/targets/serum2/gui` の stat は `REPORT_SR94.md` と `arg_row_join.py` の 2 ファイルのみ。
+
+## 5. 証拠なし 236 行の SerumController 由来判定 (#5987)
+
+判定: `arg_none_sc_judge.py` (新規・PE 不要・既存 TSV のみ)。行ごとに、所属関数 F の証拠で分けた。
+
+- SC 関数集合 (21 関数): `receiver_this_trace.py` の `sc_closure()` の結果 (`--vtable 0x180a2bf58`・PE sha256 `501e7bb3…`)。
+- 判定順: (1) F が SC 集合に入る → SC 証拠 (self) / (2) 直接呼出元 (`direct.tsv`) に SC の関数がある → SC 証拠 (direct) / (3) vtable 候補の `n_sites_sc` > 0 → SC 証拠 (vtable) / (4) 上記が無い → 「呼出元なし」。
+
+| trace 行 | 証拠なし | SC 証拠 | 呼出元なし (vtable 候補は非 SC のみ) | 呼出元なし (候補 0) |
+|---|---|---|---|---|
+| ARG | 228 | 0 | 227 | 1 |
+| ARG-CHILD | 8 | 0 | 8 | 0 |
+| 計 | 236 | 0 | 235 | 1 |
+
+- 証拠なし 236 行は 122 関数に載る。うち 121 関数は vtable 候補があり、候補の呼出元はどれも SC の関数ではない (`n_sites_sc` = 0)。残り 1 関数 (`0x1806f9660`・ARG 1 行) は直接・vtable のどちらの候補も無い。
+- 直接呼出元 (`direct.tsv` の 17 関数) に、証拠なし 122 関数は 1 つも含まれない。
+- 判定の意味: 「SC 由来の証拠が無い」ことまでしか言えない。「呼出元なし」は、呼出元が見つからないことで、非 SC と確定したわけではない。よって、SC 由来の確定は 0 件、非 SC の確定も 0 件である。
+- 件数の検算: `vt_ind.tsv` の `n_sites_sc` 合計 19・`n_sites` 合計 118,222 は §2 と一致。
+
+測定 commit: `68c4a5b81` (本 PR で追加したのは `arg_none_sc_judge.py` と本 §5 のみ)。測定ツール (`receiver_this_trace.py` / `arg_caller_types.py` / `arg_vt_indirect.py` / `arg_vt_args.py`) の `9754af068` から HEAD までの差分は 0 バイト。
+SC 集合 `sc.txt` (1 行 1 アドレス・21 行) は `receiver_this_trace.py` を runpy で読み、`sc_closure()` の戻り値を書き出して作った (出力先はリポジトリ外)。
+実行: `python3 arg_none_sc_judge.py join.tsv direct.tsv vt_ind.tsv sc.txt` 0.02 s・出力 md5 `7e3b713b…`。
+入力 md5 (`/tmp` の作業 dir・リポジトリ外): `join.tsv` `c762b72e…`・`direct.tsv` `b449ddd0…`・`vt_ind.tsv` `42bcf98b…`・`trace.tsv` `1e1f5500…` (§2 と一致)。
