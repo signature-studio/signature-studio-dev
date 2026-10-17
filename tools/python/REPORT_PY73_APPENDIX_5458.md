@@ -13,12 +13,12 @@
 
 ## 2. 測定
 
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tools/python/work/py5458/` (gitignore) に `*block00031_PE.bin` のみ展開。実測 1.6 秒。
-- unicorn 2.1.4 (`uv pip install unicorn`・導入 0.4 秒)。pefile・capstone も同 venv (`tools/python/work/venv5458`)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を repo 外の `<展開先>` に `*block00031_PE.bin` のみ展開 (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'`)。実測 1.6 秒。
+- unicorn 2.1.4 (`uv pip install unicorn`・導入 0.4 秒)。pefile・capstone も repo 外の venv (`<venv>`) に入れる。
 - ハーネス: `tools/python/analysis/flapi/pe_emu_entry_5458.py`。
-  `FL_WIN64_DIR=tools/python/work/py5458 python3 tools/python/analysis/flapi/pe_emu_entry_5458.py 2000000 60`
+  `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_emu_entry_5458.py 2000000 60`
 - 実行結果 (上限 200 万命令・60 秒): 19,956 命令・0.02 秒・import 呼出し 1 回・終了 `正常終了`・戻り先 `0x100ffff0` (ハーネスの戻りスタブ)。
-- 命令の追跡: entry → `call 0x412760` (レジスタを保存して 0 を返す。setjmp 相当 `0x412680`) → `0x41d8f0` (初期化。`0x412050` は関数ポインタ配列を逆順に呼ぶループ) と進む。初期化の途中で `0x4127bf` から `call 0x4126f0` (レジスタを復元して戻す。longjmp 相当) が実行され、setjmp 点へ戻る。2 回目の戻りでは `eax=1` となり、entry の `cmp eax,1` → `jne 0x1376884` で初期化を飛ばして戻る。
+- 命令の追跡: entry → `call 0x412760` (レジスタを保存して 0 を返す。setjmp 相当 `0x412680`) → `0x41d8f0` (初期化。`0x412050` は関数ポインタ配列を逆順に呼ぶループ) と進む。初期化の途中で `0x4127bf` から `call 0x4126f0` (レジスタを復元して戻す。longjmp 相当) が実行され、setjmp 点へ戻る。2 回目の戻りでは `eax=1` となり、entry の `0x1376840: cmp eax,1` (`setle cl` で `[rbp+0x17c]` に格納)、続けて `0x1376850: test eax,eax` → `0x1376852: jne 0x1376884` で初期化を飛ばして戻る (`cmp` は eax を変えないため、`test` の入力も 1)。
 - 初期化が途中で longjmp 相当に抜ける原因 (どの import・どの判定が失敗したか) は本付録では未確定。推測の戻り値では埋めない。
 - 測定 commit: §5 を参照。
 
