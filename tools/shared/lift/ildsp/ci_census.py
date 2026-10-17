@@ -96,6 +96,14 @@ if len(sys.argv) > 4:
     if len(labels) != 16 or "switch i64 %arg3" not in rj:
         print(f"[census] FAIL: 計算ジャンプ表の case が復元されていない (ラベル {len(labels)}/16)")
         rc = 1
+    # 直接 jcc 先 (範囲外・define 無し) への call は、復元後 IR に残らないこと (REPORT_CI §8-1・memset 段の検査)。
+    jcalls = set(re.findall(r"call [^@\n]*@([A-Za-z0-9_.]+)\(", rj))
+    still = sorted(set(direct_out) & jcalls)
+    if still:
+        print(f"[census] FAIL: 復元後 IR に直接 jcc 先への call が残る (誤モデル・REPORT_CI §8-1): {still}")
+        rc = 1
+    else:
+        print(f"[census] 直接 jcc 先への call (復元後 IR): 0 件 (復元前 {len(direct_out)} 件)")
 elif orphan:
     print(f"[census] FAIL: 範囲外の define が IR のどの call からも参照されない (計算ジャンプ表の経路の欠落の疑い・REPORT_CI §2-2 (b)): {orphan}")
     rc = 1

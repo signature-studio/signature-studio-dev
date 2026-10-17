@@ -240,4 +240,4 @@ vptr の書込み後に PE 上で到達する書込みの確認: `0x40fb40` は 
 
 - 測定 commit: `2067a068b` (`pe_this_q_callers.py` 追加。コードを変えた最後の commit)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'`。
 - 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_this_q_callers.py 0x410090 0x410340 0x4103c0`。同一基本ブロック内で rcx が `[0x15e4790]`→`[0x141d6b8]` 由来の Q と確定できる呼出元 (Q 列) は、3 関数とも 0 件 (`0x410340` 3558 件・`0x4103c0` 1296 件の大半はブロック外 = unknown/other)。陽性対照は未確認 (既知の鎖は間接 call のため E8 元にならない)。
-- 未確定・未確認: 間接 call 8 箇所のうち `0x4100d1`・`0x415ca8` は実行時テーブル (未確定)。`0x410090`・`0x410340`・`0x4103c0` の this = Q はブロック跨ぎを含めて未確認。
+- 未確定・未確認: 間接 call 8 箇所のうち `0x415ca8` は実行時データ (未確定)。`0x4100d1` は Q の VMT 鎖で到達しないと確定 (#6212・`REPORT_APPENDIX_6212.md`)。`0x410090`・`0x410340`・`0x4103c0` の this = Q はブロック跨ぎを含めて未確認。

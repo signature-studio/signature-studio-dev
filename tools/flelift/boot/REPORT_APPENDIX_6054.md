@@ -149,3 +149,43 @@ A	tools/flelift/boot/rsi_zero_variant.sh
 - 残骸を消した差のうち、内容の差として残るのは 1 語だけ。残骸が出力 (`image_writable`) の内容を変える根拠は、この 6 run では見つからなかった。
 - ただし (a) content 1 語の正体は未確定、(b) 残骸の値が分岐 (f_44f5d0・f_43c4c0・§9) を経て出力に届く経路は未追跡、(c) 配置のずれが後続の分岐を変えた可能性 (GetMem 3680 → 3681 の因果・§5) は区別できていない。よって受入 1 (「影響するか」) は **未達**。
 - 判定は **部分達成**。残りは #4426 に残す。
+
+## 19. 陽性対照が既定経路で 0 件になる理由 (#6213・測定 commit `02d46f1fc`)
+
+- 結論: 既定経路 (`FLE_IPP` 未指定・mode 3) で `0x5ac308`・`0x11f6100` が 0 件なのは、mode 3 の boot 停止時に 2 slot の値が 0 でなく (mode 1 では 0)、監視の範囲で書込みが出なかったため。差は `FLE_IPP` の mode (3 と 1) だけで、root (`0x1375990` の有無) と寛容起動 (`FLE_TOLERANT`) は原因ではない。「mode 3 では書込み処理が走らない」は仮説で、未解決側に置く。
+- 同じ build (`FLE_EXTRA_CCF` で `0x5ac308`・`0x11f6100` を監視) の boot 停止時の値 (`FLEBOOT_SLOT6213`・`fle_boot.mjs` に読取りを追加):
+
+| 条件 | 停止 unit | `0x5ac308` | `0x11f6100` | 監視の出力 |
+|---|---|---|---|---|
+| 既定 (mode 3) | 895 | `0x40f960` (mode 3 の停止時の値) | `0x4820498b48000000` (mode 3 の停止時の値) | 0 件 |
+| `FLE_IPP=1` (4464 条件) | 209 | `0x0` | `0x0` | 2 件 (unit 209 の同じ 16B 書込み) |
+
+- root 差の確認: mode 3 で root を `0x6a7b70,0x1375990` にしても 0 件 (`pcA`)。mode 1 で root を `0x6a7b70` だけにしても 2 件 (`pcB`)。
+- mode 3 の監視は 0 件。停止時点の値は mode 3 で `0x5ac308`=`0x40f960`、`0x11f6100` は監視 0 件のため変化なしとだけ言える (snapshot 時点の値は読んでいないので「初期値」とは書かない)。mode 1 では 0 (`FLEBOOT_SLOT6213` の読取り)。`fle_boot.mjs` の `FLEBOOT_SLOT6213` は `0x976410` も読むが、結果は記録しておらず本件の判定には使っていない。
+- 書込み元 (受入 2・rc 3 の診断 run での観測 = `pcF`・mode 1 (shim)): 2 slot を 0 にする書込みの呼出し連鎖は `fle_wwatch` ← `STX` ← **`f_6a7b70`** ← `ott_dispatch` ← `f_6c7610` ← `f_815050` ← `f_815e10`。§17 の書込み元と一致する。`f_6a7b70` は既定経路でも root 化されている (`FLE_EXTRA_ROOTS=0x6a7b70`)。
+- 未解決 (起票先: #5337): (a) mode 3 で `f_6a7b70` が呼ばれて別の範囲を塗るのか、呼ばれないのかは未計測。mode 3 の監視で 0 件だったことは、呼ばれないことを意味しない。(b) mode 1 と mode 3 で `f_6a7b70` の呼出し引数 (`dst`・`cnt`) がどう違うか。`0x6a7b70` の root 化は本件の範囲外 (PM 判断 blocklist) のまま。
+
+測定 commit: `02d46f1fc` (表の pcA〜pcF は `fle_boot.c` の #5415 watch 追加前の build)。main 取り込み後の HEAD `da76436b7` で default・4464 tol を再測定 (表の「HEAD 再測定」の行)。`git diff 02d46f1fc da76436b7 -- tools/flelift ':!*.md'` は `fle_boot.c` の 8 行 (#5415 の watch 追加・挙動は変えない)。
+
+| run | 条件 | rc | 所要 |
+|---|---|---|---|
+| default | mode 3・監視 `0x5ac308,0x11f6100` | 0 | 3 分 49 秒 (02d46f1fc) / 3 分 40 秒 (HEAD 再測定) |
+| 4464 tol | mode 1・寛容・root `0x6a7b70,0x1375990` | 0 | 3 分 46 秒 (02d46f1fc) / 3 分 50 秒 (HEAD 再測定) |
+| pcA | mode 3・root `0x6a7b70,0x1375990` | 0 | 3 分 35 秒 |
+| pcB | mode 1・寛容・root `0x6a7b70` | 0 | 3 分 51 秒 |
+| pcD | mode 3・読取り probe (`FLEBOOT_SLOT6213`) | 0 | 3 分 19 秒 |
+| pcE | mode 1 (shim)・監視 2 slot | 3 | 3 分 53 秒 |
+| pcF | mode 1 (shim)・`FLE_WWATCH_JS` | 3 | 3 分 47 秒 |
+
+- HEAD 再測定の結果: default は `units_run=895`・監視 0 件、tol は `units_run=209`・監視 2 件 (`old=0x40f960`・`old=0x4820498b48000000` → `new=0`)。どちらも 02d46f1fc の結果と一致。
+- rc 3 は IPP 判定 NG (mode 1 では `ptr_15F34A0=0x0`・`ok:false`)。pcE・pcF は判定 NG を想定した診断 run で、boot の停止位置 (unit 209) の確認が目的。
+- boot 単独 (HEAD 再測定の `boot ... done`): mode 3 は 895 unit で 11 秒、mode 1 は 209 unit で 26 秒。
+- 測定時の load (HEAD 再測定): 1.6〜2.1 (4 vCPU)。
+
+素材: `oc_artifacts: fl-win64 toolchain-emsdk`。
+再現:
+```sh
+FL_WIN64_DIR=<fl-win64> SS_EMSDK_ENV=<emsdk_env.sh> FLE_BOOT_WORK=<work> FLE_BOOT_RUNS=default \
+  FLE_EXTRA_ROOTS=0x6a7b70 FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_SLOTS=0x5ac308ull,0x11f6100ull" \
+  bash tools/flelift/boot/fle6_measure.sh
+```
