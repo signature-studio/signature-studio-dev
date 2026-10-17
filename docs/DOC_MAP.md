@@ -1215,6 +1215,7 @@
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_5908.md` | ~90 | MX-63 (#5908) U3e の pdata 始点 47 件と mx54 の 42 件の差の切り分け: 源側 (F 内で未定義・前段 call なし) の E 43 件、G (転送先) が pdata 始点 0 件で関数入口でないこと (G 入口 livein は根拠にならない)。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_MX15.md` | ~50 | MX-15 (#1810): MX-12 残件 490 件 (0 件 458・2 件以上 32) の失敗理由の内訳と、MX-10 親 18 件の母集団。読み方の規則・親の解決は子 issue (MX-49・MX-50)。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_MX33.md` | ~153 | MX-33 (#3032) 受入 1: xmm0〜3 だけの入口 livein 保留 17 件の読み幅による判定 (0 件確定・判定不能 17)・NC 9 件・線形上限。受入 2〜5 は子 issue。測定値の正本 |
+| `tools/targets/massivex/dsp/REPORT_APPENDIX_MX33_HISTORY.md` | ~30 | MX-33 (#3032) の旧測定記録: `REPORT_MX33.md` §8 の MX-55 (#5030) 以前の測定 commit (`4840cc082`・`d9edb0ad9`・`d106f3c23`)・e2e 実測・差分の記録。分割移動 (内容は削っていない)。現行の測定値の正本は REPORT_MX33.md §5・§8 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_5030.md` | ~60 | MX-55 (#5030) 付録: 0x17b680 の同定 (scalar 読み・入口 xmm2)・vtable slot 32 の呼出元 1 件 (xmm2 に float)・測定値の正本。REPORT_MX33 §9 から分割移動 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_5908_RUN7.md` | ~52 | Massive X MX-63 (#5908) run 7 (REPORT_APPENDIX_5908 §9 の分割移動): `mx63_g_recdesc.py` の制御フロー再帰降下 (call は飛び先を追わない・終端は ret/ud2/int3/hlt)・9.2 の表・未解決。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_5399.md` | ~70 | MX-58 (#5399) 付録: pdata_call 残 mismatch 24 件の理由別分類 (実測 commit `097da5a69`)・REX 直後 F0 の実機観測 (AMD EPYC 9V74、REX→F0 は非 #UD・REX.W は無効)。SDM REX 節は未確認。REPORT_MX25 §5.5 から参照 |
