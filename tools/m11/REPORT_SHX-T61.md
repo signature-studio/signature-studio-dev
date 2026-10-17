@@ -10,12 +10,14 @@
 ## 2. 測定条件
 
 - 測定 commit: `b07e20aaf` (本 run でコードを変えた最後の commit)。
-- 差分 0 の証跡 (本 run・HEAD で確認。測定 commit から HEAD までのコード差分は 0 行):
+- 差分 0 の証跡 (fix run・HEAD で確認。測定経路 = 計装・IR 生成・build・trace のコードは測定 commit から変わっていない):
 
 ```
-$ git diff b07e20aaf HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
+$ git diff b07e20aaf HEAD -- tools/m11/ldfix/fix_shx_t61.py tools/m11/shimx_link tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_lift.sh ':!tools/m11/shimx_link/REPORT*' | wc -l
 0
 ```
+
+- 注: `tools/m11` 全体では、`main` の取り込み (merge) により測定 commit から HEAD まで別 PR のコード (`ldfix/depth_4498.py` 等 7 ファイル) が入っている。これらは測定経路から参照されない (`grep` で確認)。
 
 - 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`) を本 run で展開。`work-m11` は本 run の artifacts 配置先 (`docs/WORKFLOW.md` §11 の `work-m11`) に無い。
 - §5 の IR の出所: 記録が無い。PR 本文と REPORT の既存記述のどこにも、§5 の trap 実測に使った IR の生成元 (生成スクリプト・素材の版・`ir_sha256`) が書かれていない。生成物 (`work/`) と lift 素材は fix run の環境に無く、再生成には RetDec が要る (D5 で新規作業は不可)。よって fix run では §5 の表を再現できなかった。
