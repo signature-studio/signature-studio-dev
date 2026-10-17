@@ -5,7 +5,7 @@
 ## 1. 結論 (実測)
 
 測定 commit: `ed474437f` (`feat(liftdiff): clift route の block_trace 計装 (LD-247 b1)`)。
-`git diff ed474437f HEAD -- tools/liftdiff` は 0 行 (測定 commit = HEAD)。前提の差分は `git diff 7cb5df311 HEAD -- tools/liftdiff` (base = origin/main) で 3 ファイル・68 行追加。
+測定後の差分: `git diff ed474437f HEAD -- tools/liftdiff` は本 REPORT ファイルのみ (コード 0 行)。PR 全体の差分は `git diff 7cb5df311 HEAD -- tools/liftdiff` (base = origin/main): `clift.py` +31、`ott_ldbridge.c` +13、`ott_clift_blk.json` +24、REPORT の更新。
 
 | 項目 | 実測 |
 |---|---|
