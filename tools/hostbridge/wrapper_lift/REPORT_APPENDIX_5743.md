@@ -100,7 +100,7 @@
 - `not in loop` を 0 にする最小集合 (旧版 `notloop_minset_err.sh`・所要 93.0 s・測定 commit `a34f768e7`): `WhileTrueToWhileCondOptimizer` 単独。**旧版の値で、未検証 (旧版)。** 旧版は RetDec 失敗時に前候補の `e.c` が残る・emcc の終了コードを見ない偽陽性の余地があった。修正版 (`885a2b627`) では未実測 (`toolchain-retdec`・`toolchain-emsdk` が素材に無いため)。
 - 修正版 (本 PR の HEAD): 候補ごとに `e.c` を消し、RetDec の終了コード・`e.c` の存在・emcc の終了コードを確認する。既定 C で `not in loop` が 0 なら中止する (正対照)。この修正版での再測定は素材 (`toolchain-retdec`・`toolchain-emsdk`) が無く未実施。修正版の分岐は偽の RetDec / emcc で確認済み (正常系・RetDec 失敗で中止・emcc 無しで中止)。
 - 判定: 未確定 (旧版の値のみ・未検証)。注釈を戻す段 (VarDef 単独) と、旧版が出した `not in loop` を消す段 (WhileTrueToWhileCond 単独) が一致するかは、修正版で再測定するまで言えない。「注釈の段 = エラーの段」という前提が成り立たないかどうかも、この時点では判断しない。
-- 未測定: 0x683120 の C を wasm 実行して bit 一致を見ること (未実施)。残り 12 組の `not in loop` の最小集合 (範囲の確定が要るため未実施。0x408770 は範囲を推定で `0x4087ff` と置いて測ったが、範囲の根拠が無いため結果は採らない)。
+- 未測定: 0x683120 の C を wasm 実行して bit 一致を見ること (未実施)。残り 12 組の `not in loop` の最小集合 (RetDec・emcc の測定が未実施。入力範囲は §4e で収録済み)。0x408770 は範囲を推定で `0x4087ff` と置いて測ったが、§4e で `.pdata` から取った範囲は `0x408770-0x4087f3` で、推定値とは末尾 12 byte (0x4087f4〜0x4087ff) の差がある。推定範囲で測った結果は採らない。
 
 ## 4d. disable 名の形式の訂正 (#5911)
 
@@ -120,12 +120,12 @@
 | 同 | snake_case 32 種 全 disable | 0 | 1 |
 | 同 | VarDefStmtOptimizer 単独 | 1 | 1 |
 
-- `notloop_minset.sh` (CamelCase 32 種・所要 75.3 s): 0x732ae0 → `EmptyStmtOptimizer,WhileTrueToWhileCondOptimizer`。0x408770 は範囲 (`lo-hi`) が未確定のため結果は採らない (§4b line 103 と同じ扱い)。
+- `notloop_minset.sh` (CamelCase 32 種・所要 75.3 s): 0x732ae0 → `EmptyStmtOptimizer,WhileTrueToWhileCondOptimizer`。0x408770 は §4e で範囲を `0x408770-0x4087f3` に確定したが、本測定は推定範囲 `0x4087ff` で行ったため結果は採らない (§4b line 103 と同じ扱い)。
 - `notloop_minset_err.sh` (CamelCase 32 種・所要 81.9 s): 0x732ae0 → `WhileTrueToWhileCondOptimizer` 単独。
 - 解釈: 注釈の消失は、CamelCase で渡せば §4b の結論どおり (0x732ae0 は 2 段の組み合わせ、0x683120 は VarDef 単独で戻る)。snake_case は無視されるので、snake_case で渡した測定は無効化が効いていない。
 - 過去の測定の有効性: 全 32 種の過去測定 (§4b の 12/12) は、渡した形式が未確定のため有効性は未確定。単一名の過去測定 (`dis_empty` = `EmptyStmtOptimizer`、`dis_wtwc` = `WhileTrueToWhileCondOptimizer`、`notloop_vardef.sh` = `VarDefStmtOptimizer`) は CamelCase で渡しており有効。VarDef 単独で注釈が戻る結果 (§4c・§4d) も、この形式で得られた。
 - 過去 PR (#5833・#5872・#5890) の diff には名前一覧が含まれず、渡した形式は diff からは確定できない。
-- 未確認: 残り 16 種 (§3 の 48 個との差) の名前。`WhileTrueToUForLoop` 等の綴りの扱いは、クラス宣言と `getId()` の両方で一致したが、RetDec の内部一覧 (`optimizerManager`) 自体は未読。12 組の入力範囲は未収録のまま。
+- 未確認: 残り 16 種 (§3 の 48 個との差) の名前。`WhileTrueToUForLoop` 等の綴りの扱いは、クラス宣言と `getId()` の両方で一致したが、RetDec の内部一覧 (`optimizerManager`) 自体は未読。12 組の入力範囲は §4e で収録済み。
 
 ## 4e. 残り 12 組の入力範囲の取り直し (本 run・測定なし)
 
