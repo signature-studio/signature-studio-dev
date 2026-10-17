@@ -131,6 +131,8 @@ def follow(md, insns, succ, start, taint0, s_is_evidence, merge=False):
                 and any(t in CALL_VOLATILE for t in T):
             return 'A', '関数外への jmp で追跡中の値が引数として渡りうる'
         rd, wr = effects(md, ins)
+        if ins.mnemonic == 'vzeroupper':
+            wr = 0
         cp = copy_pair(md, ins)
         hit = {t for t in T if rd >> t & 1}
         read_s = set()
@@ -215,6 +217,8 @@ NC = [
     ('vcvtsi2ss xmm0,xmm0,eax; addps xmm0,xmm1; ret (merge の上位 → 128 bit)', 'c5fa2ac0' + '0f58c1' + 'c3', '128bit'),
     ('vcvtsi2ss xmm0,xmm0,eax; addss xmm0,xmm1; ret (merge の後続 scalar は証拠にしない)', 'c5fa2ac0' + 'f30f58c1' + 'c3', 'undetermined'),
     ('vcvtsi2ss xmm0,xmm0,eax; movddup xmm0,xmm0; ret (merge 上位の shuffle は下位 64 bit のみ → 証拠にしない)', 'c5fa2ac0' + 'f20f12c0' + 'c3', 'undetermined'),
+    ('vcvtsi2ss xmm0,xmm0,eax; vzeroupper; addps xmm0,xmm1; ret (vzeroupper は xmm 下位を消さない → 128 bit)', 'c5fa2ac0' + 'c5f877' + '0f58c1' + 'c3', '128bit'),
+    ('movaps xmm1,xmm0; vzeroupper; addss xmm1,xmm2; ret (vzeroupper 後も複写の後続 scalar → scalar)', '0f28c8' + 'c5f877' + 'f30f58ca' + 'c3', 'scalar'),
 ]
 
 

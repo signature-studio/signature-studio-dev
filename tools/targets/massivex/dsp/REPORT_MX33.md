@@ -164,13 +164,13 @@
 | 複写 | call 境界で追跡中の値が引数として渡りうる (間接 `call qword ptr [...]` を含む) | 6 | 0xccc0・0x105e0・0x1108c0・0x110960・0x1109b0・0x110a30 |
 | 複写 | ret で xmm0 戻り値として渡る | 1 | 0x17b4e0 |
 | 複写 | 3 オペランド `vcvtsd2ss` の下位 64 bit 読みを曖昧 (A) と扱う (規則の当てはめ要確認) | 1 | 0x11830 |
-| merge | 上位保持の宛先が `vmovaps`/`vmovups` 等で部分書込される (`zeroupper` を含む) | 2 | 0x7d38d0・0x7d3b10 |
+| merge | `vzeroupper` (上位の消去のみ) の後、ret で xmm0 戻り値として渡る (旧規則は全幅書込と誤判定・本 PR で修正) | 2 | 0x7d38d0・0x7d3b10 |
 | merge | 上位の読みが `movddup` (下位 64 bit のみ読む shuffle・証拠にしない) | 2 | 0x7dce90・0x7ddc90 |
 | merge | CFG 後続に幅の証拠なし | 2 | 0x7dcb60・0x7dd960 |
 | merge | ret で xmm0 戻り値として渡る | 1 | 0x118d8b0 |
 | merge | call 境界 (引数として渡りうる) | 1 | 0xef60 |
 
-- 残件の未解決: 間接 call 先の引数幅 (解析外)・`vcvtsd2ss` 規則 (0x11830)・`movddup` 後の上位追跡 (0x7dce90 等)。いずれも本 issue 範囲の追加実装が要る。
+- 残件の未解決: 間接 call 先の引数幅 (解析外)・`vcvtsd2ss` 規則 (0x11830)・`movddup` 後の上位追跡 (0x7dce90 等)・ret の xmm0 戻り値の呼出側の幅 (0x7d38d0・0x7d3b10・0x17b4e0・0x118d8b0)。いずれも本 issue 範囲の追加実装が要る (呼出側の解析)。
 - `follow()` の A 理由は分類結果を変えない。`classify_fn` は merge の A 理由を記録するように変えた (件数 scalar 1 / 128 bit 0 / 判定不能 16 は不変)。
 
 - 受入 2〜4 (U3d・U3e・U3g) の感度測定 (#4989): 付録 `REPORT_APPENDIX_4989.md` (結論は同付録 §0)。
