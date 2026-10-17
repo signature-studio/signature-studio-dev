@@ -10,7 +10,11 @@
 #   3. `zext (i32 xor (i32 A, i32 A) to i64)` 型 constexpr の 0 化 (RetDec が
 #      address identity を xor 0 で出す形)
 #
-# python3 ir_normalize.py IN.ll OUT.ll
+#   4. (opt-in --drop-uselistorder) `  uselistorder ...` 行 (use-list 順序の
+#      メタ情報・意味なし) を除く。emcc 6.0.12 の LLVM は読めず
+#      `wrong number of indexes` で止まる (REPORT_CI §9-3・T-SH-164 #6235)
+#
+# python3 ir_normalize.py [--drop-uselistorder] IN.ll OUT.ll
 
 import re
 import sys
@@ -19,7 +23,10 @@ POINTER_TYPE = re.compile(r"i[0-9]+\*")
 NAMED_PTR_TYPE = re.compile(r"%[\w.\-]+\*")
 
 
-def normalize(text: str) -> str:
+def normalize(text: str, drop_uselistorder: bool = False) -> str:
+    if drop_uselistorder:
+        text = re.sub(r"(?m)^  uselistorder [^\n]*\n", "", text)
+
     # (0) datalayout を wasm32 互換に差し替え (RetDec は x86-64 の datalayout
     #     のまま出すため wasm バックエンドの MachineFunction 作成でいずれも致命)
     text = re.sub(
@@ -65,15 +72,18 @@ def normalize(text: str) -> str:
 
 
 def main():
-    if len(sys.argv) != 3:
+    args = sys.argv[1:]
+    drop = "--drop-uselistorder" in args
+    args = [a for a in args if a != "--drop-uselistorder"]
+    if len(args) != 2:
         print(__doc__)
         sys.exit(2)
-    with open(sys.argv[1]) as fh:
+    with open(args[0]) as fh:
         text = fh.read()
-    text = normalize(text)
-    with open(sys.argv[2], "w") as fh:
+    text = normalize(text, drop_uselistorder=drop)
+    with open(args[1], "w") as fh:
         fh.write(text)
-    print(f"[ir_normalize] wrote {sys.argv[2]}")
+    print(f"[ir_normalize] wrote {args[1]}")
 
 
 if __name__ == "__main__":
