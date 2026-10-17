@@ -69,6 +69,21 @@ python3 snapins/scripts/carve_iat_census.py work/winpkg/HeartCore.core_64 work/c
 - 判定の集計: stub 0 / fail-fast 19 (#1〜#11・#15〜#18 は規則 2・4・6 による。#12〜#14 は規則 3 の (b) 未確認による既定。#19 は規則 2 の条件が未確認のための既定) / 実装 0。
 - #18 と #19 は `0x49450` (#1〜#4 の文言生成) を経由する経路にある。`0x49450` 内で #1 (fail-fast) が先に呼ばれるかは本測定では確かめていない。#18 の 0 が正しい側かも、native 実行が無いため確かめていない。確かめるまで #18 は stub にしない。
 
+### 2.1 #18 (GetLastError) を規則 2 の fail-fast に合わせない根拠 (KH-155・#5379)
+
+規則 2 は #18 を fail-fast と判定するが、`IMP_SHIM` の `rax = 0;` は維持する。判定を変えて fail-fast にすると既存 RESULT が変わるため。
+
+- 測定 commit = `7d75fb1db` (origin/main。#5379 の前 run の測定基準)。本節の数値は前 run の実測で、本 PR では再測定していない。
+- 差分 (測定 commit から本 PR の HEAD まで):
+  - `git diff 7d75fb1db HEAD -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/snapins/harness` の出力は空 (0 行)。khbase の実行入力は変わっていない。
+  - `snapins.json` は既存エントリ不変。追加は `carveproc` のみ (13 行追加・削除 0)。
+  - `snapins/` 全体では `REPORT_APPENDIX_5377.md`・`5378.md`・`5653.md` の付録、`scripts/carve_process_split.py`・`scripts/ksge_process_layout.py`、`carveproc` の差分がある。いずれも khbase の実行入力ではない。
+- 変更版 (`GetLastError` を IMP_SHIM から外し既定 `abort()`) で `lift/build.py khbase --path s0 --trials 200 --seed 1` を実行: `RESULT trials 155/200 bit-exact; calls 10344/10389`。`FAIL trial 0 call 47 fn 180fb5c20: wasm trap: Aborted()` ほか trial 5・9 も同じ関数で abort。
+- 現行版 (`rax = 0`): `RESULT trials 200/200 bit-exact; calls 10500/10500`。
+- 他 13 本 (matrix〜disperser〜delay・limiter 等) は変更版でも 200/200 bit-exact (abort なし)。host harness (khmrel / khmaster / khmring) は khbase が落ちたため未測定。
+- 付録 §2 の判定は process 直接 closure (`GraphicEqDsp`) だけを見ている。khbase の共通基盤 scenario で `0xfd7518` (#18 の呼出元) に到達するかは未確認。`180fb5c20` が `0xfd7518` の呼出元かも未確認。
+- よって、規則 2 の判定どおりに fail-fast にすると khbase の RESULT が壊れる。判定の覆しは、この実測を根拠に、規則 2 の例外として #18 を `rax = 0` 維持とする (技術判断・PM 判断 R7 (a)①)。`gen_stubs_sigs.py` は変更しない。
+
 ## 3. process 経路と間接 call (下限見積の範囲)
 
 - process root (slot 14 = `0x37d210`、`GraphicEqDsp` の vtable 20 slot 中の 14 番目。Gain の process `0x1804b0380` と同じ slot 番号) の直接 closure は **145 関数**。そのうち unique 集合 (infra 除外後) に入るのは 25 関数で、IAT 呼出は **0 件**。
@@ -82,7 +97,7 @@ python3 snapins/scripts/carve_iat_census.py work/winpkg/HeartCore.core_64 work/c
 - 共通基盤側 (process 直接 closure の 120 関数) の IAT 件数は未集計 (§3)。
 - #12〜#14 の lock/cv が #16 の SleepConditionVariableSRW と同一かは未確認 (規則 3 の前提 (b))。確認するには `plugins-kilohearts` 素材で census を再実行し、#12〜#14 と #16 の lock/cv の RIP 相対アドレスを比べる必要がある。(b) を確認できた site だけ stub にできる。同一なら規則 4 により fail-fast のまま。
 - slot 7・13 の呼出順 (scenario で set/prepare が呼ばれるか) の確定 → 子 issue。呼ばれるなら slot 7 の協調を単一スレッドの同期実行に置換する (実装判定の追加) か、harness の呼出を避ける設計を決める。
-- 判定 (fail-fast 19 件) と現行 `IMP_SHIM` の整合 (18 件は abort で一致。GetLastError の既存 `rax = 0` を fail-fast に合わせる件)、反映で既存 14 本の出力が変わらないことの確認 → 子 issue。
+- 判定 (fail-fast 19 件) と現行 `IMP_SHIM` の整合: 18 件は abort で一致。GetLastError (#18) は `rax = 0` を**維持** (§2.1。fail-fast にすると khbase RESULT が 200/200 から 155/200 に落ちる)。#18 の判定覆し後の khbase 共通基盤側の `0xfd7518` 到達経路の確認は未解決 → 本 issue の範囲外 (#5380 の前提として別途扱う)。
 - `carve_iat_census.py` の `PROCESS_ROOT = 0x37d210` は固定 VA。vtable JSON から GraphicEqDsp の slot 14 を引く照合は未実装 (入力が変わると古い値を黙って使う)。→ §5 で実装 (KH-123)。
 
 ## 5. KH-123 (#4864): 再測定・vtable 照合・lock/cv 同一性
