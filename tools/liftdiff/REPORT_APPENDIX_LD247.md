@@ -9,7 +9,7 @@
 
 | 項目 | 実測 |
 |---|---|
-| x64c 再 lift (`ld131_lift.sh`) | 29 functions / 952 insns / unsup {} / unlifted callees 0 / imports 11。PR #6074 の記録 (29/952) と一致。前々 run の 28/941 は当時の入力の差で、現在の入力では再現しない |
+| x64c 再 lift (`ld131_lift.sh`) | 29 functions / 952 insns / unsup {} / unlifted callees 0 / imports 11。PR #6074 の記録 (29/952) と一致。前々 run の 28/941 の入力差は未確認 (切り分けていない) |
 | `ott_clift` build (既定版) | OK。sigs 234 (defined 178)、lifted 29、instrumented 29、imps 11、nptab 22。link 0.4s、`sig_mismatch 0 / undefined 0`、wasm 744,292 B |
 | `ott_clift_blk` build (計装版) | OK。block 入口 136 箇所 (`L_<VA>:;`)。link 0.4s、`sig_mismatch 0 / undefined 0`、wasm 754,903 B |
 | 既定版 6 関数の採点 (HEAD) | 6 関数すべて `verdict=match`。1801ab1d0・1801ab258・1801c5e84・1801c621c・1801c682c・1801c69cc |
@@ -28,6 +28,8 @@
 | 1801c69cc | equal / equal | equal / equal | 283 / 288 |
 
 (表の順は vm0 / u16。`compare_blk.py` の出力 `cases=12 diff=0`。)
+
+比較キーは `compare_blk.py` の `key()` で、outcome・wasm_status・diffs・wasm の rax/x0 の一致を見る。blk 列 (block 入口の記録) は比較キーに入っていない。既定版は `ld_blk_on = 0` のため blk 列が空で、計装版だけに出るため比較できない。表の blk 件数は計装版の記録件数の参考値。
 
 ### 前 run との差 (注意)
 
@@ -61,5 +63,6 @@ python3 results/ld67/compare_blk.py work/ld247/def2.json work/ld247/blk2.json   
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| PR #6074 の 3 関数 mismatch の原因 | HEAD の既定版は全 match。前 run の条件を再現できていない | #4968 (次 run で切り分け) |
+| PR #6074 の 3 関数 mismatch の原因 | HEAD の既定版は全 match。前 run の条件を再現できていない | #4952 (親 LD-244 の本文チェックリストに追記。次 run で切り分け) |
+| x64c 再 lift の 28/941 (前々 run) の入力差 | 現在の入力 (29/952) は PR #6074 の記録と一致。28/941 の入力差は未確認 | #4952 (同上) |
 | `liftdiff.py run --nobuild` の既定 `work/` 出力先 | `--json` の親 dir が無いと失敗する (本 run で 1 回失敗・dir 作成で解消) | 既存挙動のため本 PR では変えない |
