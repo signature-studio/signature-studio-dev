@@ -18,7 +18,7 @@
    受入 1 の確定にはこの追跡が要る (未解決 U3h・§6)。
 4. **独立再計算 (線形): 範囲内に 128 bit 読みを持つ関数は 9 件**。ただし CFG で入口から未定義と判定された読みに 128 bit 型はなく、
    線形の 128 bit 読みは定義後 (または CFG 非到達) の読み。CFG 側の 128 bit 候補は 0 件のため包含検査 `CFG-P ⊆ 線形-P` は空真。構造上の上限確認にとどまる (§4)。
-5. **NC 15/15 PASS** (MX-33 の合成列 15 件・§3。前版 9 件 + #3774 で追加 6 件)。MX-6 の `mx6_vectorcall.py --selftest` 5/5 は別集合 (§3・§5)。e2e `mx6_e2e.sh` は exit 0 (48 s・測定 commit `1083467fe`)。funclet は REPORT_MX6.md §4 と一致 (step 7/7 で assert・positive control PASS)。
+5. **NC 17/17 PASS** (MX-33 の合成列 17 件・§3。前版 9 件 + #3774 で 6 件 + MX-64 で vzeroupper 2 件)。MX-6 の `mx6_vectorcall.py --selftest` 5/5 は別集合 (§3・§5)。e2e `mx6_e2e.sh` は exit 0 (48 s・測定 commit `1083467fe`)。funclet は REPORT_MX6.md §4 と一致 (step 7/7 で assert・positive control PASS)。
 6. **MX-6 の表示値は不変**: pdata 始点の xmm4/5 livein 0・保留 17 (seeds)・census・funclet の値は MX-6 §1 と一致。
 
 ## 1. 判定定義 (実装: `scripts/mx33_xmm03.py`・読み列挙は `scripts/mx6_vectorcall.py` の `analyze`)
@@ -92,7 +92,7 @@
 | 14 | `vcvtsi2ss xmm0, xmm0, eax; addss xmm0, xmm1; ret` (追加・merge の後続 scalar は証拠にしない) | 判定不能 | PASS |
 | 15 | `vcvtsi2ss xmm0, xmm0, eax; movddup xmm0, xmm0; ret` (追加・merge 上位の shuffle は下位 64 bit のみ) | 判定不能 | PASS |
 
-- **NC 15/15 PASS** (`--selftest` 15 cases)。MX-6 の `mx6_vectorcall.py --selftest` (5 件) も PASS のまま。
+- **NC 17/17 PASS** (`--selftest` 17 cases)。MX-6 の `mx6_vectorcall.py --selftest` (5 件) も PASS のまま。
 - **感度 (分類規則の影響・前版 #3032 の計算。#3774 後は未再計測)**:
   - 仕様文言どおり `cvtsi2*` の xmm 入力を scalar 読みにする: **scalar 8 / 128 bit 0 / 判定不能 9** (前版)。増えた 8 件は上表の merge 8 件そのもので、
     入力を消費しないため採らない (§1 (a))。
