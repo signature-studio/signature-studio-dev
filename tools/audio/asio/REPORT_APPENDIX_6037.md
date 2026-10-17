@@ -162,5 +162,7 @@ rl_1〜8 は `work/load_trial.cjs 8` で取った (`yes` × 4 を全 8 試行の
 - 負荷下 FAIL は 9 回中 1 回 (r4_1)。母数が小さく、頻度は確定しない。
 - r4_1 の停止の時間帯 (underrun = 0 ms 基準): producer の row107 は `wake` = `tb` = -29.9 ms、`t0` (memset 直後) = +77.2 ms。区間 [-29.9, +77.2] (約 107 ms) は `tb`→`t0` の間で、この区間の仕事は memset のみ (数 µs)。
 - 同区間の `wait32` の記録は無い。最後の wait (開始 -39.8・終了 -29.9 ms、rc 0) が返った時刻と row107 の wake (-29.9 ms) は一致し、次の wait の開始は +77.4 ms。つまり producer は wait が返った直後から `tb`→`t0` (memset 区間) の中で約 107 ms 戻らなかった。
+- worklet の `recs`・main thread の heartbeat は r4_1 では解析していない (結果 JSON が r4_2 で上書きされ、値が残っていない)。よって worklet・main 側が同区間で停止していなかったとは言えず、未確定。確定しているのは producer 側の空白まで。
+- 返り時 fill (`fill1`) は r4_1 の値が残っていない。r4_2〜r4_9 の `fill1` も本節に値を書いていない。今回の計測では `fill1` の値は取れていない (列の計装だけ入り、数値の記録は無い)。
 - 読み: 区間の仕事は memset だけ (数 µs) なので、この空白はスレッドが実行されなかった時間として読める。「memset 中に preempt された」か「`tb` 記録の後に実行を得られなかった」かは、`tb`・`t0` の 2 点しか無いため区別できない。wait の返り時刻 (-29.9 ms) が notify に対して遅れたかは、row107 の notify 時刻を照合していないため未確定。
 - 受入 2 (直接経路の特定): 特定できなかった。切り分けの範囲は「producer thread が wait の返りの直後、memset 区間で約 107 ms 実行されなかった」まで。OS の preempt かホスト側の thread 停止かは、wasm 側の計装では分けられない。
