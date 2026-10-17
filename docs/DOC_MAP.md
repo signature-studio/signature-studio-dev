@@ -568,7 +568,8 @@
 | `tools/m11/ldfix/REPORT_942_QSTORE.md` | 81 | #942 (CI-22): post 済み snapshot に本番の IR 生成順 (ldfix → ld108 → qstore) を適用した stage4/survey A/B (`qstore_ab_942.sh`)。qstore で survey trap 9→6 (unit 53・87・138 が消える = D17)。本番 IR (post 前) での件数は未測定。逐次 boot の threw (unit 17) は不変 |
 | `tools/m11/ldfix/REPORT_942_ALLOCA.md` | ~102 | #942 (CI-22): 通常 boot の unit 17 trap の書込み元 (44bae0 の alloca 縮退・GetCPInfo 越え書き) を観測フックで特定し、alloca 修正の A/B (`alloca_ab_942.sh`) を実測。残りの trap (unit 56 ほか) は次 run |
 | `tools/m11/ldfix/REPORT_942_PRODORDER.md` | ~126 | #942 (CI-22): 本番の IR 生成順での通常 boot の A/B 再現と unit 56 の診断。測定値と判定は本文が正本 |
-| `tools/m11/ldfix/REPORT_3608.md` | ~160 | #3608 (CI-171・部分達成): 本番順の survey 残 trap の段別 A/B・r8b を含む本番順の判定・F3c 増加の出所 (`f63b5953d`) を記録。結論と数値は REPORT_3608 §0・§1-3・§4 を参照。trap 144・149・114 の引き金は未特定 |
+| `tools/m11/ldfix/REPORT_3608.md` | ~195 | #3608 (CI-171・部分達成): 本番順の survey 残 trap の段別 A/B・r8b を含む本番順の判定・F3c 増加の出所 (`f63b5953d`) を記録。結論と数値は REPORT_3608 §0・§1-3・§4 を参照。trap 144・149・114 の引き金は未特定 |
+| `tools/m11/ldfix/REPORT_APPENDIX_3608.md` | ~72 | #3608 / #5280: REPORT_3608 §8 (trap 144・149・114 の引き金の採取・8-1〜8-8) の分割移動。要約は REPORT_3608 §8 |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
 | `tools/m11/shimx_link/REPORT_APPENDIX_179.md` | ~49 | M11 closure の旧 main link 失敗 (`sxt_*` export) の修正前後・`--midi` / `--ws --midi` の e2e 実測・起動 KPI (#179 SHX-T6)。REPORT §11 の全文を分割移動 (250 行上限のため) |
 | `tools/m11/shimx_link/REPORT_APPENDIX_2839.md` | ~70 | midiOutShortMsg の HMIDIOUT が IR で i64 になる根因 (SHX-T31 #2839): 機械語・IR・署名 DB (`windows.json` の HMIDIOUT = unknown) の突合、HANDLE 系の対照 (CloseHandle = i64*)、修正方針 (正規化 pass の恒久化)。測定値の正本。再現は `hmo_rootcause.py` |
