@@ -120,7 +120,7 @@ ACFStartup() = 0 (0x0)
 - `HeartCore.core_64` の sha256: `d55ce8b4c0ad7ebedf1a4a1f74443a91d255596be887a514e54269ec8751441e` (§2 と一致)。
 - Wine: `wine-9.0 (Ubuntu 9.0~repack-4build3)` (apt `wine64`・`/usr/bin/wine`)。MinGW: `x86_64-w64-mingw32-gcc (GCC) 13-win32` (apt `gcc-mingw-w64-x86-64`)。
 - ビルド: `cd tools/targets/kilohearts/runtime_wine && x86_64-w64-mingw32-gcc -O0 -o loader_qi_ok.exe loader_qi_ok.c` (`loader_qi_ok.exe` sha256 `d0ab08a7…`)。
-- 実行: `WINEDEBUG=-all wine ./loader_qi_ok.exe "$PWD/HeartCore.core_64"`。exit 0・stderr 空。stdout は §7 の生ログと同じ 8 行。
+- 実行: `WINEDEBUG=-all wine ./loader_qi_ok.exe "$PWD/HeartCore.core_64"`。exit 0・stderr 空。stdout は §7 の生ログと同じ 7 行。
 - 検証起点 commit: `60c94d658`。`git diff 60c94d658 HEAD -- tools/targets/kilohearts/runtime_wine` は**空** (差分 0)。`tools/targets/kilohearts` 全体の差分は本 PR の REPORT のみ。
 - QI の IID `0x181429538` は `382B6A96-7FD0-11D6-BCFE-00306542A024` (§6.2 と一致)。
 - QI 成功時も `ACFStartup` は 0 で戻る。戻り値 0 は初期化成功の根拠にならない (§6.2 と同じ結論)。slot の戻り値を変えた場合の分岐は未測定。
