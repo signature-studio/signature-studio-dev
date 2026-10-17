@@ -1,13 +1,13 @@
-# p0c 付録 N (#6046: 手書き本体のうち x87 の 5 本を x87 一般 pass に置換)
+# p0c 付録 O (#6046: 手書き本体のうち x87 の 5 本を x87 一般 pass に置換)
 
-REPORT.md 索引の §27。親 #3952 (残件 A)・#2182 (P0c-17) の BODIES 14 本のうち、x87 スタック参照のずれで手書きしていた本体の一部を既存の `x87fix.py` の対象に入れた。
+REPORT.md 索引の §28。親 #3952 (残件 A)・#2182 (P0c-17) の BODIES 14 本のうち、x87 スタック参照のずれで手書きしていた本体の一部を既存の `x87fix.py` の対象に入れた。
 
-## 27. #6046: 手書き本体 14 → 9 (x87 の 5 本を一般 pass に置換)
+## 28. #6046: 手書き本体 14 → 9 (x87 の 5 本を一般 pass に置換)
 
 - 測定 commit: `ecadfb82d` (コードを変えた最後の commit。`tools/plugins/p0c/p0c4_abi_e2e.py` と `k80_hand_bodies.py`)。
 - 基準: origin/main `de14f0d49` (worktree `ws-6046`、branch `6046-x87-hand-bodies`)。
 
-### 27.1 根本原因 (受入 3)
+### 28.1 根本原因 (受入 3)
 
 - 手書きの本体が必要だったのは、`x87fix.py` の `--funcs` 一覧 (`p0c4_abi_e2e.py` の `funcs`) にその関数が入っていなかったため。
 - `x87fix.py` の `skip` 判定に入れない関数は、`__frontend_reg_load.fpr` / `__frontend_reg_store.fpr` が IR に残る (`work/exp/pe.ll` の 0x5dee20 は 9 行)。そこで差分が出ていた。
@@ -26,13 +26,13 @@ REPORT.md 索引の §27。親 #3952 (残件 A)・#2182 (P0c-17) の BODIES 14 �
 | 0x5e0300 | skip:ambiguous-balance | 残 (未解決) |
 | 0x5e0350 | skip:ambiguous-balance | 残 (未解決) |
 
-### 27.2 変更
+### 28.2 変更
 
 - `p0c4_abi_e2e.py`: x87fix の `--funcs` に上の 5 本を追加。`HB_N` 14 → 9。
 - `k80_hand_bodies.py`: BODIES から 5 本を削除 (0x5dee20・0x5dee50・0x5dedb0・0x5dea40・0x5dec40)。docstring の 0x5dee20 行を削除。
 - 新規の pass は作っていない。既存の `x87fix.py` の対象関数を広げただけ。
 
-### 27.3 実測 (全て 4 vCPU・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`RETDEC_ROOT=$RUNNER_TEMP/retdec/retdec`・`PATH=/usr/lib/llvm-18/bin:$PATH`)
+### 28.3 実測 (全て 4 vCPU・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`RETDEC_ROOT=$RUNNER_TEMP/retdec/retdec`・`PATH=/usr/lib/llvm-18/bin:$PATH`)
 
 | 測定 | commit | rc | 所要 (wall) | load 1 分 (開始 → 終了) | 結果 |
 |---|---|---:|---:|---|---|
@@ -56,7 +56,7 @@ REPORT.md 索引の §27。親 #3952 (残件 A)・#2182 (P0c-17) の BODIES 14 �
 | 0x5dee20 | 0 | 0 |
 | 0x5dee50 | 0 | 0 |
 
-### 27.4 負論対照 (受入 4)
+### 28.4 負論対照 (受入 4)
 
 置換の効果を見るため、手書き本体も x87fix の対象もない IR (`work/diff3/k80.pe.ll` = 基準の中間 IR・2000 case) で差分を取った。
 
@@ -70,7 +70,7 @@ REPORT.md 索引の §27。親 #3952 (残件 A)・#2182 (P0c-17) の BODIES 14 �
 
 手書き本体と x87fix 対象の両方を外すと 5 本とも FAIL する。修正後は 0。
 
-### 27.5 残り (受入 1・未解決)
+### 28.5 残り (受入 1・未解決)
 
 - 置換した本数: 5 本 (14 → 9)。
 - 残りの手書き本体 9 本 (`k80_hand_bodies.py` の BODIES): 0x5e0300・0x5e0350・0x5de620・0x5dfae0・0x5dffc0 (対象 10 本の残り 5 本。`x87fix` が `skip` する)・0x5dfff0・0x5e12c0・0x5e1490・0x5df340 (対象外)。
@@ -81,7 +81,7 @@ REPORT.md 索引の §27。親 #3952 (残件 A)・#2182 (P0c-17) の BODIES 14 �
 | 0x5e0300・0x5e0350・0x5de620・0x5dfae0・0x5dffc0 の手書き本体 5 本 (x87fix の skip 4 種) | BODIES 9 本が残る | #3952 (親。本文に残件のチェックリストを追記) |
 | 0x5dfff0・0x5e12c0・0x5e1490・0x5df340 の手書き本体 4 本 | 対象外。本 issue の対象ではない | #3952 (親) |
 
-### 27.6 差分 (WORKFLOW §6)
+### 28.6 差分 (WORKFLOW §6)
 
 - 測定 commit: `ecadfb82d`。REPORT 追加後の HEAD までの `tools/plugins/p0c` のコード差分 (REPORT を除く) は下記の出力のとおり空。
 
@@ -89,7 +89,7 @@ REPORT.md 索引の §27。親 #3952 (残件 A)・#2182 (P0c-17) の BODIES 14 �
 git diff ecadfb82d HEAD -- tools/plugins/p0c ':!*REPORT*'
 ```
 
-### 27.7 再現
+### 28.7 再現
 
 ```
 export FL_WIN64_DIR=<fl-win64 展開先> RETDEC_ROOT=<retdec 展開先> PATH=/usr/lib/llvm-18/bin:$PATH
