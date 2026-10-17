@@ -120,6 +120,8 @@ SC 集合 `sc.txt` (1 行 1 アドレス・21 行) は、`receiver_this_trace.py
 
 ## 6. SR-100 (#5986): vtable 候補の受け手の表 (RTTI) の確定 (未解決 (a) の入口)
 
+- 測定 commit: d0dc354d7 (PR head)
+- git diff d0dc354d7 cf941efd7 -- tools/targets/serum2/gui: `vt_head_scan.py` の 3 箇所のみ (`read_q` の None 判定・`data.index` を `data.find` + 判定に変更・`col_va` の None 判定)。表の値は d0dc354d7 で測定。cf941efd7 での再実行は未実施 (`plugins-serum2` 素材が無いため)
 - 日付: 2026-10-17 / 親: #5612 / 本 issue: #5986。入力 PE の sha256 `501e7bb3…` / 19,236,864 B (§0 と一致・`plugins-serum2` から展開)。
 - 新規ツール: `vt_head_scan.py` (中間スロットの VA から表の先頭を後退探索し RTTI を付ける・静的・PE のみ)。
 - 実行: `python3 vt_head_scan.py Serum2_win64.vst3 0x180a1d8c8 0x180a1dc18 0x180a2bfd8`
