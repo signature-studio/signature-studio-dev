@@ -340,7 +340,7 @@
 | `tools/m11/REPORT_N87.md` | ~80 | #1373 (M11-N87, 部分達成せず・実値化 0 件): sigfix 0 詰め inherit 1,172 件の呼出元 def 追跡 (基本ブロック到達定義・入口の呼出元再帰・call 越しの引数レジスタ要約)・復元不能 1,172 件 (未分類 0) の理由別内訳・survey ok 872 (退行なし) |
 | `tools/m11/REPORT_3296.md` | ~95 | #3296 (親 #3229・REPORT_N403 §7): `function_412770` の rep movsq 源 `ptr null` (機械語 `mov rsi,[rax]` の load 脱落・D4 再発例) の修正 `ldfix/fix_src412770.py` と、修正前後の寛容起動の unit 結果 (kind 差 8 件は不変)。判定 (D4 再発例・REPORT_1080 と一致)・撤回した address 0 の記述・測定 commit 以降の差分 |
 | `tools/m11/REPORT_5358.md` | ~70 | m11 #5358 (FLE-44, 親 #4011): `function_409c80` の `0x409d2d jae 0x409c40` を引数付き tail call に直す修正 (`ldfix/fix_tail409c80.py`) の機械語の根拠・修正前後の boot 測定 (既定 OFF・`M11_M2V=1`)・未解決 (trap アドレス・OOB の直接原因)。測定値の正本 |
-| `tools/m11/REPORT_APPENDIX_5358.md` | ~100 | m11 #5358: `REPORT_5358.md` §8 (arg 実値と s24 の書換え位置) の移送 (行数上限のため分割移動。内容は不変) |
+| `tools/m11/REPORT_APPENDIX_5358.md` | ~100 | m11 #5358: `REPORT_5358.md` §8 (arg 実値と s24 の書換え位置) の移送 (§8 の移送 + §9 (本 PR で追加: 書換え経路の機械語突合・同一 build の再測定・計装)。行数上限のため分割移動。移送分の内容は不変) |
 | `tools/m11/REPORT_APPENDIX_3161.md` | ~20 | m11 #3161 (REPORT_N403.md §10 の分割移動): 1 通りの所要 (IR 46–47 s・build 22–24 s・run 1–2 s・survey 15–16 s)・LB=0x10000 の boot5 有無の補足・寛容起動 (#2779) との関係・§10-4 結論 |
 | `tools/m11/REPORT_294.md` | ~70 | #294 m11 area: `FL_WIN64_DIR` 既定値の tools/shared 経由への置換。before (706147914) / after (256a869d1) で `m11_data.c`・`m11_image.bin`・reloc gate の出力一致 (実測)。`m11_e2e.sh --full` の before/after は子 #4245 |
 | `tools/m11/REPORT_APPENDIX_3229.md` | ~47 | m11 #3229 (親 #3188・子 #3296): LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (REPORT_N403 §7 の全文。IR 段で LB 直書きは確認した範囲で見つからず・機構は未特定) |

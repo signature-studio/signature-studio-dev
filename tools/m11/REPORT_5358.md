@@ -119,7 +119,7 @@ index と名前の対応は `m11_wasmnames.py` (今回の build の wasm) で確
 |---|---|---|---|---|---|
 | `M11_M2V=1` + `M11_FIX_652500=1` | 129 | 132 | 16 | 144 `0x65c540` | memory access out of bounds |
 
-- 基準 (7.1) と同一。効果の有無は未判定 (§7.4・§8.4)。
+- 基準 (7.1) と同一 (前 run の記録)。ただし同じ構成の再測定は §9.4 で units_run 134 と不一致 (原因未確定・REPORT_APPENDIX_5358.md §9.4)。units_run は 129 (前 run の記録) / 134 (§9.4)。効果は未判定 (§7.4・§8.4)。
 
 ## 8. arg 実値と s24 の書換え位置 (付録へ移動)
 
@@ -127,7 +127,7 @@ index と名前の対応は `m11_wasmnames.py` (今回の build の wasm) で確
 
 ## 10. 既定 build で 414c70 入口の arg 実値を採取する計装経路 (#5358 PM 07:18Z の範囲)
 
-測定 commit: `97a5bd8ab` 系 (origin/main `448d36738` に取り込み)。以降のコード差分は下記 §10.1 の 4 ファイルのみ。素材: fl-win64 (`block00031_PE.bin` を `$RUNNER_TEMP/fl/extracted/` に展開)・work-m11 (`tools/m11/work/` に展開)・toolchain-emsdk。IR は `M11_M2V=1 m11_gen_ir2.sh` で作り直した (`ir_conditions.json`: ldfix/ld108/ld115/r8b/450560 = applied・`ir_sha256` `8840c541…`)。
+測定 commit: `448d36738` (origin/main) + 本 PR の 4 ファイル (§10.1。HEAD 時点のコード = `bd8019b3f` のコード)。`448d36738`..HEAD のコード差分は 4 ファイルのみ (docs 以外)。境界: `97a5bd8ab` → `448d36738` の差分 (ldfix・trap_triage 等) は main 取り込み分で、boot 経路の IR・build には影響しないことを確認済み (`m11_gen_ir2.sh`・`ldfix.py`・`fix_450560.py`・`m11_build.sh`・`m11_cond.py`・`m11_run.mjs` から呼ばれない)。素材: fl-win64 (`block00031_PE.bin` を `$RUNNER_TEMP/fl/extracted/` に展開)・work-m11 (`tools/m11/work/` に展開)・toolchain-emsdk。IR は `M11_M2V=1 m11_gen_ir2.sh` で作り直した (`ir_conditions.json`: ldfix/ld108/ld115/r8b/450560 = applied・`ir_sha256` `8840c541…`)。
 
 ### 10.1 経路 (計装の作り方)
 
@@ -135,6 +135,7 @@ index と名前の対応は `m11_wasmnames.py` (今回の build の wasm) で確
 - 観測関数 `m11_414c70_obs(arg1, arg2, arg3)` を `m11_ov.c` に置く (既定 0 で `#if` の外)。出力は `[m11][414c70] #n arg1=… arg2=… arg3=… [arg2-4]=… [arg2]=…` (上限 64 行。線形メモリ外は読まない)。
 - `m11_build.sh` に stamp (`work/instr_414c70.stamp`) と `-DM11_INSTR_414C70` を足した。`tools/gui/flengine/build.sh` の `CF` も同じ `-D` を渡す (前 run の時点では、この `CF` が M11_INSTR_* を渡さず、計装版の `ov.o` が undefined symbol になっていた)。
 - 変更ファイル: `tools/m11/m11_post.py` / `tools/m11/m11_ov.c` / `tools/m11/m11_build.sh` / `tools/gui/flengine/build.sh`。
+- 注意: `tools/gui/flengine/build.sh` の `cc()` は `-nt` 判定のみで、`M11_INSTR_414C70` を切り替えても `GF_W/obj/ov.o`・`boot.o` は再 build されない。切替時は `GF_W/obj/ov.o` を手で消してから build する (消さないと link が undefined symbol で止まる)。
 
 ### 10.2 既定の不変性 (ゲート OFF)
 
@@ -152,9 +153,10 @@ index と名前の対応は `m11_wasmnames.py` (今回の build の wasm) で確
 | 2 | #1・#2 | 同上 | 同上 | 同上 | 同上 | 同上 |
 | 3 | #1・#2 | 同上 | 同上 | 同上 | 同上 | 同上 |
 
-- 呼出し #2 の `arg2 = 0xa44eb0` は、前 run の観測 (`src = 0xa44eb0`) と一致。`arg3 == 0` なので、§9.3 の経路 (`arg3 == 0` かつ `arg2 != 0` → `4133f0(arg1, arg2)`) に入る。よって `src` は `arg2` = `*s24` 由来が実値でも確認された。
-- `arg2 = 0xa44ed0` は今回の 3 回では出ていない。`arg2` の run 間変動は再現しなかった (§9.6 の未確定 2 は未確定のまま)。
+- 呼出し #2 の `arg2 = 0xa44eb0` は、前 run の観測 (`src = 0xa44eb0`) と一致。`arg3 == 0` なので、REPORT_APPENDIX_5358.md §9.3 の経路 (`arg3 == 0` かつ `arg2 != 0` → `4133f0(arg1, arg2)`) に入る。よって `src` は `arg2` = `*s24` 由来が実値でも確認された。
+- `arg2 = 0xa44ed0` は今回の 3 回では出ていない。`arg2` の run 間変動は再現しなかった (REPORT_APPENDIX_5358.md §9.6 の未確定 2 は未確定のまま)。
 - 計装版の結果: units_run 129 / init 132 / icall_miss 16 / threw `memory access out of bounds` (既定と同一。計装は挙動を変えない)。
+- 所要 (PR 本文の記載に基づく・本 run では再測定していない・§4.1 と同じ扱い): `m11_build.sh` 18 秒・`tools/gui/flengine/build.sh` 16 秒・`boot_halt_probe.mjs` 0.5 秒。load は未採取。
 
 ### 10.4 未解決
 
