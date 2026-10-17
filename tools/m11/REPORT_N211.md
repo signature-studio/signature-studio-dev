@@ -11,7 +11,7 @@
 ## 測定
 
 - 測定の基点: `fe48dca85` (origin/main) の作業ツリーに `fix_xmm_args.py` の 1 ファイルの変更を入れて測った (commit 前に測定)。このコードを commit した後の HEAD で、build と survey を再実行して同じ結果を確認する (下の「再測定」)。
-- 素材: fl-win64 / work-m11 / work-liftdiff を `$HOME/artifacts` から展開。toolchain-retdec・toolchain-emsdk は `/opt/retdec`・`/opt/emsdk` に既存。
+- 素材: fl-win64 / work-m11 / work-liftdiff を R2 bundle から展開。toolchain-retdec・toolchain-emsdk は [RETDEC]・[EMSDK] に既存 (`docs/REFERENCES.md` §4)。
 - IR: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash m11_gen_ir2.sh` rc 0 (51 秒)。
 - 基準 build `M11_XMM_ARGS=0` 18.2 秒、survey 5.9 秒。
 - 変換 build `M11_XMM_ARGS=1` (`fix_xmm_args] fixed=47 skipped=651`)、survey 約 6 秒。`function_40c650` は `double %in.xmm0` に変換。変換 site 87、0.0 のまま 104 (`callsite_zero_args`)。
