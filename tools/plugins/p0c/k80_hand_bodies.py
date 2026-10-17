@@ -11,7 +11,6 @@ global の初期値 (@global_var_6fffb0 の PE 値など) は k80_pe_globals.py 
 
 差し替えの根拠 (REPORT_APPENDIX_H §19):
   0x5dfff0  : 引数 a(xmm2)/b(xmm3) の参照が入れ替わる + (1±a)*b を 80-bit で丸める
-  0x5dee20  : out[2k+j] += in[k] (f32 加算)。RetDec の fstp 参照先がずれる
   0x5e0300  : out[k] = f32((in[2k]+in[2k+1]) * c)。80-bit 中間値
   0x5e0350  : out[2k+j] = f32((in[..]+in[..]) * c)。80-bit 中間値
 """
@@ -50,33 +49,6 @@ dec_label_pc_5e0027:
   ret i64 0
 }
 ''',
-    'function_5dee20': '''define i64 @function_5dee20(i64 %arg1, i64 %arg2, i64 %arg3) local_unnamed_addr {
-dec_label_pc_5dee20:
-  br label %dec_label_pc_5dee2b
-dec_label_pc_5dee2b:
-  %k = phi i64 [ 0, %dec_label_pc_5dee20 ], [ %k1, %dec_label_pc_5dee2b ]
-  %xa = mul i64 %k, 4
-  %xp = add i64 %arg1, %xa
-  %xptr = inttoptr i64 %xp to float*
-  %x = load float, float* %xptr, align 4
-  %oa = mul i64 %k, 8
-  %op = add i64 %arg2, %oa
-  %o0 = inttoptr i64 %op to float*
-  %op1 = add i64 %op, 4
-  %o1 = inttoptr i64 %op1 to float*
-  %v0 = load float, float* %o0, align 4
-  %s0 = fadd float %v0, %x
-  store float %s0, float* %o0, align 4
-  %v1 = load float, float* %o1, align 4
-  %s1 = fadd float %v1, %x
-  store float %s1, float* %o1, align 4
-  %k1 = add i64 %k, 1
-  %c = icmp ult i64 %k1, %arg3
-  br i1 %c, label %dec_label_pc_5dee2b, label %dec_label_pc_5dee48
-dec_label_pc_5dee48:
-  ret i64 0
-}
-''',
     'function_5e0300': '''define i64 @function_5e0300(i64 %arg1, i64 %arg2, i64 %arg3) local_unnamed_addr {
 dec_label_pc_5e0300:
   %c32 = load float, float* @global_var_6fc200, align 4
@@ -104,35 +76,6 @@ dec_label_pc_5e0311:
   %c = icmp ult i64 %k1, %arg3
   br i1 %c, label %dec_label_pc_5e0311, label %dec_label_pc_5e0325
 dec_label_pc_5e0325:
-  ret i64 0
-}
-''',
-    'function_5dee50': '''define i64 @function_5dee50(i64 %arg1, i64 %arg2, i64 %arg3) local_unnamed_addr {
-dec_label_pc_5dee50:
-  br label %dec_label_pc_5dee5b
-dec_label_pc_5dee5b:
-  %k = phi i64 [ 0, %dec_label_pc_5dee50 ], [ %k1, %dec_label_pc_5dee5b ]
-  %xa = mul i64 %k, 8
-  %xp = add i64 %arg1, %xa
-  %x0p = inttoptr i64 %xp to float*
-  %x0 = load float, float* %x0p, align 4
-  %xp4 = add i64 %xp, 4
-  %x1p = inttoptr i64 %xp4 to float*
-  %x1 = load float, float* %x1p, align 4
-  %op = add i64 %arg2, %xa
-  %o0 = inttoptr i64 %op to float*
-  %v0 = load float, float* %o0, align 4
-  %s0 = fadd float %x0, %v0
-  store float %s0, float* %o0, align 4
-  %op4 = add i64 %op, 4
-  %o1 = inttoptr i64 %op4 to float*
-  %v1 = load float, float* %o1, align 4
-  %s1 = fadd float %x1, %v1
-  store float %s1, float* %o1, align 4
-  %k1 = add i64 %k, 1
-  %c = icmp ult i64 %k1, %arg3
-  br i1 %c, label %dec_label_pc_5dee5b, label %dec_label_pc_5dee7f
-dec_label_pc_5dee7f:
   ret i64 0
 }
 ''',
@@ -169,37 +112,6 @@ dec_label_pc_5de64b:
   ret i64 0
 }
 ''',
-    'function_5dedb0': '''define i64 @function_5dedb0(i64 %arg1, i64 %arg2, i64 %arg3, float %arg4, i64 %in.xmm3.bits) local_unnamed_addr {
-dec_label_pc_5dedb0:
-  %t3 = trunc i64 %in.xmm3.bits to i32
-  %bf = bitcast i32 %t3 to float
-  %be = fpext float %bf to x86_fp80
-  %se = fpext float %arg4 to x86_fp80
-  br label %dec_label_pc_5dedce
-dec_label_pc_5dedce:
-  %k = phi i64 [ 0, %dec_label_pc_5dedb0 ], [ %k1, %dec_label_pc_5dedce ]
-  %sc = phi x86_fp80 [ %be, %dec_label_pc_5dedb0 ], [ %sc1, %dec_label_pc_5dedce ]
-  %ia = mul i64 %k, 4
-  %ip = add i64 %arg1, %ia
-  %ipt = inttoptr i64 %ip to float*
-  %x = load float, float* %ipt, align 4
-  %xe = fpext float %x to x86_fp80
-  %p = fmul x86_fp80 %xe, %sc
-  %op = add i64 %arg2, %ia
-  %opt = inttoptr i64 %op to float*
-  %ov = load float, float* %opt, align 4
-  %oe = fpext float %ov to x86_fp80
-  %s = fadd x86_fp80 %p, %oe
-  %r = fptrunc x86_fp80 %s to float
-  store float %r, float* %opt, align 4
-  %sc1 = fadd x86_fp80 %sc, %se
-  %k1 = add i64 %k, 1
-  %c = icmp ult i64 %k1, %arg3
-  br i1 %c, label %dec_label_pc_5dedce, label %dec_label_pc_5dede3
-dec_label_pc_5dede3:
-  ret i64 0
-}
-''',
     'function_5e12c0': '''define i64 @function_5e12c0(i64 %arg1, i64 %arg2) local_unnamed_addr {
 dec_label_pc_5e12c0:
   %n = trunc i64 %arg2 to i32
@@ -223,94 +135,6 @@ dec_label_pc_5e12d9:
   %c = icmp ult i64 %k1, %n64
   br i1 %c, label %dec_label_pc_5e12d9, label %dec_label_pc_5e1311
 dec_label_pc_5e1311:
-  ret i64 0
-}
-''',
-    'function_5dea40': '''define i64 @function_5dea40(i64 %arg1, i64 %arg2, i64 %arg3, float %arg4, i64 %in.xmm3.bits) local_unnamed_addr {
-dec_label_pc_5dea40:
-  %t3 = trunc i64 %in.xmm3.bits to i32
-  %bf = bitcast i32 %t3 to float
-  %be = fpext float %bf to x86_fp80
-  %se = fpext float %arg4 to x86_fp80
-  br label %dec_label_pc_5dea61
-dec_label_pc_5dea61:
-  %k = phi i64 [ 0, %dec_label_pc_5dea40 ], [ %k1, %dec_label_pc_5dea61 ]
-  %sc = phi x86_fp80 [ %be, %dec_label_pc_5dea40 ], [ %sc1, %dec_label_pc_5dea61 ]
-  %ia = mul i64 %k, 8
-  %ip = add i64 %arg1, %ia
-  %x0p = inttoptr i64 %ip to float*
-  %x0 = load float, float* %x0p, align 4
-  %ip4 = add i64 %ip, 4
-  %x1p = inttoptr i64 %ip4 to float*
-  %x1 = load float, float* %x1p, align 4
-  %x0e = fpext float %x0 to x86_fp80
-  %x1e = fpext float %x1 to x86_fp80
-  %p0 = fmul x86_fp80 %x0e, %sc
-  %p1 = fmul x86_fp80 %x1e, %sc
-  %op = add i64 %arg2, %ia
-  %o0p = inttoptr i64 %op to float*
-  %o0 = load float, float* %o0p, align 4
-  %o0e = fpext float %o0 to x86_fp80
-  %s0 = fadd x86_fp80 %p0, %o0e
-  %r0 = fptrunc x86_fp80 %s0 to float
-  store float %r0, float* %o0p, align 4
-  %op4 = add i64 %op, 4
-  %o1p = inttoptr i64 %op4 to float*
-  %o1 = load float, float* %o1p, align 4
-  %o1e = fpext float %o1 to x86_fp80
-  %s1 = fadd x86_fp80 %p1, %o1e
-  %r1 = fptrunc x86_fp80 %s1 to float
-  store float %r1, float* %o1p, align 4
-  %sc1 = fadd x86_fp80 %sc, %se
-  %k1 = add i64 %k, 1
-  %c = icmp ult i64 %k1, %arg3
-  br i1 %c, label %dec_label_pc_5dea61, label %dec_label_pc_5dea8d
-dec_label_pc_5dea8d:
-  ret i64 0
-}
-''',
-    'function_5dec40': '''define i64 @function_5dec40(i64 %arg1, i64 %arg2, i64 %arg3, i32 %arg4, float %arg5, float %arg6, i64 %in.xmm3.bits) local_unnamed_addr {
-dec_label_pc_5dec40:
-  %t3 = trunc i64 %in.xmm3.bits to i32
-  %cf = bitcast i32 %t3 to float
-  %ce = fpext float %cf to x86_fp80
-  %ff = bitcast i32 %arg4 to float
-  %fe = fpext float %ff to x86_fp80
-  %ae = fpext float %arg5 to x86_fp80
-  %be = fpext float %arg6 to x86_fp80
-  br label %dec_label_pc_5dec6a
-dec_label_pc_5dec6a:
-  %k = phi i64 [ 0, %dec_label_pc_5dec40 ], [ %k1, %dec_label_pc_5dec6a ]
-  %cs = phi x86_fp80 [ %ce, %dec_label_pc_5dec40 ], [ %cs1, %dec_label_pc_5dec6a ]
-  %fs = phi x86_fp80 [ %fe, %dec_label_pc_5dec40 ], [ %fs1, %dec_label_pc_5dec6a ]
-  %ia = mul i64 %k, 4
-  %ip = add i64 %arg1, %ia
-  %ipt = inttoptr i64 %ip to float*
-  %x = load float, float* %ipt, align 4
-  %xe = fpext float %x to x86_fp80
-  %pc = fmul x86_fp80 %xe, %cs
-  %pf = fmul x86_fp80 %xe, %fs
-  %oa = mul i64 %k, 8
-  %op = add i64 %arg2, %oa
-  %o0p = inttoptr i64 %op to float*
-  %o0 = load float, float* %o0p, align 4
-  %o0e = fpext float %o0 to x86_fp80
-  %s0 = fadd x86_fp80 %pc, %o0e
-  %r0 = fptrunc x86_fp80 %s0 to float
-  store float %r0, float* %o0p, align 4
-  %op4 = add i64 %op, 4
-  %o1p = inttoptr i64 %op4 to float*
-  %o1 = load float, float* %o1p, align 4
-  %o1e = fpext float %o1 to x86_fp80
-  %s1 = fadd x86_fp80 %pf, %o1e
-  %r1 = fptrunc x86_fp80 %s1 to float
-  store float %r1, float* %o1p, align 4
-  %cs1 = fadd x86_fp80 %cs, %ae
-  %fs1 = fadd x86_fp80 %fs, %be
-  %k1 = add i64 %k, 1
-  %c = icmp ult i64 %k1, %arg3
-  br i1 %c, label %dec_label_pc_5dec6a, label %dec_label_pc_5decaf
-dec_label_pc_5decaf:
   ret i64 0
 }
 ''',
