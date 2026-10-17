@@ -534,6 +534,7 @@
 | `tools/m11/ldfix/REPORT_3450.md` | ~100 | CI-163 (#3450・親 #3426): `function_41c8c0` (WideCharToMultiByte の薄いラッパ) を 8 引数化し、呼出元 4 site を機械語の rcx〜r9 と照合して接続。e2e 実測 (stage4・survey 不変)・DEFECTS D26 の行案 |
 | `tools/m11/ldfix/REPORT_3088.md` | ~70 | LD-146 (#3088): unexec 4 関数 (5c1030 / 737d10 / 7ff6e0 / d243c0) の native 実行条件。古い `work/ld_native` (vmslot 無し) を `ensure_native` で作り直し、this 疑似オブジェクトを与えて 4/4 を突合 (判定 mismatch・icall_drop = D15) |
 | `tools/m11/ldfix/REPORT_3195.md` | ~90 | LD-149 (#3195): #1325 の見送り 10 組の不能理由を本体 `Machine` で判定し直して関数ごとに記録 (修復 0 組)。6905f0 の理由を訂正 (前段パスではなく生の使用の位置)。判定は `residual_3195.py` |
+| `tools/m11/ldfix/REPORT_5993.md` | ~90 | LD-294 (#5993): first-deref-not-entry の 10 関数 (101d180・1050f90・10626e0・10628d0・12f9730・5c44b0・6905f0・75a180・786d50・787380) の survey 到達理由を呼び出し元と閉包の根で記録 (#3194 受入 4 の分割) |
 | `tools/m11/ldfix/REPORT_1325.md` | ~110 | LD-46 (#1325): first-deref-not-entry の支配関係つき修復。deref の IR ブロックが置換対象の全使用を支配する 11 組を修復し、残り 10 組は見送り理由を記録。survey 到達 (23 関数) を再測定 (#1134・#3194・#3195) |
 | `tools/m11/ldfix/REPORT_5994.md` | ~70 | LD-295 (#5994): first-deref-not-entry 修復 関数群 B (10 関数) の直接呼び出し元 (IR 静的) を関数ごとに記録。survey の呼び出し元到達は未測定 (同梱 obj から committed と一致する build を再現できず)。`callers_5994.py` で再現 (#3194) |
 | `tools/m11/ldfix/REPORT_2688.md` | ~104 | LD-123 (#2688): spill 宛 判定不能 9 site の F3d 適用 IR 再検証。上流 xor 0 の 4 site は OK_LOAD 候補 (本番 IR は未修復・配線は #2834)、残り 5 site は UNDETERMINED |
