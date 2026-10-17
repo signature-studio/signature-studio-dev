@@ -19,6 +19,7 @@ import {
   PM_LIMITS,
   pruneHistory,
   selectDispatch,
+  selectWake,
   validPayload,
   DETECTED_KINDS,
   HOLD_LABELS,
@@ -222,6 +223,9 @@ interface Meta {
     intentRejected?: Record<string, number>;
     redelivered?: number;
     wouldRedeliver?: number;
+    // 停止行の直接の再投入 (wake・CI-250)。投稿した数と、dry-run で記録した数。
+    wakeSent?: number;
+    wouldWake?: number;
     demoted?: number;
     restored?: number;
   };
@@ -234,6 +238,8 @@ export interface Log {
     | "launch"
     | "would-dispatch"
     | "dispatch"
+    | "would-wake"
+    | "wake"
     | "would-pm-dispatch"
     | "pm-dispatch"
     | "would-close"
@@ -1451,6 +1457,60 @@ export class Engine {
     return out;
   }
 
+  // 停止行の直接の再投入 (wake・CI-250)。停止行のうち oldest-first の対象へ、/oc の再投入コメントを Worker が直接投稿する (oc-pm の判断を挟まない)。
+  // 投稿の条件は launch と同じ: 停止中 (halt・stop・blocked・review-only) では送らず、同期が古いときも送らない。LIVE_LAUNCH=1 のときだけ投稿し、dry-run は記録する。
+  // 1 時間に WAKE_PER_H 件・同じ issue は 24 時間に WAKE_REF_DAY_MAX 件。prio:critical と needs-user-input は除く (selectWake)。
+  // 投稿した停止行は同じ tick の oc-pm に送らない (run が進行中になるため)。
+  private wakeHistory(now: number, key: "wakeLive" | "wakeWould"): Array<{ ref: number; at: number }> {
+    return pruneHistory(now, this.d.store.get<Array<{ ref: number; at: number }>>("meta", key) ?? []);
+  }
+  async wakeStopped(gh: Gh | null): Promise<PmTarget[]> {
+    const plan = this.meta.lastPlan;
+    if (!this.fresh() || !plan || plan.stop || plan.blocked || plan.phase.review_only) return [];
+    const live = !!(this.launchLive() && gh);
+    const now = this.d.now();
+    const key = live ? "wakeLive" : "wakeWould";
+    const hist = this.wakeHistory(now, key);
+    const targets = this.detectPmTargets();
+    const picks = selectWake(now, targets, hist, {
+      perH: this.d.cfg.wakePerH,
+      refDayMax: this.d.cfg.wakeRefDayMax,
+      excludeLabels: ["needs-user-input"],
+      labelsOf: (n) => this.s.issues[String(n)]?.labels ?? [],
+    });
+    if (picks.length === 0) return [];
+    this.meta.counters = this.meta.counters ?? this.zero();
+    const sent: PmTarget[] = [];
+    for (const tg of picks) {
+      const i = this.s.issues[String(tg.ref)];
+      const art = defaultArtLine(this.s.pmArt[String(tg.ref)]?.line, i?.artLine, i?.title ?? "", i?.labels ?? []);
+      if (!live) {
+        hist.push({ ref: tg.ref, at: now });
+        this.meta.counters.wouldWake = (this.meta.counters.wouldWake ?? 0) + 1;
+        this.pushLog({ kind: "would-wake", n: tg.ref, art, note: "stopped_report" });
+        sent.push(tg);
+        continue;
+      }
+      if (restGuardOn(this.meta.rest?.remaining)) break;
+      // 失敗した試行も履歴に数える (毎分叩き直さない。上限はそのまま効く)。
+      hist.push({ ref: tg.ref, at: now });
+      try {
+        await gh!.comment(tg.ref, buildLaunchBody(art));
+      } catch (e) {
+        this.pushLog({ kind: "error", n: tg.ref, note: e instanceof GhError ? `wake: ${e.message}` : "wake failed" });
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+        continue;
+      }
+      this.markPosted(tg.ref, iso(now));
+      this.meta.counters.wakeSent = (this.meta.counters.wakeSent ?? 0) + 1;
+      this.pushLog({ kind: "wake", n: tg.ref, art, note: "stopped_report" });
+      sent.push(tg);
+    }
+    this.d.store.put("meta", key, hist);
+    this.saveMeta();
+    return sent;
+  }
+
   // 検出した対象を oc-pm で送る。payload は kind (列挙) と ref (数字) だけ。LIVE_DISPATCH=1 のときだけ送る (oc-watchdog と同じスイッチ)。
   // 同期が古い間は送らない (誤った対象を起こさない)。
   async pmDispatch(gh: Gh | null): Promise<{ sent: PmTarget[]; would: PmTarget[] }> {
@@ -1727,6 +1787,7 @@ export class Engine {
       await this.watchdog(gh);
       await this.launch(gh);
       await this.haltNotify(gh);
+      await this.wakeStopped(gh);
       await this.pmDispatch(gh);
       await this.autoClose(gh);
       await this.digest(gh);
@@ -1947,6 +2008,8 @@ export class Engine {
       pm_dispatch_1h_by_prio: pmByPrio,
       // oc-pm の毎時上限 (PM_LIMITS.hourMax) と、直近 24 時間にその上限で見送った件数 (対象ごと・tick ごとの回数。pmDispatch と haltNotify が数える)。
       pm_dispatch_cap: PM_LIMITS.hourMax,
+      // 停止行の直接の再投入 (wake・CI-250) の config と、直近 1 時間の投稿数・dry-run の記録数。除外は needs-user-input・prio:critical・open な子持ち。
+      wake: { per_h: this.d.cfg.wakePerH, ref_day_max: this.d.cfg.wakeRefDayMax, live: this.launchLive(), sent_1h: this.wakeHistory(now, "wakeLive").filter((h) => now - h.at < 3_600_000).length, would_1h: this.wakeHistory(now, "wakeWould").filter((h) => now - h.at < 3_600_000).length },
       pm_skipped_hour_24h: this.pmHourSkips(now).reduce((sum, h) => sum + h.n, 0),
       // dry-run で『送るはずだった』oc-pm (直近 24 時間。kind と ref だけ)。LIVE_DISPATCH では空。
       would_dispatch_pm: this.dispatchLive() ? [] : this.pmHistory().map((h) => ({ kind: h.kind, ref: h.ref, at: iso(h.at) })),

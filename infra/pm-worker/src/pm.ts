@@ -69,6 +69,10 @@ export const KIND_LIMITS: Partial<Record<DetectedKind, { dupMs: number; dayMax: 
 // 枠が厳しければ wrangler.toml の値を下げる。
 export const STOPPED_REF_DAY_MAX = 3;
 export const DEFAULT_STOPPED_INTAKE_PER_H = 48;
+// 停止行の直接の再投入 (wake・CI-250)。停止行のうち oldest-first の対象へ、/oc の再投入コメントを Worker が直接投稿する (oc-pm の判断を挟まない)。
+// 1 時間に WAKE_PER_H 件まで・同じ issue は 24 時間に WAKE_REF_DAY_MAX 件まで (config。既定 24 と 2)。
+export const DEFAULT_WAKE_PER_H = 24;
+export const DEFAULT_WAKE_REF_DAY_MAX = 2;
 // PM が停止行の判断 (応答) を書いた直後に、同じ停止行をすぐ送り直さない猶予 (CI-239・#5722)。
 // no_pr の検出 (未回答のときだけ送る) と stopped_report (応答後も上限まで送る) が同じ行を続けて 2 回送るのを防ぐ。
 export const PM_INTAKE_GRACE_MS = 3_600_000;
@@ -268,6 +272,29 @@ export function selectDispatch(
 }
 
 export const pruneHistory = <T extends { at: number }>(now: number, h: T[]): T[] => h.filter((x) => now - x.at < PM_LIMITS.dayMs);
+
+// wake の選定 (CI-250)。停止行 (stopped_report) から、prio:critical・needs-user-input を除いたものを停止の古い順に選ぶ。
+// 上限: 1 時間に perH 件 (履歴の wake の数)・同じ issue は 24 時間に refDayMax 件。子持ち・保留・PM 応答の猶予は detectPm で既に除かれている。
+// 送る件数は枠の残りまで。送る対象は history に加えたものとして次を判定する (1 回の tick で上限を超えない)。
+export function selectWake(
+  now: number,
+  targets: PmTarget[],
+  wakeHistory: Array<{ ref: number; at: number }>,
+  opts: { perH: number; refDayMax: number; excludeLabels: string[]; labelsOf: (ref: number) => string[] },
+): PmTarget[] {
+  const hist = [...wakeHistory];
+  const out: PmTarget[] = [];
+  const cands = targets
+    .filter((tg) => tg.kind === "stopped_report" && tg.prio !== "critical" && !opts.labelsOf(tg.ref).some((l) => opts.excludeLabels.includes(l)))
+    .sort((a, b) => t(a.at) - t(b.at) || a.ref - b.ref);
+  for (const tg of cands) {
+    if (hist.filter((h) => now - h.at < 3_600_000).length >= opts.perH) break;
+    if (hist.filter((h) => now - h.at < PM_LIMITS.dayMs && h.ref === tg.ref).length >= opts.refDayMax) continue;
+    hist.push({ ref: tg.ref, at: now });
+    out.push(tg);
+  }
+  return out;
+}
 
 // 毎時上限 (hourMax) で見送った件数。tick ごとに 1 件 (時刻と件数)。pruneHistory と同じ 24 時間の窓で捨てる (#3462)。
 export interface SkipEntry {
