@@ -6,7 +6,7 @@
 測定 commit: `eb6f0e1c7` (#3300 時点の closure 入力作成の測定。本 PR の数値の根拠は下の §7 の `56ec5cf11`)。`git diff eb6f0e1c7 HEAD -- tools/shared/lift/ildsp ':!*.md'` は 24 ファイルの差分があり、差分 0 ではない。
 
 ## 結論 (1 行)
-closure は 36 関数・961 命令・間接 call 10 件で、RetDec の範囲入力と IR の define 検査は通る。ただし closure は条件分岐と計算ジャンプの先を辿らず、範囲外の直接呼び出し先 1 件が IR に declare のみで残る (§2-2 (a))。IR は計算ジャンプ表の経路 (n = 1〜16) を落とし、その書き込みは IR に無い (§2-2 (b))。baseline 時点の census はこれを検出しなかったが、§8-2 で検出器を追加した (現在は FAIL で検出)。wasm 化 (#3318) と native 差分 (#3320) が残る。
+closure は 36 関数・961 命令・間接 call 10 件で、RetDec の範囲入力と IR の define 検査は通る。ただし closure は条件分岐と計算ジャンプの先を辿らず、範囲外の直接呼び出し先 1 件が IR に declare のみで残る (§2-2 (a))。IR は計算ジャンプ表の経路 (n = 1〜16) を落とし、その書き込みは IR に無い (§2-2 (b))。baseline 時点の census はこれを検出しなかったが、§8-2 で検出器を追加した。(a) は #6231、(b) は #6184 で解消済み。残るのは native 差分と wasm の意味の検証 (#3320)。
 
 ## 1. 再現
 ```
@@ -42,13 +42,13 @@ FL_WIN64_DIR=<fl-win64 展開先> [RETDEC_BIN=<retdec-decompiler>] bash tools/sh
 | 範囲外で define の無い直接呼び出し先 (1 種) | function_1801aef40 1 (呼び出し元 0x1aef60・x86 の飛び元 0x1aefa7 `jne`) |
 | SSE helper `__asm_` (8 種) | movaps 7・movntps 8・movups 3・int3 4・movapd 1・movq 1・punpcklbw 1・sfence 1 |
 
-### 2-2. 閉包の取りこぼし (未解決・#3318 で扱う)
+### 2-2. 閉包の取りこぼし (§8 で扱った・(a) は #6231、(b) は #6184)
 closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が範囲に入らない。どちらも x86 で確認した。
 - **(a) 条件分岐の先の直接呼び出し先 (1 件)**: 0x1aefa7 `jne 0x1801aef40` (閉包関数 0x1aef60 の中)。0x1aef40 は `.pdata` の無い 16 バイトの `rep stosb` ヘルパ (`push rdi; mov eax,edx; mov rdi,rcx; mov rcx,r8; rep stosb; mov rax,r11; pop rdi; ret`)。IR では `declare` だけがあり、0x1aef60 の本体から `call @function_1801aef40` で呼ばれる。`ci_census.py` は「範囲外で define の無い直接呼び出し先」として別行に出す。
 - **(b) 計算ジャンプの表の経路 (n = 1〜16) を IR が落とす (9 define は未参照)**: x86 では 0x1aef74 `cmp r8,0x10` → 0x1aef78 `jbe 0x1af070` が、n ≤ 16 のとき計算ジャンプへ進み 1〜16 バイトを書く。0x1af070 の `lea r9,[rip-0x1af07a]` は r9 = イメージ基底 (0x180000000) を作り、0x1af07a `mov eax,[r9+r8*4+0x442000]`・0x1af082 `add r9,rax`・0x1af08b `jmp r9` で飛ぶ。表 0x442000 (`_RDATA`) の k = 0〜16 の 32 bit 値は RVA の 17 件 (k = 17〜19 は 0)。17 件のうち 9 件は RetDec の define の先頭 (function_1801af090・af0a0・af0a8・af0b0・af0c0・af0cc・af0d0・af0e0・af0e8)、残り 8 件は case 本体の途中 (0x1af094・0x1af097・0x1af09b・0x1af09e・0x1af0a4・0x1af0b4・0x1af0c4・0x1af0c7)。
   IR (`ci.drc.ll`) では `@function_1801aef60` の先頭が `%0 = icmp ult i64 %arg3, 17` → `br` で `dec_label_pc_1801af028` (`ret i64 %arg1`) に入る。`1801af070`・`1801af07a` を参照する行は 0 件で、0x1aef60 の本体に `indirectbr`・`switch`・`unreachable` は無い。つまり n = 1〜16 の書き込みは IR に無いまま `ret` する。9 define はどの `call` からも参照されない (census の「IR 内の call 参照 0 件」)。症状は DEFECTS D9 と同じ形 (間接 jmp の経路が `ret` に化け、case ブロックが呼び出し元の無いまま残る)。ret の値は undef ではなく `%arg1`。
   baseline 時点の census は検出しなかった (define の有無だけを見ていた)。§8-2 で orphan 検査を追加して検出するようにした。RetDec 内部でどの段がこの経路を落としたかは未確認。
-- 閉包規則を変える (jcc と計算ジャンプの表を辿る) と 36 関数・961 命令が変わるので、再測定を伴う。判断は #3318 で行う。
+- 閉包規則を変える (jcc と計算ジャンプの表を辿る) と 36 関数・961 命令が変わるので、再測定を伴う。閉包規則は変えない方針 (§8-1・§8-3)。
 
 ## 3. IR の呼び出し行数と x86 件数
 - **IR の呼び出し行数は x86 の件数と一致しない** (`ci_census.py` の注)。例: FlsSetValue の IR 5 行 = `function_1801b8820` の 4 行 (x86 の `call 0x1801b9334` が 0x1b8865・0x1b8892・0x1b88a3・0x1b88b4 の 4 箇所。件数は一致) + サンク本体 `function_1801b9334` の 1 行 (`jmp qword ptr [rip + IAT]` が define になる)。
@@ -64,10 +64,10 @@ closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が
 ## 5. 未解決 (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| IAT 10 種の stub 化の方針 (C 実装か wasm import)。直接 call のサンク 2 種 (0x1b932c・0x1b9334) と末尾 jmp の 2 種 (0x1bb426・0x1bb47a) を含む | wasm 化 | [T-SH-65] #3318 |
-| SSE helper 8 種 (`__asm_`) の C 実装 (解消は §7。5 種は #4229 で C 実装済み) | wasm 化 | [T-SH-65] #3318 |
-| 間接 call 4 件の trap 化 (ac 4) | 正常系の到達 | [T-SH-65] #3318 (到達実測は #3250) |
-| 閉包の取りこぼし: 直接 jcc 先 function_1801aef40 (§2-2 (a))。閉包規則を変えるか。変えれば 36/961 が変わり再測定 | 範囲・wasm 化の意味 | [T-SH-65] #3318 |
+| IAT 10 種の stub 化 (C 実装 `ci_iat.c`・#5787 で main 済み)。直接 call のサンク 2 種 (0x1b932c・0x1b9334) と末尾 jmp の 2 種 (0x1bb426・0x1bb47a) を含む | IAT の意味 (native との差分) が未検証 | [T-SH-66] #3320 |
+| SSE helper 8 種 (`__asm_`) の C 実装 (解消は §7。5 種は #4229 で C 実装済み) | 実行時の意味が未検証 | [T-SH-66] #3320 |
+| 間接 call 4 件の扱い (ac 4。2 件 (slot 0x268260・0x268268) は trap 化済み (#3318・closed)、残り 2 件は IAT 静的) | 正常系の到達 | [T-SH-54] #3250 (到達実測) / #4289 (既定入力での発火) |
+| 閉包の取りこぼし: 直接 jcc 先 function_1801aef40 (§2-2 (a))。IR 側で解消 (§8-1)。閉包規則は未変更 | 解消 | #6231 (本 PR) |
 | 計算ジャンプ表の経路 (n = 1〜16) が IR で `ret` になる (§2-2 (b))。§11 で `switch` に戻し、census は ALL OK (修復済み) | 解消 | #6184 (§11) |
 | 全バイト差分・ネガティブコントロール・gate | 受入の残り | [T-SH-66] #3320 |
 | `.pdata` の無い葉 12 件の範囲 (次の `.pdata` 先頭まで) | 命令数は上限側に偏りうる | #161 |
@@ -137,30 +137,32 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 ### 7-4. 既知の制約
 - 0x1aefa9 の書き込み先は、RetDec の alloca 経由 (`bitcast i64* %rcx to i128*`) の load である。`store i64 %arg1, i64* %rcx` が関数入口の 1 回だけであることを確認して `%arg1` を値として使った。書き込み直前まで rcx に他の store が無い形なので、この 1 箇所だけに当てはまる。pass は、その形以外では exit 1 で止まる。
 - 復元の正しさは IR の構造と x86 の命令の照合で確かめた。wasm 実行と native 差分は未実施 (#3320)。
-- 閉包の取りこぼし (§2-2 (a)(b)) と IAT stub は変えていない (#3318)。
+- 閉包の取りこぼし (§2-2 (a)(b)) と IAT stub は変えていない (IAT stub の意味は #3320)。
 
 ### 7-5. 未解決 (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x1aefa9 の `%arg1` 解決は「入口 store が 1 回だけ」の前提。一般の形は未対応 (pass が exit 1 で止まる) | 別の CreateInstance 形に当たると止まる | [T-SH-65] #3318 |
-| `movapd` の helper 分岐は実装したが、復元後 IR に `movapd` が無く生成 0 件。テストと NC は無い | 実行されない分岐 (未検証) | [T-SH-65] #3318 |
+| 0x1aefa9 の `%arg1` 解決は「入口 store が 1 回だけ」の前提。一般の形は未対応 (pass が exit 1 で止まる) | 別の CreateInstance 形に当たると止まる | [T-SH-66] #3320 |
+| `movapd` の helper 分岐は実装したが、復元後 IR に `movapd` が無く生成 0 件。テストと NC は無い | 実行されない分岐 (未検証) | [T-SH-66] #3320 |
 | 差分 (native と wasm の全バイト比較・gate) | 復元の意味論が未検証 | [T-SH-66] #3320 |
-| IAT stub・閉包の取りこぼし・emcc | wasm 化 | [T-SH-65] #3318 |
+| IAT stub の意味・emcc の obj 化 (uselistorder 回避を含む) | wasm 化の検証 | [T-SH-66] #3320 |
 
 ## 8. 方針の決定と census の検出 (T-SH-153 #5749)
 
-結論: (a) は閉包規則を変えず範囲外のままにする。(b) は受入として扱わず、census が FAIL で検出するようにした。IR の計算ジャンプ経路の修復は未了 (#3318)。
+結論: (a) は閉包規則を変えず範囲外のままにする。(b) は受入として扱わず、census が FAIL で検出するようにした。IR の計算ジャンプ経路の修復は #6184 (§11) で済み、(a) は #6231 で IR 側を直した。
 
 ### 8-1. (a) 直接 jcc 先 function_1801aef40
 - x86: 0x1aefa7 `jne 0x1801aef40` は **条件分岐**。0x1aef40 は `rep stosb` の memset ヘルパで、`ret` は呼び出し元へ戻らず 0x1aef60 の呼び出し元 (閉包の外) に返る。
 - IR: `call i64 @function_1801aef40` の後に fall-through で 0x1aefa9 へ続く。つまり IR は jcc を call に化かしている。これは現行の IR (baseline) に既にある誤モデルで、閉包を広げても直らない。
 - 試算 (scratch, 非コミット・`work/` の probe): jcc を辿ると 37 関数・969 命令 (+1 関数・+8 命令)。`ci_ranges.py` に入れて `ci_lift.sh` を回すと、RetDec は 0x1aef40 を `__asm_rep_stosb_memset` の呼び出しとして出し、`gen_helpers.py` が未対応の signature で exit 1 になった。閉包規則は戻し、コードの差分は 0 (`ci_ranges.py` は HEAD と同じ)。
-- 決定: 範囲外のまま扱う。誤モデルを閉包で正すには IR の jcc 扱いを直す必要があり、#3318 で扱う。
+- 決定 (T-SH-163 #6231・旧決定 #5749 を更新): 閉包規則は変えず、IR 側で直す。`ci_restore_memset.py` が `call i64 @function_1801aef40` を memset ループ (`i8` store を `arg3` 回) に置き換え、0x1aefa7 の jcc の偽側を `ci_ms` へ向ける。ループ後は `ret` ブロック `dec_label_pc_1801af028` へ `br` する (x86 の `ret` と同じ行き先)。`ci_restore_memset.py` は 0x1aef40 の 8 命令の形と jne の飛び先を逆アセンブルで確かめ、外れたら exit 1 で止まる。
+- 検証 (測定 commit `8339e3fa5`・4 core・n=3・§9-4): `ci_lift.sh` rc 0・ALL OK を 3 回 (2.898 / 2.834 / 2.851 s)・`直接 jcc 先への call (復元後 IR): 0 件 (復元前 1 件)`。`function_1801aef40` は未解決から消えた。(旧測定 `8a4474076` の値 2.353 / 2.331 / 2.254 s と `ci_link.sh` 0.499 / 0.501 / 0.777 s は時点の記録として §9-4 に残す。)`%2` の出どころ: `ci.rm.ll` の `function_1801aef60` 入口の `%1 = urem i32 %arg2, 256`・`%2 = zext i32 %1 to i64` で、`trunc i64 %2 to i8` は arg2 の下位 8 bit (x86 の `dl`) を指す。NC: 旧 IR (call 残存) を census の第 4 引数に渡すと `FAIL`・rc 1。`ci_restore_memset.py` に復元済み IR を渡すと `jcc の分岐が想定と違う`・rc 1。
+- 閉包規則は変えていない (36 関数・961 命令・間接 call 10 は不変)。よって 36/961 の再測定は要らない (§8-3)。
 
 ### 8-2. (b) 計算ジャンプ表の経路 (n = 1〜16)
 - 決定: 欠落を受入として扱わない (silent miscompile を見逃さない)。census に検査を入れた。
 - 追加した検査 (`ci_census.py`): 範囲外の define のうち、IR のどの `call` からも参照されないものを FAIL にする。baseline では 9 件 (function_1801af090 ほか 8 件) が該当し、`ci_lift.sh` は rc 1 になる。
-- 本 PR の `ci_lift.sh` は HEAD で rc 1 を返す。これは (b) が未修復であることを示す意図した結果。修復 (表を解く経路を IR に戻す) は #3318 で行い、その時点で rc 0 に戻る。
+- 本 PR の `ci_lift.sh` は HEAD で rc 1 を返す。これは (b) が未修復であることを示す意図した結果。修復 (表を解く経路を IR に戻す) は #6184 (§11) で行い、その時点で rc 0 に戻った。
 - 検出器の限界: この検査は「範囲外 define のうち IR の call から未参照のもの」という副次的な形にだけ依存する。RetDec が 9 件の define を出さなくなると、(b) の欠落があっても PASS する (現在の RetDec 出力の形に依存する)。
 - 実測 (HEAD `ci_census.py` 変更後・4 core・n=1): 出力末尾 `[census] FAIL: 範囲外の define が IR のどの call からも参照されない ... ['function_1801af090', ..., 'function_1801af0e8']` (9 件)・rc 1。範囲の 36 関数は define 欠落 0 (他の検査は通る)。
 
@@ -170,8 +172,8 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 ### 8-4. 未解決 (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 計算ジャンプ表の経路 (n = 1〜16) を IR に戻す | 解消 (§11)。RetDec 内部の段は未確認 | #6184 (§11) |
-| 直接 jcc 先 function_1801aef40 の誤モデル (jcc を call として扱う) | 範囲・意味論。閉包を変えると wasm 化の前提が変わる | [T-SH-65] #3318 |
+| 計算ジャンプ表の経路 (n = 1〜16) を IR に戻す | 解消 (§11)。RetDec 内部の段は未確認 | 解消済み (#6184 は closed・§11) |
+| 直接 jcc 先 function_1801aef40 の誤モデル | 解消 (§8-1・`ci_restore_memset.py`)。`ci_link.sh` の未解決から消えた | #6231 (本 PR) |
 
 ## 11. 計算ジャンプ表の経路を IR に戻す (T-SH-161 #6184)
 
@@ -180,7 +182,7 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 
 ## 9. wasm リンクと外部グローバル (T-SH-152 #5748)
 
-結論: `ci_lift.sh` の出力を wasm にリンクすると、未解決は IAT 10 種 (#5747) と直接/画像内の呼び出し先 2 種 (閉包の取りこぼし #5749) の集合だけになる。外部グローバル 2 種と `__stack_pointer` はリンクが通った。ただし外部グローバルの画像上の敷設は未決 (§9-2)。
+結論: `ci_lift.sh` の出力を wasm にリンクすると、未解決は 0 件 (wasm-ld rc 0・測定 commit `8339e3fa5`・§9-4)。直接 jcc 先 `function_1801aef40` は #6231 で IR 側を直して消えた。IAT 10 種は #5787・#6226 でリンク済み。外部グローバル 2 種と `__stack_pointer` はリンクが通った。ただし外部グローバルの画像上の敷設は未決 (§9-2)。
 
 ### 9-1. 実測 (`ci_link.sh`・rc 1 = 期待どおりの未解決)
 - 測定 commit: `9f3c2a969` (コードを変えた最後の commit。`ci_link.sh` のコメント 1 行と本節の更新)。`ci_lift.sh`・`ci_link.sh` はこの HEAD で実行した。`git diff 332faf055 9f3c2a969 -- tools/shared/lift/ildsp tools/shared/lift/libreverb` の差分は `ci_link.sh` のコメント 1 行のみ (実行されるコードは同じ)。
@@ -225,19 +227,23 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 |---|---|---|
 | 外部グローバル: `global_var_1803f6610` は絶対アドレス化済み (§9-2・ci_link.sh)。`@0` (`__unnamed_1`) は shim の仮置きのまま (画像に敷設しない方式を決定、§9-2) | リンクは通るが、仮置きの値で意味が変わりうる | 意味の確認は #3320 |
 | `uselistorder` 行を emcc が読めない | 解消 (§9-5。`ir_normalize.py --drop-uselistorder` で除去し、ci_link.sh の `grep -v` を外した) | #6235 (T-SH-164・解消) |
-| 直接 jcc 先 `function_1801aef40` (閉包の誤モデル・§8-1) | 未解決 (リンクエラー・1 件) | #6231 (T-SH-163) |
+| 直接 jcc 先 `function_1801aef40` (閉包の誤モデル・§8-1) | 解消 (wasm-ld rc 0・§9-4) | #6231 (T-SH-163) |
 
 ### 9-4. 再測定 (T-SH-152 #5748・受入 2)
+- **現 head の実測 (測定 commit `8339e3fa5`・4 core・n=3)**: `ci_lift.sh` rc 0・ALL OK を 3 回 (2.898 / 2.834 / 2.851 s)・`直接 jcc 先への call (復元後 IR): 0 件 (復元前 1 件)`。`ci_link.sh` rc 0・wasm-ld rc 0・`undefined.txt` 0 行 (未解決 0 件) を 3 回 (0.608 / 0.616 / 0.620 s)。素材は `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を展開して実行 (RetDec v5.0 Linux・emsdk 6.0.12)。
+- `8339e3fa5` は `ci_link.sh` の判定を「期待集合 (`function_1801aef40`) との照合」から「wasm-ld rc 0 かつ未解決 0 件」に変えた commit。`ci_lift.sh` の入力と段は変えていない。`git diff 0c36f172a 8339e3fa5 -- tools/shared/lift/ildsp` は `ci_link.sh` の 8 行 (3 追加・5 削除) のみ。
+- 同じ `ci_lift.sh` (`0c36f172a` 時点) の測定: rc 0・ALL OK を 3 回 (3.688 / 2.954 / 3.391 s)。`ci_link.sh` (`0c36f172a` 時点・判定は旧): rc 0・wasm-ld rc 0・未解決 0 件 (2 回目以降 0.641 / 0.636 s。初回 13.7 s は emsdk キャッシュ生成を含む)。
+- 測定 commit `8a4474076` の値 (`ci_lift.sh` 2.353 / 2.331 / 2.254 s・`ci_link.sh` 0.499 / 0.501 / 0.777 s) は、その時点の記録として残す。
 - 測定 commit: `f46916860` (`ci_link.sh` に `ci_iat.o`・`ci_traps.o` を追加した commit)。以後の変更は `ci_link.sh` の出力文言とヘッダコメントのみで、リンクの入力・期待集合・終了条件は変えていない。`git diff f46916860 HEAD -- tools/shared/lift/ildsp` は `ci_link.sh` の文言・コメントと本 REPORT の差分だけ。
 - 実測の記録 (測定 commit `f46916860` 時点。この記録は、その commit で素材 `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を展開して実行した結果である):
   - `ci_lift.sh` → rc 0 (ALL OK。census FAIL は #6184 で解消済み)。
   - `ci_link.sh` → rc 0 (wasm-ld rc 1)。未解決は **`function_1801aef40` の 1 件のみ** (想定外 0 件)。
 - 後続 fix (`f179908b5` 以前の文言修正) の run では `toolchain-retdec`・`toolchain-emsdk` が取得されず、`ci_lift.sh`・`ci_link.sh` は再実行していない。この head での再実行結果ではない。
 - `uselistorder` 行の起票先は #6235 (T-SH-164)。解消は §9-5。
-- 前回 §9-1 の 153 行のうち IAT 10 種 (147 行) と `function_1801cb600` (5 行) は消えた。原因: `ci_link.sh` が `ci_iat.o` (#5747) と `ci_traps.o` (#3318 の trap 化) をリンクしていなかった。残りは 153 − 147 − 5 = 1 行 (`function_1801aef40`)。
-- 残り `function_1801aef40`: 閉包の jcc 誤モデル (§8-1)。stub で埋めると意味の誤りを隠すため置かない。起票先は #6231 (T-SH-163)。旧起票先の #3318・#5749 はどちらも closed。
+- 前回 §9-1 の 153 行のうち IAT 10 種 (147 行) と `function_1801cb600` (5 行) は消えた。原因: `ci_link.sh` が `ci_iat.o` (#5747) と `ci_traps.o` (trap 化・#3318 は closed) をリンクしていなかった。残りは 153 − 147 − 5 = 1 行 (`function_1801aef40`)。
+- 残り `function_1801aef40`: 閉包の jcc 誤モデル (§8-1)。stub で埋めると意味の誤りを隠すため置かない。起票先は #6231 (T-SH-163)。旧起票先の #3318・#5749 はどちらも closed (#5749 は #6231 で IR 側に直して解消)。
 - 受入 2 (未解決 0 件) は未達のまま。
 
 ## 10. emcc の obj 化と間接 call 2 件の trap 化 (T-SH-65 #3318・部分達成)
 
-結論: `uselistorder` (順序メタ情報) を除いた IR は emcc で obj 化でき、間接 call 2 件 (`function_1801cb5e0`・`function_1801cb600`) は trap 定義を入れた (検査は実 RetDec 出力の `declare i64 @<name>(i64)` に合わせた)。wasm のリンク・実行は未実施で、IAT 10 種 (#5747)・外部グローバル 2 種 (#5748)・範囲外の直接 call 先と計算ジャンプ表 (#5749) が残る。trap 化の理由: 2 件の宛先は CFG/XFG dispatch 経由で実行時の `rax` になり、IR の固定名 declare からは一意に決まらない (slot 0x268260・0x268268、呼出し元 0x1aedf6・0x1b6f6c。到達実測は #3250)。詳細と実測は `REPORT_APPENDIX_3318.md`。現 head `63f896abe` では `ci_lift.sh` 全体は census の orphan 検査で rc 1 (§8-2 の意図した結果)。census 以降の後段は単独実行で rc 0 (付録 §3)。
+結論: `uselistorder` (順序メタ情報) を除いた IR は emcc で obj 化でき、間接 call 2 件 (`function_1801cb5e0`・`function_1801cb600`) は trap 定義を入れた (検査は実 RetDec 出力の `declare i64 @<name>(i64)` に合わせた)。wasm のリンク・実行は当時未実施で、後に IAT 10 種 (#5787・#6226) と外部グローバル 2 種 (#5748) は解消。残りの検証は #3320 (native 差分)。trap 化の理由: 2 件の宛先は CFG/XFG dispatch 経由で実行時の `rax` になり、IR の固定名 declare からは一意に決まらない (slot 0x268260・0x268268、呼出し元 0x1aedf6・0x1b6f6c。到達実測は #3250)。詳細と実測は `REPORT_APPENDIX_3318.md`。現 head `63f896abe` では `ci_lift.sh` 全体は census の orphan 検査で rc 1 (§8-2 の意図した結果)。census 以降の後段は単独実行で rc 0 (付録 §3)。

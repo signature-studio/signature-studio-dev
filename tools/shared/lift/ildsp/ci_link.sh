@@ -4,7 +4,7 @@
 # 処理: (uselistorder は ci_lift.sh の ir_normalize 段で除去済み・残っていたら exit 1) -> @global_var_1803f6610 を画像内の絶対アドレス化 -> ci.o -> helpers.o -> 検査用 shim (@0 のみ) -> IAT stub (ci_iat.o)・trap (ci_traps.o) をリンク -> wasm-ld。
 # 出力: tools/shared/work/lift/ci-link/ (gitignore)。
 # 注意: @0 (__unnamed_1) の shim は「リンクが通るための仮置き」。画像上の意味は未検証 (REPORT_CI.md §9-2)。絶対アドレスの値 (0x303f6610) の画像上の意味確認は #3320。
-# usage: bash tools/shared/lift/ildsp/ci_link.sh   (exit 0 = 未解決の集合が期待集合と一致 / exit 1 = 想定外の未解決 / exit 2 = 入力が無い)
+# usage: bash tools/shared/lift/ildsp/ci_link.sh   (exit 0 = wasm-ld rc 0 かつ未解決 0 件 / exit 1 = 未解決あり・wasm-ld 失敗 / exit 2 = 入力が無い)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."
 source "$ROOT/env.sh"
@@ -33,8 +33,6 @@ set -e
 grep -o 'undefined symbol: [A-Za-z_0-9]*' "$W/link.log" | sed 's/undefined symbol: //' | sort | uniq -c > "$W/undefined.txt" || true
 echo "[ci-link] wasm-ld rc=$RC / 未解決シンボル (種, 件数 = リンクエラー行数)"
 cat "$W/undefined.txt"
-EXPECT='function_1801aef40'
-BAD=$(sed -E 's/^ *[0-9]+ //' "$W/undefined.txt" | grep -Ev "^($EXPECT)$" || true)
-if [ -n "$BAD" ]; then echo "[ci-link] 想定外の未解決: $BAD"; exit 1; fi
-echo "[ci-link] 未解決は期待集合 (function_1801aef40 のみ・#6231)。IAT 10 種 (ci_iat.o)・trap 2 種 (ci_traps.o) はリンク済み。global_var_1803f6610 と __stack_pointer は解決済み (@0 は shim)"
+if [ "$RC" -ne 0 ] || [ -s "$W/undefined.txt" ]; then echo "[ci-link] 未解決または wasm-ld 失敗 (rc $RC)。期待集合は空 (#6231 で解消済み)"; exit 1; fi
+echo "[ci-link] 未解決 0 件。IAT 10 種 (ci_iat.o)・trap 2 種 (ci_traps.o) はリンク済み。global_var_1803f6610 と __stack_pointer は解決済み (@0 は shim)"
 exit 0
