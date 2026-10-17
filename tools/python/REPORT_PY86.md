@@ -191,6 +191,12 @@
 - 実測 (`analysis/py5144_dis.py 0xb35250 0xb352c0`・n=1・real 0.06 秒・load 0.36 / 1 分平均): exit 0・33 行。
 - 結論 (本 run): 受け手の出所は「Self のフィールドからの読出し」まで確定した。型の確定 (受入 2b の群 C) は未達のまま。
 
+- 訂正 (VMT アドレスの取り違え・本 run): 上の節の VMT アドレス `0xb07378` (TDBXStreamValue)・`0xb655c8` (TGenericPlugin) は、VMT 本体ではなく **VMT の自己ポインタ (VMT-88) の値**だった。`tools/plugins/inventory/delphi_vmt.py` は VMT 本体の VA を引数に取り、`ClassName` を `vmt-24` から読む。自己ポインタ値を渡すと `ClassName` が機械語になる (既知の正の対照 `TFruityHost` の VMT `0x1314108` は自己ポインタ `0x1314178` で、規約どおり読める)。正しい VMT は `0xb07308` (ClassName=TDBXStreamValue・InstanceSize=152) と `0xb65558` (ClassName=TGenericPlugin・InstanceSize=1984)。
+  - 影響: 上の「VMT 即値 0 件」「RIP 相対 lea 0 件」「生バイト検索」の結果は、探した対象が誤り (自己ポインタ値) のため、VMT 本体の参照検索としては無効。正しい VMT (`0xb07308`・`0xb65558`) で `analysis/py5144_ctor.py` を流し直すと、即値・RIP 相対 lea ともに 0 件 (実測 1.88 秒・n=1・load 0.47 / 1 分平均)。生バイト検索 (4 バイト即値) も、両 VMT とも 0 件。
+  - 自己ポインタ値 (`0xb07378`・`0xb655c8`) の 4 バイト即値は、.text 内の 2 箇所ずつ (`0xb072b0`・`0xb07c79`・`0xb65500`・`0xb659b0`) にあるが、いずれも機械語の途中で、コードからの参照ではない。
+- FieldTable の検証 (`analysis/py5144_fields.py`・新規): 正の対照 `TFruityHost` (VMT `0x1314108`) は FieldTable nil。`TDBXStreamValue` (VMT `0xb07308`) は FieldTable `0xb07720` (Count=0)。`TGenericPlugin` (VMT `0xb65558`) は nil。published フィールドが無いため、`+0x18`・`+0x7a0` の宣言型はここからは引けない (実測 0.049 秒・n=1)。
+- 未確定の残り: 受け手オブジェクトの格納元 (コンストラクタ・代入サイト) は、正しい VMT 参照では見つからなかった。宣言型は FieldTable に無いため、RTTI 以外の手段 (フィールドの代入サイトの追跡) が要る。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 群 C の 2 件の受け手の型 (`[Self+0x18]`・`[Self+0x7a0]` に格納されるオブジェクトの動的型。格納元は未特定) | 受入 2b の件数 | #5144 (残り) |

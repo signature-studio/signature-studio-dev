@@ -3,7 +3,7 @@
 
   python3 analysis/py5144_ctor.py <PE.bin>
 
-対象 VMT: TDBXStreamValue 0xb07378 (受け手 +0x18)・TGenericPlugin 0xb655c8 (受け手 +0x7a0)。
+対象 VMT (本体の VA。自己ポインタ値 0xb07378・0xb655c8 ではない): TDBXStreamValue 0xb07308 (受け手 +0x18)・TGenericPlugin 0xb65558 (受け手 +0x7a0)。
 見るもの:
   - `mov qword [mem], imm32` (即値が VMT アドレス。符号拡張 imm32 を含む)
   - `lea reg, [rip+disp]` (target が VMT アドレス)
@@ -17,7 +17,7 @@ import pefile
 
 X = capstone.x86
 path = sys.argv[1]
-VMTS = {0xB07378: "TDBXStreamValue", 0xB655C8: "TGenericPlugin"}
+VMTS = {0xB07308: "TDBXStreamValue", 0xB65558: "TGenericPlugin"}
 
 pe = pefile.PE(path, fast_load=True)
 data = open(path, "rb").read()
