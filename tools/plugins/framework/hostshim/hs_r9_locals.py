@@ -19,7 +19,7 @@ import hs_disp_emu as E
 import hs_store_111c as W
 
 SITES = (0x1090dc4, 0x1090ff9)
-TARGETS = ('+ 0x60]', '+ 0x98]')
+TARGETS = ('[rbp + 0x60]', '[rbp + 0x98]')
 
 
 def func_start(insns, idx):
