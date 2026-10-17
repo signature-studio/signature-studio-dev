@@ -120,6 +120,7 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   if [ "${M11_FIX_F552A0:-0}" = 1 ]; then
     python3 ldfix/fix_f552a0.py work/boot_final.ll work/boot_final.f552a0.ll
     mv work/boot_final.f552a0.ll work/boot_final.ll
+    python3 ldfix/judge_arg1_5999.py work/boot_final.ll
     python3 m11_cond.py f552a0=applied
   else
     python3 m11_cond.py f552a0=not-applied
