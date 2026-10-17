@@ -493,6 +493,8 @@
 | `tools/m11/ldfix/REPORT_509.md` | ~165 | F3c 門の拡張と LSF 脱落 8 関数 / 11 site の IR 修復、消費者形 (`fix_f3c_use`) の監査、残存誤り (41a670 / 666a60) (#509) |
 | `tools/m11/ldfix/REPORT_510.md` | ~150 | base が引数由来でない load→store (370 site / 169 関数) の判定軸: SSA 対応の静的判定 vs liftdiff 動的差分の実測比較と脱落数 (#510) |
 | `tools/m11/ldfix/REPORT_5693.md` | ~60 | function_439f90 (0x439f90) の IR を機械語どおりに組み直す opt-in pass (`fix_439f90.py`)。judge MISMATCH 13→10 の実測。unit 結果は未測定 (#5693) |
+| `tools/m11/ldfix/REPORT_6246.md` | ~50 | function_f552a0 (0xf552a0) の間接 call `f55396` (`[rsi+0x18]`) が IR に写らない件 (callee は実行時 vtable で未解決) と、脱出後 call の第 1 引数が #5999 と同じ原因であることの判定。probe `probe_f552a0_6246.py` (#6246) |
+| `tools/m11/REPORT_APPENDIX_6246.md` | ~26 | m11 #4011 の REPORT.md §19・§20 の全文 (#6246 で 250 行上限のため分割移動。内容は無変更) |
 | `tools/m11/ldfix/REPORT_5999.md` | ~75 | function_f552a0 (0xf552a0) のループ呼出し第 1 引数を機械語 `[rbx]` (= %arg1) に戻す opt-in pass (`fix_f552a0.py`)。既定 OFF (e2e 期待値ゲートが修正の有無にかかわらず落ちるため)。修正の有無で e2e 数値は不変 (#5999) |
 | `tools/m11/ldfix/REPORT_564.md` | ~60 | escape 済み stack_var 内部 read の undef 化 (AllocateHWnd 52a7f0 の `cmp [TempClass.lpfnWndProc]`)。ldfix F4 の修復 10 関数と RegisterClassW 到達の実測・全数走査 (#564) |
 | `tools/m11/ldfix/REPORT_968.md` | ~50 | D17 修復 pass (rip 相対セルの 2 段 deref 潰れ) の部分達成: 単一 load の 24 関数を修復、残りは子 issue (#968) |
