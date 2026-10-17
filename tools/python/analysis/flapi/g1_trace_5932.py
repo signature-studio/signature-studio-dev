@@ -2,9 +2,9 @@
 """G1 0xbd0ba0 の呼出し前段を追う (#5932)。entry 0x1376820 の全命令を記録し、
 import スタブの呼出しと、初期化テーブルの handler 呼出し件数を出す。
 
-  FL_WIN64_DIR=<展開先> python3 analysis/flapi/g1_trace_5932.py [出力 txt]
+  FL_WIN64_DIR=<展開先> python3 analysis/flapi/g1_trace_5932.py <出力 txt>
 
-出力 txt は全命令の列 (約 2 万行)。既定は work/5932/full_trace.txt (gitignore)。
+出力 txt は全命令の列 (約 2 万行)。出力先は引数で必須指定する (リポジトリ内には書かない。例: /tmp/opencode/full_trace.txt)。
 """
 import os
 import struct
@@ -18,7 +18,9 @@ from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RSP, UC_X86_REG_RIP, UC
 
 PAGE = 0x1000
 PE_PATH = os.path.join(os.environ["FL_WIN64_DIR"], "extracted", "block00031_PE.bin")
-OUT = sys.argv[1] if len(sys.argv) > 1 else "work/5932/full_trace.txt"
+if len(sys.argv) != 2:
+    sys.exit("usage: FL_WIN64_DIR=<展開先> python3 g1_trace_5932.py <出力 txt>")
+OUT = sys.argv[1]
 STUB = 0x10000000
 STUB_SIZE = 0x100000
 STACK_TOP = 0x30100000
