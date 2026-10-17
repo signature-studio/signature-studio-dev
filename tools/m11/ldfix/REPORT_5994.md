@@ -16,22 +16,22 @@
 
 「kind=ok で入口に hit」は、その関数の入口計装が kind=ok の unit で 1 回以上 hit したもの。
 
-| 関数 | survey kind=ok hit | 他 kind の hit | IR の直接呼び出し元 (2 段目) | 間接 call 経路 (trampoline) |
+| 関数 | survey kind=ok hit | 他 kind の hit | 直接呼び出し元 (`caller X -> callers Y`: X の呼び出し元が Y) | 間接 call 経路 (trampoline・生成規則上の有無) |
 |---|---|---|---|---|
-| db6480 | 0 | — | dc25f0 (→ dc27c0) | 有 (`m11_tr_function_db6480`) |
-| dc27c0 | 0 | — | dbde10 (→ 10348b0) | 有 |
-| ddd4d0 | 0 | — | ddeca0 (→ de10c0) | 有 |
-| 41b8d0 | 0 | — | 41bd20 (→ 41bff0)・41be80 (→ 41c040) | 有 |
-| 41b970 | 0 | — | 41bd20・41be80 (同上) | 有 |
-| 449550 | 0 | — | 449600 (→ 50a8c0・50aa70・50abe0・50ad30・528150)・47a250 (→ 42 関数) | 有 |
-| 44fb40 | 0 | — | 44fab0 (→ 44fce0) | 有 |
-| 784ed0 | 0 | — | 785220 (→ 7878c0・78bab0・78c110)・786180 (→ 785a90) | 有 |
-| c40420 | 0 | — | d341b0 (→ d34290) | 有 |
-| f552a0 | 0 | — | f3c7b0 (→ f40840) | 有 |
+| db6480 | 0 | — | caller dc25f0 -> callers dc27c0 | 有 (`m11_tr_function_db6480`) |
+| dc27c0 | 0 | — | caller dbde10 -> callers 10348b0 | 有 |
+| ddd4d0 | 0 | — | caller ddeca0 -> callers de10c0 | 有 |
+| 41b8d0 | 0 | — | caller 41bd20 -> callers 41bff0・caller 41be80 -> callers 41c040 | 有 |
+| 41b970 | 0 | — | caller 41bd20 -> callers 41bff0・caller 41be80 -> callers 41c040 (41b8d0 と同じ) | 有 |
+| 449550 | 0 | — | caller 449600 -> callers 50a8c0・50aa70・50abe0・50ad30・528150・caller 47a250 -> callers 42 関数 | 有 |
+| 44fb40 | 0 | — | caller 44fab0 -> callers 44fce0 | 有 |
+| 784ed0 | 0 | — | caller 785220 -> callers 7878c0・78bab0・78c110・caller 786180 -> callers 785a90 | 有 |
+| c40420 | 0 | — | caller d341b0 -> callers d34290 | 有 |
+| f552a0 | 0 | — | caller f3c7b0 -> callers f40840 | 有 |
 
 - 関数ごとの hit 件数は、committed 2 本の survey で確認した。41b8d0・41b970・449550・44fb40・784ed0・c40420・f552a0・db6480・dc27c0・ddd4d0 は、どちらの JSON でも kind=ok の hit が 0。
 - 40fe90 は reach_1325_head で oob (unit 745) と halt0 (unit 895) の hit だけ。この run の対象外。
-- 間接 call 経路は、関数の 2 段目呼び出し元として `m11_tr_function_*` が出る (`m11_build.sh` の間接 call トランポリン)。どの unit がこの経路を通るかは未計測。
+- 間接 call 経路の「有」は、個別の IR 確認をしていない。`tools/m11/m11_post.py` は引数 8 以下の定義関数それぞれに `m11_tr_<fn>` (`m11_tr_function_<VA>`) を生成し、VA→トランポリン表に載せる (同ファイル 360〜371 行)。表の「有」はこの生成規則からの推定。どの unit がこの経路を通るかは未計測。
 - 呼び出し元の 2 段目が多い 449550 (← 47a250 の 42 呼び出し元) と 784ed0 (← 785220・786180) は、呼び出し元のうち survey で到達するものの有無を個別に見る必要がある (未実施)。
 
 計算は `tools/m11/ldfix/callers_5994.py` (静的・計装なし)。出力:
@@ -51,7 +51,7 @@ python3 tools/m11/ldfix/callers_5994.py work/boot_final3.ll 101d180 db6480 dc27c
 
 | 残件 | 影響 | 起票先 |
 |---|---|---|
-| 呼び出し元 (§2 の 2 段目) の kind=ok 到達を、committed と同じ build で計装して測る | 10 関数の「到達しない理由」の機構が未確定 | #5994 (本 issue)・#3194 |
-| 同梱 obj の C 再コンパイルと `ir_conditions.json` の再現 (build 経路の確認) | 上の測定の前提 | #3194 |
+| 呼び出し元 (§2 の 2 段目) の kind=ok 到達を、committed と同じ build で計装して測る | 10 関数の「到達しない理由」の機構が未確定 | #5994 (open・本 issue に残件を保持) |
+| 同梱 obj の C 再コンパイルと `ir_conditions.json` の再現 (build 経路の確認) | 上の測定の前提 | #5994 (open・本 issue に残件を保持) |
 
-- 子 issue は起票しない (測定の残件は親 #3194 の受入 4 に既にあり、本 issue の PR 本文の未解決表に書く)。
+- 子 issue は起票しない。残件は open のままの #5994 に保持する (#3194 には、この残件に対応する受入条件が無い)。
