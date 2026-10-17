@@ -206,3 +206,14 @@ node tools/m11/trap_triage/survey_units.mjs <out>.json                          
 ### 10.1 差分 0 の証跡
 
 - 測定 commit `22c914300` 以降の build 入力の差分は無い (本 REPORT の追記のみ)。
+
+## 11. unit 492 の `$2983` 入口の実行時値 (#4882、測定 commit `6bb9056ff`)
+
+- 測定 commit: `6bb9056ff` (e2e を実行した commit)。build 入力 (IR・C・build スクリプト・survey) は `7cb5df311` と同一。`git diff 7cb5df311 6bb9056ff -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/trap_triage/survey_units.mjs | wc -c` は 0。`6bb9056ff` が足すのは計測スクリプト 2 本と本節だけ (`git diff --stat 7cb5df311 6bb9056ff -- tools/m11` = 3 files, 128 insertions)。
+- build: `m11_gen_ir2.sh` rc 0 → `m11_build.sh` rc 0。計装版は `wasm-opt --instrument-memory` (version 133) で `work/trap_2891/instr.wasm`、`wasm-dis` で `instr.wat` (`$2983` は 1304192 行、`call $161` は 1304857 行)。
+- 入口 hook: `trap_triage/patch_entry_2983_4882.py` が `instr.wat` の `local.set $8` の直後に `dbg_entry_4882(i32 $2, i64 $0)` を足す (分岐・戻り値は変えない)。
+- 組み立て: `wasm-as --all-features` で組んだ wasm は Node が `unknown import kind 0x7e` で読めなかった。`--enable-bulk-memory --enable-sign-ext --enable-mutable-globals --enable-nontrapping-float-to-int` で組むと読める。
+- 実行: `trap_triage/entry_2983_4882.mjs` で全 942 unit を順に実行 (4 分 30 秒、rc 0)。kind の集計は `ok 873 / miss 47 / halt0 6 / oob 15 / noproc 1` で、§2 の基準 (`ok 873 / miss 47 / halt0 7 / oob 14 / noproc 1`) と **1 unit ずれている** (`halt0` 6 と `oob` 15。`halt0` 7 と `oob` 14 ではない)。原因は未特定 (§4 では計装版と既定 build の kind 差分は 0 件だったため、それとも矛盾する)。per-unit の kind は保存していない。ずれた unit が 492 か否かは、この run の出力からは判定できない。よって 492 の記録の採否は、既定 build での再 survey (未実施。素材不足) まで保留する。記録は unit 492 のみ。
+- 結果 (unit 492、`$2983` 入口 1 回。ただし上の kind のずれにより暫定): `$2` = `0x10f`、`*(s+280)` = `0x0`。`$8 = ($2 & 0xffff) - 256 = 15`、`$15 = ($8 < *(s+280)) = 0`。`block3` を抜けないため `call $161` (第 3 引数 `i64.const 1`) が実行される。
+- 単独実行の注意: unit 492 だけを先に回すと `oob` になり、`$2983` に到達しない (測定 commit の base でも同じ)。前 run までと同じく、全 unit を順に回す必要がある。
+- 未確定: 「`$2983` が 0x10aa1150 に値 1 を置く」の同一 run での照合は未実施 (watch と入口 hook は別の run)。`$2` の由来 (呼び出し元) は次の run の範囲。
