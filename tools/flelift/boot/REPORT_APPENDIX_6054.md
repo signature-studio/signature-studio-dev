@@ -149,3 +149,43 @@ A	tools/flelift/boot/rsi_zero_variant.sh
 - 残骸を消した差のうち、内容の差として残るのは 1 語だけ。残骸が出力 (`image_writable`) の内容を変える根拠は、この 6 run では見つからなかった。
 - ただし (a) content 1 語の正体は未確定、(b) 残骸の値が分岐 (f_44f5d0・f_43c4c0・§9) を経て出力に届く経路は未追跡、(c) 配置のずれが後続の分岐を変えた可能性 (GetMem 3680 → 3681 の因果・§5) は区別できていない。よって受入 1 (「影響するか」) は **未達**。
 - 判定は **部分達成**。残りは #4426 に残す。
+
+## 19. 陽性対照が既定経路で 0 件になる理由 (#6213・測定 commit `02d46f1fc`)
+
+- 結論: 既定経路 (`FLE_IPP` 未指定・mode 3) で `0x5ac308`・`0x11f6100` が 0 件なのは、監視が効かないからではなく、**この 2 slot を書く処理が mode 3 では走らないから**。差は `FLE_IPP` の mode (3 と 1) だけで、root (`0x1375990` の有無) と寛容起動 (`FLE_TOLERANT`) は原因ではない。
+- 同じ build (`FLE_EXTRA_CCF` で `0x5ac308`・`0x11f6100` を監視) の boot 停止時の値 (`FLEBOOT_SLOT6213`・`fle_boot.mjs` に読取りを追加):
+
+| 条件 | 停止 unit | `0x5ac308` | `0x11f6100` | 監視の出力 |
+|---|---|---|---|---|
+| 既定 (mode 3) | 895 | `0x40f960` (PE 値のまま) | `0x4820498b48000000` (不変) | 0 件 |
+| `FLE_IPP=1` (4464 条件) | 209 | `0x0` | `0x0` | 2 件 (unit 209 の同じ 16B 書込み) |
+
+- root 差の確認: mode 3 で root を `0x6a7b70,0x1375990` にしても 0 件 (`pcA`)。mode 1 で root を `0x6a7b70` だけにしても 2 件 (`pcB`)。
+- mode 3 の監視で 0 件になるのは、既定経路で slot の値が変わらないため (`FLEBOOT_SLOT6213` が PE 値・初期値のまま)。監視の空振りではない。
+- 書込み元 (受入 2): `FLE_WWATCH_JS` の build (`pcF`・mode 1) で、2 slot を 0 にする書込みの呼出し連鎖は `fle_wwatch` ← `STX` ← **`f_6a7b70`** ← `ott_dispatch` ← `f_6c7610` ← `f_815050` ← `f_815e10`。§17 の書込み元と一致する。`f_6a7b70` は既定経路でも root 化されている (`FLE_EXTRA_ROOTS=0x6a7b70`) が、mode 3 では受け手を覆う書込みが出ない。
+- 未解決 (起票先: #5337): mode 1 と mode 3 で `f_6a7b70` の呼出し引数 (`dst`・`cnt`) がどう違うか。mode 3 で `f_6a7b70` が呼ばれて別の範囲を塗るのか、呼ばれないのかは未計測。`0x6a7b70` の root 化は本件の範囲外 (PM 判断 blocklist) のまま。
+
+測定 (いずれも `fle6_measure.sh`・`FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs"`・rc は各 run の結果。所要は各 run の `time`):
+
+| run | 条件 | rc | 所要 |
+|---|---|---|---|
+| default | mode 3・監視 `0x5ac308,0x11f6100` | 0 | 3 分 49 秒 |
+| 4464 tol | mode 1・寛容・root `0x6a7b70,0x1375990` | 0 | 3 分 46 秒 |
+| pcA | mode 3・root `0x6a7b70,0x1375990` | 0 | 3 分 35 秒 |
+| pcB | mode 1・寛容・root `0x6a7b70` | 0 | 3 分 51 秒 |
+| pcC | mode 3・監視 4 slot (`0x15e1c78` 等を含む) | 0 | 3 分 38 秒 |
+| pcD | mode 3・読取り probe (`FLEBOOT_SLOT6213`) | 0 | 3 分 19 秒 |
+| pcE | mode 1 (shim)・監視 2 slot | 3 | 3 分 53 秒 |
+| pcF | mode 1 (shim)・`FLE_WWATCH_JS` | 3 | 3 分 47 秒 |
+
+- rc 3 は IPP 判定 NG (mode 1 では `ptr_15F34A0=0x0`・`ok:false`)。pcE・pcF は判定 NG を想定した診断 run で、boot の停止位置 (unit 209) の確認が目的。
+- boot 単独 (同じ build・`--boot-only`): mode 3 は 895 unit・mode 1 は 209 unit。どちらも約 10 秒。
+- 測定時の load: 1.1〜2.8 (4 vCPU)。
+
+素材: `oc_artifacts: fl-win64 toolchain-emsdk`。
+再現:
+```sh
+FL_WIN64_DIR=<fl-win64> SS_EMSDK_ENV=<emsdk_env.sh> FLE_BOOT_WORK=<work> FLE_BOOT_RUNS=default \
+  FLE_EXTRA_ROOTS=0x6a7b70 FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_SLOTS=0x5ac308ull,0x11f6100ull" \
+  bash tools/flelift/boot/fle6_measure.sh
+```
