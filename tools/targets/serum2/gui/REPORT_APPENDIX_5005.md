@@ -178,3 +178,15 @@ GHIDRA_HOME=<Ghidra 12.1.4 の展開先> python3 ../gui/iterate_sr85_upper.py   
   - 不一致 6 件は全て `[RAX+0x8]` (slot 1) で、`--all-disps` の TSV に行が無い。理由は未確認 (候補列挙の条件を読んだだけでは説明できなかった。`receiver_this_trace.py` の 433 行付近の条件を次 run で確かめる)。
 - 判定: 受入 (同じ slot を持つ別クラス vtable の候補を型で絞る) は**未達**。`vptr:THIS` 14 件は「所属関数の this」であって、呼出先の型を証明しない。別クラス候補の絞り込みには、この 14 件を slot 関数に結び付ける段が要る (本 run では未実施)。
 - 未解決: 不一致 6 件 (slot 1 の `[RAX+0x8]`) の分類、`vptr:THIS` 14 件から別クラス候補を絞る段 → #5934 (open のまま)。
+
+### 5.11 不一致 6 件の原因と修正 (#5934・run 5)
+
+- 原因: `receiver_this_trace.py` の `parse_mem` が、十進の変位 `[rax + 8]` の `8` を index と誤認していた (`term.startswith("0x")` だけを変位と判定していた)。そのため `analyze()` の `mm["index"]` で除外され、TSV に行が出なかった。6 件は全て `[RAX+0x8]` で、この理由に一致する。
+- 修正: `parse_mem` で十進の数字を変位として読む (1 箇所)。
+- 測定 commit (コード): `41a9499ba`。入力 `Serum2_win64.vst3` sha256 `501e7bb3…4e5283` (19,236,864 B)。Ghidra 12.1.4 (sha256 `ddac49f9…d4db` を検査済み) import **18 分 13 秒** (rc 0)。
+- 閉包 `-process` (root = `xferonoff_upper2_fns.tsv`・sha256 `fcafc8df…82f9`) と間接 call 列挙は前 run と一致 (SITE 107 行)。
+- `receiver_this_trace.py` の結果 (commit `41a9499ba`): 既定 (disp 0x30/0x38/0x88) **1052 件** (修正前と同じ)。`--all-disps` **26,793 件** (修正前 24,651 件・+2,142 件。`[rax+8]` の分)。
+- 突き合わせ (`indirect_sr85_join_recv.py`): **46 件中 46 件一致・未一致 0** (前 run は 40 件一致・6 件不一致)。
+- 46 件の分類 (strict): `vptr:THIS` 14・`R-index` 10・`R-nodom` 8・`vptr:NODOM` 6・`vptr:THIS-CHILD` 3・`vptr:CALLRET` 2・`vptr:OUTPARAM` 1・`vptr:THIS-EMB` 1・`vptr-emb:THIS-EMB` 1。
+- 判定: 受入 (同じ slot を持つ別クラス vtable の候補を型で絞る) は**未達**。`vptr:THIS` 14 件を slot 関数に結び付けて別クラス候補を絞る段、および `R-index` 10 件の由来の追跡が残る。
+- 未解決: `vptr:THIS` 14 件の slot 結び付け、`R-index` 10 件 → #5934 (open のまま)。
