@@ -27,15 +27,24 @@ REPORT.md §14 の分割移動先。測定値・経緯はここ。
 
 ### 15. f_c395a0 (束縛関数) の既定経路での到達 (測定 commit `54ba2ac7e`)
 
-- **結論**: 既定経路 (FLE_IPP 未指定・mode 3) で、`0x16b8298` を書く `f_c395a0` の入口 (`c395a0`)・格納直前 (`c396c5`)・唯一の直接呼出元 (`c3b3a2`) は 0 件だった。したがって `0x16b8298` が 0 のままなのは、この束縛関数が既定 boot で走らないためと読める。受入 1 (E[1..999] の実測) は未達のまま。
+- **結論**: probe 付きの既定経路 (FLE_IPP 未指定・mode 3) の run で、`0x16b8298` を書く `f_c395a0` の入口 (`c395a0`)・格納直前 (`c396c5`)・唯一の直接呼出元 (`c3b3a2`) は 0 件だった。`0x16b8298` が 0 のままなのは、この束縛関数が既定 boot で走らないためという仮説と整合する。ただし挿入位置を照合できていない (下記) ため、観測の強さは「挿入位置未照合の観測」にとどまる。受入 1 (E[1..999] の実測) は未達のまま。
 - 測定: `tools/flelift/boot/c395_entry_probe.sh` (lift 生成 C に `dbg_lift.py` で 4 点を挿入し、`build.sh plain` → `fle_boot.mjs --boot-only`)。
-- 挿入の確認 (4 点・`dbg_lift.py` の出力を転記。shard は `FLE_SHARDS=8` の `fle_lifted_s<k>.c`):
-  - `c3b3a2` (callsite): `-> line 249823 in f_c3b340` (shard 2)。unresolved ではない。0 件の読みはこの挿入の上で得た。
-  - `c395a0` (entry): `-> line 254453 in f_c395a0` (shard 7)
-  - `4235f0` (resolver): `-> line 36079 in f_4235f0` (shard 7)
-  - `c396c5` (STORE): `-> line 254555 in f_c395a0` (shard 7)
-  - 上記は測定時の挿入と別 (`s0.c:258322`・`s7.c:36080` の行番号は旧測定の記録)。probe 機構は動く (resolver は既定経路で 16 件以上発火)。
-  - 検証: 挿入段のみを HEAD の `c395_entry_probe.sh` で実行 (`insert_probe` の shard 単位判定) し、4 点とも 1 回ずつ解決して `inserted=4`。boot 段 (`build.sh plain` → `fle_boot.mjs`) は emsdk が runner に無く未実行。上の 0 件の boot 結果は `54ba2ac7e` 時点の実測のまま。
+- 挿入位置の照合 (測定 commit `eb9d3859a` 以降の HEAD・挿入段のみ): 0 件の boot run (`54ba2ac7e`) の挿入位置は記録が無い。前版に転記した値 (shard 2 `249823`・shard 7 `254453`/`254555`) は、本照合の lift では再現しなかった。
+  - 再現手順: lift を `FLE_EXTRA_ROOTS=0x6a7b70` (fle6 既定 root) で `gen_boot.py` (phase A) → `x64c.py --closure 2 --shards 8` → `fle_data_gen.py` → `gen_boot.py --meta` (phase B) の順に作る。その `work/boot/lift` に対し、HEAD の `c395_entry_probe.sh` の 26〜46 行 (挿入段) を切り出して実行した (boot 段は未実行)。
+  - 出力 (`bash work/boot/insert_only.sh`・rc 0):
+
+```
+[c395] callsite [dbg_lift] 0xc3b3a2 -> line 250114 in f_c3b340 (shard 3)
+[c395] entry [dbg_lift] 0xc395a0 -> line 258221 in f_c395a0 (shard 0)
+[c395] resolver [dbg_lift] 0x4235f0 -> line 36080 in f_4235f0 (shard 7)
+[c395] STORE [dbg_lift] 0xc396c5 -> line 258322 in f_c395a0 (shard 0)
+[c395] probe 挿入行数: 4
+```
+
+  - `grep -c 'C395-' fle_lifted_s*.c` は s0 = 2・s3 = 1・s7 = 1 (計 4)。4 点とも 1 shard に 1 件だけ解決された。
+  - 0 件の読みが使った挿入位置は本照合と同じかは未確認 (前版の転記値は再現しなかった)。よって 0 件の読みは「現 script の挿入位置で未照合の観測」として扱う。
+- 挿入の確認 (`c3b3a2`・`c395a0`・`4235f0`・`c396c5` の 4 点とも unresolved ではない)。probe 機構は動く (resolver は既定経路で 16 件以上発火)。
+- boot 段 (`build.sh plain` → `fle_boot.mjs`) は、この runner に emsdk (`SS_EMSDK_ENV`) が無く未実行。上の 0 件の boot 結果は `54ba2ac7e` 時点の実測のまま。
 - 測定時の `SS_EMSDK_ENV`: 実行ログに記録が無く、どの emsdk で走ったかは未確認 (`3b081a0f9` の script の既定値 [EMSDK] か、指定値かは不明)。HEAD の script は `SS_EMSDK_ENV` 必須なので、以後は必ず指定して run する。
 
 | 項目 | 結果 (`54ba2ac7e`) |
