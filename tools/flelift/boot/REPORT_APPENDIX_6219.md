@@ -15,7 +15,7 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | 診断 route・既定 route とも `62bc6ddb0` (現 HEAD)。`wval_lift.py` の重なり判定は `6e2c7ec49` から変えていない。`fle_boot.c` の監視 slot (#5415) は main 取り込みで入った計測のみの差分 |
+| 測定 commit | 診断 route は `62bc6ddb0` (現 HEAD)。既定 route は `949ec634a` と `6e2c7ec49` (下の n=2)。`wval_lift.py` の重なり判定は `6e2c7ec49` から変えていない。`fle_boot.c` の監視 slot (#5415) は main 取り込みで入った計測のみの差分 |
 | 素材 | `fl-win64` (`$ARTIFACTS_DIR`) / `toolchain-emsdk` (上流 `emsdk install 6.0.12`) を `$RUNNER_TEMP` に展開 (repo 外) |
 | 診断 route (root 無し・`FLE_BOOT_RUNS=diag_shim`・`62bc6ddb0`) | units_run **209** / `unlifted 0x6bbc20` / getmem 2314 / freemem 1200 / `IPP_CHECK mode:1 ok:true`。n=2 (`fle6_measure.sh` 1 回 + 同じ build の boot 再実行 1 回 (`fle_boot.mjs`)。2 回とも同値) |
 | 監視版 (診断 route・`WVAL_OBJWATCH=1`・`62bc6ddb0`) | units_run **209** / 停止点同じ / getmem 2314 / freemem 1200 (差 0・通常版と同値)。n=1 |
