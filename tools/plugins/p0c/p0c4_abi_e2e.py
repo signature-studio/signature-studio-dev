@@ -43,7 +43,7 @@ UCOMI_FIX = ['0x5e12b0']  # #3439: ucomiss の被演算子・flags を接続 (k8
 FIX18 = ['0x5de620', '0x5dea40', '0x5dec40', '0x5dedb0', '0x5dee20', '0x5dee50', '0x5df340',
          '0x5dfae0', '0x5dfbe0', '0x5dfc90', '0x5dfdb0', '0x5dffc0', '0x5dfff0', '0x5e0300',
          '0x5e0350', '0x5e03f0', '0x5e12c0', '0x5e1490']
-HB_N = 14  # k80_hand_bodies.py の BODIES 14 (#2182)
+HB_N = 9  # k80_hand_bodies.py の BODIES 9 (#2182。#6046 で x87 一般 pass に置換した 5 本を除く)
 PE_N = 2  # k80_pe_globals.py の置換対象 (0x6fffb0 = (0.5, 0.5) #2182 / 0x6fc26c = 同種の i128 0 初期化 #3281)
 EXT_FUNCS = 'function_5dfc90,function_5dfbe0,function_5dfd30,function_5dfdb0'
 EXT_CHOPF = 'function_5dfbe0,function_5dfc90,function_5dfdb0'
@@ -107,7 +107,8 @@ def main():
         rep['movd_fixed'], rep['helper_xmm_fixed'], rep['struct_copy_fixed'],
         rep['orphan_gpr_fixed'], rep['orphan_float_fixed']))
     funcs = ('function_5de820,function_5dedf0,function_5dfb60,function_5dfbe0,'
-             'function_5dfc90,function_5dfd30,function_5dfdb0')
+             'function_5dfc90,function_5dfd30,function_5dfdb0,'
+             'function_5dea40,function_5dec40,function_5dedb0,function_5dee20,function_5dee50')
     run(['python3', os.path.join(HERE, 'x87fix.py'),
          os.path.join(d3, 'k80.argfix.ll'), os.path.join(d3, 'k80.x87fix.ll'),
          '--report', os.path.join(d3, 'x87fix.json'), '--funcs', funcs,
