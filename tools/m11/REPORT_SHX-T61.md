@@ -3,8 +3,9 @@
 ## 1. 結論
 
 - 計装の基盤を入れた。`M11_FIX_SHX_T61=1` のときだけ callee `function_4483f0` の入口に呼出し回数と `this+0x4c`・`this+0x48` を `@fx61_buf` へ書く。既定 OFF で、既定 IR は変わらない (`shx_t61=not-applied`)。
-- 受入 1 (hang の機序の確定) は未達。ON で実 boot は rc 124 (hang) し、hang 後に `@fx61_buf` を読む経路が無い。hang 位置は未確定。
-- 本 REPORT の ON・既定の数値は、PR 本文に書かれた前 run の実測である。本 run では lift 素材 (`tools/m11/work/boot*.lift.ll`) が無く、IR を再生成できなかった (§3)。
+- 受入 1 (hang の機序の確定) は未達。前 run の ON では実 boot が rc 124 (hang) し、hang 後に `@fx61_buf` を読む経路が無かった (trap 方式より前の状態)。hang 位置は未確定。
+- trap 方式 (§5) で、hang の前に記録を読めるようになった。ON の値は §5 の表が正本。
+- §3.1・§3.3 は前 run の実測である。本 run (fix) では lift 素材 (`tools/m11/work/boot*.lift.ll`) が無く、IR を再生成できなかった (§3.2)。
 
 ## 2. 測定条件
 
@@ -17,6 +18,7 @@ $ git diff b07e20aaf HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
 ```
 
 - 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`) を本 run で展開。`work-m11` は本 run の artifacts 配置先 (`docs/WORKFLOW.md` §11 の `work-m11`) に無い。
+- §5 の IR の出所: 記録が無い。PR 本文と REPORT の既存記述のどこにも、§5 の trap 実測に使った IR の生成元 (生成スクリプト・素材の版・`ir_sha256`) が書かれていない。生成物 (`work/`) と lift 素材は fix run の環境に無く、再生成には RetDec が要る (D5 で新規作業は不可)。よって fix run では §5 の表を再現できなかった。
 - 負荷 (前 run): 1 分平均 0.99〜1.00 (nproc 4)。
 
 ## 3. 実測
@@ -32,11 +34,11 @@ $ git diff b07e20aaf HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
 
 全文の `ir_sha256` は前 run の PR 本文に無く、本 run でも再生成できないため未記録。
 
-### 3.2 本 run の再現 (失敗)
+### 3.2 前 run の再現 (失敗・fix run でも同じ)
 
-- `m11_gen_ir2.sh` (既定・FL_WIN64_DIR を展開先に設定): rc 1。`work/boot0.lift.ll` が無い (`m11_merge.py` が FileNotFoundError)。
-- 原因: lift 素材 `boot0〜5.lift.ll` を含む `work-m11` が本 run に配置されていない。本 run の artifacts 配置先は `fl-win64.tar.zst` のみ。`boot*.lift.ll` の再生成は RetDec を使うため、新規の作業としては行わない (D5)。
-- よって本 run では §3.1 の `ir_sha256` 全文と `fx61` 件数を再確認できなかった。
+- `m11_gen_ir2.sh` (既定・FL_WIN64_DIR を展開先に設定): rc 1。`work/boot0.lift.ll` が無い (`m11_merge.py` が FileNotFoundError)。fix run でも同じ rc 1 を確認した。
+- 原因: lift 素材 `boot0〜5.lift.ll` を含む `work-m11` が fix run に配置されていない。fix run の artifacts 配置先は `fl-win64.tar.zst` のみ。`boot*.lift.ll` の再生成は RetDec を使うため、新規の作業としては行わない (D5)。
+- よって fix run では §3.1 の `ir_sha256` 全文と `fx61` 件数を再確認できなかった。
 
 ### 3.3 ON 計装 (`M11_FIX_SHX_T40=1 M11_FIX_SHX_T61=1`・前 run の実測)
 
@@ -57,9 +59,9 @@ $ git diff b07e20aaf HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
 - `printf` を計装に使うと、`m11_winstubs.c` の `printf` stub と型が衝突してビルドが落ちた。
 - `sx_t61_rec` (IR から C の関数を呼ぶ形) も `genstubs` が生成する stub と名前が衝突し、リンクが落ちた (`gui_stubs_*.c`・`trace_wrap.c`)。IR の `declare` は stub 化されるため、IR から C を呼ぶ形は使えない。
 - そこで IR 側は `@fx61_buf` (global) に書き、C 側は読み出し関数だけを持つ形にした。リンクは通った。
-- ただし hang 中は `run_trace.mjs` が JS に制御を戻さないため、`fx61_buf` を読めない。
+- hang 中は `run_trace.mjs` が JS に制御を戻さないため、前 run の計装 (trap なし) では `fx61_buf` を読めなかった。trap 方式 (§5) で読めるようになった。
 
-## 5. 読み出し経路 (本 run・trap 方式)
+## 5. 読み出し経路 (fix run・trap 方式)
 
 - hang の前に記録を読むため、呼出し回数が `FX61_LIMIT` (既定 100000) を超えたら IR の `unreachable` で trap させる (`fix_shx_t61.py`)。trap は wasm 例外として JS に戻るため、`run_trace.mjs` は `_fx61_count` / `_fx61_self` / `_fx61_c4c` / `_fx61_c48` を読んで run.json の `fx61` に入れる (`build.sh` は計装の IR のときだけ export する)。
 - 実測 (commit は本 PR の HEAD。ON = `M11_FIX_SHX_T40=1 M11_FIX_SHX_T61=1`・trace_soft):
