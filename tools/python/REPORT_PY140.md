@@ -81,13 +81,22 @@
 
 ## 保留 (PE で確定できなかった点)
 
-- **ゲート**: 送出 leaf の入口に至る前に `0x60c220(obj, 0x57f, op, arg)` の戻り値 (> 0 で status 1) と `0x728f50` (mode bit 4) と `0xfdeaf0` (mode bit 0x20) がある。戻り値の値は未確定。`0x60c220` は `obj` の `vtbl+0x80` に委譲する汎用の問合せ (`0x60c22c`〜`0x60c24f`)。
-- **mode の源**: `0xfdd270` は `0x1542bec` (`.data` の定数表) を `vtbl+0x80` の戻り値で引き、`call 0x81c0a0` の戻り値が 0 のとき `or bl, byte ptr [rip+0xa]` (`0xfdd2a8`、対象 VA `0xfdd2b9`) を行う。表の添字の値域と `0x81c0a0` は未確定。
+- **ゲート**: 送出 leaf の入口に至る前に `0x60c220(obj, 0x57f, op, arg)` の戻り値 (> 0 で status 1) と `0x728f50` (mode bit 4) と `0xfdeaf0` (mode bit 0x20) がある。戻り値の値は未確定。`0x60c220` は `obj` の `[obj+0x80]` を直接呼ぶ汎用の問合せ (`0x60c22c`〜`0x60c24f`)。
+- **mode の源**: `0xfdd270` は `0x1542bec` (`.data` の定数表) を `vtbl+0x80` (`call [rax+0x80]`・`rax=[G+8]` の vtbl) の戻り値で引き、`call 0x81c0a0` の戻り値が 0 のとき `or bl, byte ptr [rip+0xa]` (`0xfdd2a8`、対象 VA `0xfdd2b9`) を行う。表の添字の値域と `0x81c0a0` は未確定。
 - **runtime の状態**: `rsi` (`0xfdd402` の `[rax+0xcc]` と比較する値) やゲート関数の対象 `obj` は runtime の状態。送出の成否はこの状態に依存する。
+
+## PY-406 受入 1: `0x60c220` の戻り値条件
+
+- **確定した構造** (`pe_disasm.py 60c220`): `0x60c220` は `msg.Result` (`[rbp+0x38]`、初期値 0) を戻す。`[rbp+0x20]`=edx (0x57f)・`[rbp+0x28]`=r8・`[rbp+0x30]`=r9 を立てたあと、`obj` (`rbx`=rcx) が非 0 なら `call qword ptr [rbx+0x80]` を `rcx=[rbx+0x88]`・`rdx=&msg` で呼ぶ (`0x60c244`〜`0x60c24f`)。よって戻り値は呼ばれた先が `msg.Result` に書く値そのもの。
+- **未確定**: 呼ばれる先 (`[obj+0x80]`) の値。`[obj+0x80]` を直接読む (VMT 経由ではない: `0x410090` の `call [rbx-0x38]` は VMT 経路)。この関数ポインタは obj のインスタンス状態で、PE 内の静的な書込み元が確定できない。
+- **探索範囲と結果**: `analysis/flapi/pe_obj80_writers.py` が block00031_PE の実行可能 section を線形走査 (5,022,467 命令を復号)。`mov qword ptr [<非フレーム reg>+0x80], <src>` は 77 件。うち src が `lea reg,[rip+disp]` で `0x410090` を指すものは 0 件。`call 0x410090` の直接参照も 0 件。すなわち「`0x410090` が `obj+0x80` に入る」経路は静的な即値・rip 相対では見つからない。線形走査のため、間接 (レジスタ経由の複数段) の書込みは除外しきれない。
+- **結論**: 戻り値 ≤ 0 の条件は、`obj+0x80` の実行時の値 (呼び先) と、その呼び先が `msg.Result` に書く値で決まる。静的には確定できない。理由は上記の書込み元が PE から一意に決まらないことである。確定には実行時の trace (`obj`・`[obj+0x80]`・呼び先が書く `msg.Result`) が要る。
 
 ## 検証
 
-- 本 REPORT の数値は PY-246 の実装 commit `a0fc92492` (tools/python のコードを最後に変えた commit) で測定した。`9b57a83cd` 以降の差分は REPORT のみ。
+- 本 REPORT の 27 関数の数値 (送出 leaf・VK・修飾) は PY-246 の実装 commit `a0fc92492` で測定した。`a0fc92492`..`9b57a83cd` の差分は REPORT のみ。
+- 新節 (PY-406 受入 1) の数値 (`decoded=5022467 writes_to_nonframe+0x80=77`) は `pe_obj80_writers.py` を含む commit `70c323053` で測定した。この PR の commit が `tools/python` のコードに加えたのは `analysis/flapi/pe_obj80_writers.py` の追加 (63 行) のみ。`pe_ui_dispatch_probe.py` と `pe_disasm.py` は `a0fc92492` 以降変更なし。
+- `a0fc92492`..`70c323053` の `tools/python` の非 md 差分 (157 ファイル) は main 側 (`9b57a83cd`..`1e95ba237`) の取り込みで、この PR の変更ではない。
 - 解析 probe (`analysis/flapi/pe_ui_dispatch_probe.py`) の測定 commit は `ca104e569`。旧版の `cond()` は符号付き分岐 (`jle`・`jg`) を判定できず到達しない経路を出していたため、ca104e569 でフラグを演算幅から求めるように直した。以下の probe 出力は ca104e569 以降のコードによる。
 - 測定 commit `a0fc92492` (HEAD `9b57a83cd` と tools/python のコード同一) で実行したコマンドと結果:
 
@@ -100,10 +109,11 @@
 | `node tests/ui_keys_diff.mjs` | rc 0。`{"calls":26,"diffs":0,"PASS":true}` | 0.049 秒 |
 | ネガティブコントロール: `host/fl_mock.mjs` の `ui.selectWindow` の符号を反転して `node tests/ui_keys_diff.mjs` | rc 1。`ui 送出キー差分 4 件` (selectWindow の arg 1・0 などで mock と C が食い違う)。検証後に mock を元へ戻し、`git diff` は 0 行 | — |
 | `node tests/ui_diff.mjs` | rc 0。`{"calls":17,"diffs":0,"outOfRangeKnownDiffs":3,"PASS":true}` (範囲外 index 3 件は既知の差分として分けて報告) | — |
-| `node tests/provider_check.mjs` | rc 1。§1 (表の整合) は通過し、件数は `{"functions":435,"implemented":220,"unimplemented":215,"mcp_static":60,"PASS":true}` (§1 のみを切り出して実行。rc 0)。§2 (エラー code) のアサートも通過。§3 で `work/midi.py` が無く ENOENT (`work/` は gitignore の素材置き場。`fetch_inputs.sh` 未実行)。受入 4・5 の未達は未解決表 (#4579) のとおり | — |
+| `node tests/provider_check.mjs` (HEAD `d81fa4a45` で再測定) | §1 (表の整合・件数) のみ。`provider_check.mjs` を `// 2. エラー code` の行の前で切った一時ファイルで実行し rc 0。`{"functions":435,"implemented":234,"unimplemented":201,"mcp_static":60,"PASS":true}`。a0fc92492 の同じ切り出しは `implemented:220`・`unimplemented:215` で、差 14 は `provider_expect` に追加された 7 ファイル (14 関数。すべて `fl_engine.c` で実装済み)。§2 (エラー code) と §3 (flpy 経路) は HEAD で未実行: §3 は `dist/flpy.js` が要り、`build_flpy.sh` は CPython wasm (`work/build-wasm/.../python312.zip`) が無いため HEAD で rc 1 (`cp: cannot stat`) で止まる。受入 4・5 の未達は未解決表 (#4579) のとおり | — |
 
 - 修飾子 (`rdx`) の値: 上の出力では cut/copy/paste = 0x4、selectWindow の arg≤0 = 0x1、他 = 0x0。PE の静的値と一致。
-- 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff a0fc92492 HEAD -- tools/python ':!*.md'` の出力は 0 byte (コード差分 0。再測定は不要)。
+- 差分の証跡 (`docs/WORKFLOW.md` §6): 27 関数の表の測定 commit `a0fc92492` から HEAD `f8ba50187` までに、上の表のテストが読むコードは変わっている。`git diff --stat a0fc92492 f8ba50187 -- tools/python/host tools/python/provider tools/python/tests` は 20 ファイル (`host/fl_mock.mjs`・`provider/fl_engine.c`・`provider/gen/fl_table.c`・`tests/*.mjs`・`tests/provider_expect/*.json`、main 側 `9b57a83cd`..`1e95ba237` の取り込み)。このため表のうち `ui_keys_diff`・`ui_diff` の 2 行は HEAD `f8ba50187` で再実行し、下の「HEAD 再測定」の値が表の値と同じであることを確認した。`pe_ui_dispatch_probe.py`・`pe_disasm.py` は a0fc92492..f8ba50187 で 0 byte。`provider_check` の §1 の件数は HEAD `d81fa4a45` で再測定して上の表に書いた。`a0fc92492`..`d81fa4a45` で件数に効く入力は `provider_expect/*.json` の 7 ファイル (14 関数の追加) のみ。`provider/gen/fl_table.c` の 1 行の変更 (`launchMapPages.setMapItemTarget` の戻り型 `'i'`→`'n'`) は関数の有無を変えず、件数 (435) は変わらない。`build_flpy.sh` の変更 (EMSDK_ENV の受け口) は件数に関与しない。`host/fl_mock.mjs` は §1 の切り出しで読まれない (§6 の mock 照合でだけ使われる)。`gen/fl_table.c` は HEAD のビルドで「435 関数」と出ており、§1 の件数 `functions:435` と一致する。新節の測定 commit は `70c323053` (上の「検証」)。
+- HEAD 再測定 (`f8ba50187`・emsdk 6.0.12 を `$RUNNER_TEMP` に導入): `bash tools/python/provider/build.sh` rc 0。`node tests/ui_keys_diff.mjs` rc 0 `{"calls":26,"diffs":0,"PASS":true}`。`node tests/ui_diff.mjs` rc 0 `{"calls":17,"diffs":0,"outOfRangeKnownDiffs":3,"PASS":true}`。ネガティブコントロール (`host/fl_mock.mjs` 489 行の `ui.selectWindow` の符号を反転) で `ui_keys_diff` は `AssertionError: ui 送出キー差分 4 件` rc 1、元に戻して `git diff` は 0 行。表の数値 (件数・VK・修飾・回数) は a0fc92492 の値と一致。
 - `FL_ENGINE=wasm node tests/all_tools.mjs` は本 PR では実行していない (受入 5 は子 #4579 で扱う)。
 
 ## 未解決
