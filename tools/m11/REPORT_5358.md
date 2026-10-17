@@ -123,7 +123,7 @@ index と名前の対応は `m11_wasmnames.py` (今回の build の wasm) で確
 
 ## 8. arg 実値と s24 の書換え位置 (PM 03:2x Z の範囲・派生計装・測定 commit `410956bd5`)
 
-測定 commit: `410956bd5` (`origin/5358-m11-callchain` = `09bcb13d6` に `origin/main` `360f7ecd2` を取り込んだ merge)。計装は派生で `m11_ov.c` と `work/boot_final.ll` に入れて測定後に戻した。コードを変えた commit は本節の追記のみ。素材: fl-win64・work-m11・toolchain-emsdk (`/opt/emsdk`)。`M11_M2V=1` で `m11_gen_ir2.sh` → `m11_build.sh` → `m11_run.mjs`。
+測定 commit: `410956bd5` (`origin/5358-m11-callchain` = `09bcb13d6` に `origin/main` `360f7ecd2` を取り込んだ merge)。計装は派生で `m11_ov.c` と `work/boot_final.ll` に入れて測定後に戻した。コードを変えた commit は本節の追記のみ。素材: fl-win64・work-m11・toolchain-emsdk ([EMSDK])。`M11_M2V=1` で `m11_gen_ir2.sh` → `m11_build.sh` → `m11_run.mjs`。
 
 ### 8.1 計装なしの基準 (再現)
 
