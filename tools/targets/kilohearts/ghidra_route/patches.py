@@ -141,8 +141,11 @@ ABI = {
         ('delay 7002 FUN_180fe3cd0 rcx=param_1[0xc]', r'(if \(param_1\[0xc\] != _DAT_1829896e0\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(param_1[0xc]);'),
         # #4835 (KH-118): 引数数不一致 (too few) の呼出し 1 件。呼出元の機械語で rcx の源を確定 (rcx = rbx = 入口の param_1)。
         #   180fbbfb8: mov rbx,rcx (180fbbfdb) → call FUN_180fbdfcc (180fbbfde)。直線で rbx 不変。callee 宣言 short FUN_180fbdfcc(short *) は REPORT_APPENDIX_4835.md。
-        #   180fcdbfc → FUN_180fbde90 は callee の生成宣言が未確認のため規則にしない (REPORT_APPENDIX_4835.md)。
         ('delay 2666 FUN_180fbbfb8 rcx=param_1 (FUN_180fbdfcc)', r'sVar1 = (?:func_0x000|FUN_)180fbdfcc\(\);', 'sVar1 = FUN_180fbdfcc((short *)param_1);'),
+        # KH-147 (#4835): FUN_180fbde90 の生成宣言 `short FUN_180fbde90(short *param_1)` を Ghidra 出力 (DecompEach・12.1.4) で確認。
+        #   呼出元 180fcdbfc の機械語: 180fcdc1f `mov rbx,rcx` → 180fcdc22 `call 0x180fbde90` (間に rcx を書く命令なし) = 入口 param_1。
+        #   本体は param_1[3] を 16bit 単位で読むので、呼出元の double* を (short *) で渡すのが bit の意味どおり (harness の _dtest rcx=double* と一致)。
+        ('delay 4329 FUN_180fbde90 rcx=param_1 (180fcdc22)', r'sVar1 = (?:func_0x000|FUN_)180fbde90\(\);', 'sVar1 = FUN_180fbde90((short *)param_1);'),
         # #4883 (KH-127): FUN_180fb5c6c (3 引数・C 宣言は int, undefined4, undefined4) の呼出し 2 件。
         #   2573 は 180fb5f8c の `mov r8d,1; lea ecx,[r8+1]` (rcx=2)・`mov edx,0xc0000417` → call 180fb5fb5 → r8 = 1。
         #   5014 は 180fd2a60 の `mov r8d,1; lea ecx,[r8+2]` (rcx=3)・`mov edx,0x40000015` → call 180fd2aa6 → r8 = 1。

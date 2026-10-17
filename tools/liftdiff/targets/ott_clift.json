@@ -1,0 +1,23 @@
+{
+  "name": "ott_clift",
+  "desc": "OTT (Xfer) VST2 win64 — x64c clift route (tools/ott/lift, LD-247)。ott_old と同一の sigs (ir_instr.ll 署名源) で、lift 産物 C を liftdiff プロトコルに載せる。lift 産物は tools/liftdiff/work/ott_clift/lift/ に置く (ld131_lift.sh の出力を複写)",
+  "pe": "${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll",
+  "ir": "tools/liftdiff/work/ott_old/ir_instr.ll",
+  "image": null,
+  "wasm_origin": "0x30000000",
+  "fn_prefix": "function_",
+  "clift": true,
+  "clift_sources": ["tools/liftdiff/work/ott_clift/lift/ott_lifted.c"],
+  "clift_meta": "tools/liftdiff/work/ott_clift/lift/lift_meta.json",
+  "clift_data_gen": "tools/ott/lift/data_gen.py",
+  "clift_rt": "tools/ott/rt",
+  "clift_cpu": "ott_cpu.c",
+  "clift_bridge": "rt/ott_ldbridge.c",
+  "clift_extra_c": ["tools/ott/rt/ott_glue.c"],
+  "clift_dispatch": "ott_dispatch_impl",
+  "runner_js": "rt/fle_runner.mjs",
+  "init_exports": ["ott_data_install"],
+  "initial_memory": 905969664,
+  "max_memory": 905969664,
+  "global_base": 268435456
+}

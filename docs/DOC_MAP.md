@@ -171,6 +171,7 @@
 | `tools/liftdiff/REPORT_APPENDIX_LD177.md` | ~45 | liftdiff LD-177 (#3782): fvm の候補多重 (2 件以上) と ret 断片 (`add rsp,N; ret`) を fvm の対象外にする方式、sample:800 の件数 (fvm 437→12)・対象外の関数一覧。REPORT_APPENDIX §12.1.2 から分割移動 (250 行上限のため) |
 | `tools/liftdiff/REPORT_APPENDIX_LD182.md` | ~110 | liftdiff LD-182 (#3881): units / hybrid 2 回連続の件数・関数単位の判定は一致。case 単位の揺れの結論と切り分けは付録の §結論・§4 を参照。突合は `tests/ld182_casediff.py` |
 | `tools/liftdiff/REPORT_APPENDIX_LD183.md` | ~120 | liftdiff LD-183 (#3935): case 単位の揺れの切り分け。追加の busy 競合の有無では件数・関数判定は動かず (無負荷ベースラインではない)、case の並び (履歴) は件数・関数判定を動かす。V8 階層化は未切り分け。harness は `tests/ld183_order_load.py` |
+| `tools/liftdiff/REPORT_APPENDIX_LD247.md` | ~50 | liftdiff LD-247 (#4968): OTT 用 x64c clift bridge (`rt/ott_ldbridge.c`) と `targets/ott_clift.json`。build OK (sig_mismatch 0)・6 関数の native/wasm 採点まで。計装版との 12 case 比較は未達 |
 | `tools/liftdiff/REPORT_APPENDIX_LD248.md` | ~60 | liftdiff LD-248 (#4975): 機械語入口型 double の i128 引数を xmm に記録し、cmp_trace の i128 位置の除外を外した結果。11 関数の偽の不一致は 0 件、sample:800 の判定は base と同一 (359/236/206) |
 | `tools/liftdiff/REPORT_APPENDIX_LD243.md` | ~90 | liftdiff LD-243 (#4887): case 単位の揺れの切り分け。(B) 並び・process 履歴が主因、(C) V8 階層化は判定 0 変化。詳細は §9。`--v8 liftoff` は `tests/ld183_order_load.py` |
 | `tools/liftdiff/REPORT_APPENDIX_LD165.md` | ~120 | liftdiff LD-165 (#3585): units / hybrid の case 単位の揺れ (本 run の判定は 4 回とも不変・case 単位 16 件のうち 15 件が wasm の trap ↔ timeout 等、1 件が native ms の 50 ms 跨ぎ)、shard ごとの起点、単独 replay。揺れの候補 (A 負荷による 1.0 s 上限の内外・B wasm runner の履歴依存・C V8 階層化・D native ms の 50 ms 跨ぎ) と未確定の点。再現性の受入は子 LD-182 へ。突合は `tests/ld165_flip_origin.py`・replay は `tests/ld165_replay.py` |
@@ -540,6 +541,7 @@
 | `tools/m11/ldfix/REPORT_3450.md` | ~100 | CI-163 (#3450・親 #3426): `function_41c8c0` (WideCharToMultiByte の薄いラッパ) を 8 引数化し、呼出元 4 site を機械語の rcx〜r9 と照合して接続。e2e 実測 (stage4・survey 不変)・DEFECTS D26 の行案 |
 | `tools/m11/ldfix/REPORT_3088.md` | ~70 | LD-146 (#3088): unexec 4 関数 (5c1030 / 737d10 / 7ff6e0 / d243c0) の native 実行条件。古い `work/ld_native` (vmslot 無し) を `ensure_native` で作り直し、this 疑似オブジェクトを与えて 4/4 を突合 (判定 mismatch・icall_drop = D15) |
 | `tools/m11/ldfix/REPORT_3195.md` | ~90 | LD-149 (#3195): #1325 の見送り 10 組の不能理由を本体 `Machine` で判定し直して関数ごとに記録 (修復 0 組)。6905f0 の理由を訂正 (前段パスではなく生の使用の位置)。判定は `residual_3195.py` |
+| `tools/m11/ldfix/REPORT_6066.md` | ~50 | LD-296 (#6066): rep-not-dominated 6 組の修復方式。「B 先頭 load 挿入」は不可と判定 (値使用・支配されない使用)。代替方式は未決。判定は `design_6066.py` |
 | `tools/m11/ldfix/REPORT_5993.md` | ~90 | LD-294 (#5993): first-deref-not-entry の 10 関数 (101d180・1050f90・10626e0・10628d0・12f9730・5c44b0・6905f0・75a180・786d50・787380) の survey 到達理由を呼び出し元と閉包の根で記録 (#3194 受入 4 の分割) |
 | `tools/m11/ldfix/REPORT_1325.md` | ~110 | LD-46 (#1325): first-deref-not-entry の支配関係つき修復。deref の IR ブロックが置換対象の全使用を支配する 11 組を修復し、残り 10 組は見送り理由を記録。survey 到達 (23 関数) を再測定 (#1134・#3194・#3195) |
 | `tools/m11/ldfix/REPORT_5994.md` | ~70 | LD-295 (#5994): first-deref-not-entry 修復 関数群 B (10 関数) の直接呼び出し元 (IR 静的) を関数ごとに記録。survey の呼び出し元到達は未測定 (同梱 obj から committed と一致する build を再現できず)。`callers_5994.py` で再現 (#3194) |
@@ -572,6 +574,7 @@
 | `tools/shimx/REPORT_R1-R8.md` | ~78 | shimx §9 (CAB-211: M11 リンク フィードバック R1〜R8) + §10 (CAB-177: cbtrans R2/R3 実体接続) 全文 (REPORT.md から分割, #584) |
 | `tools/shimx/REPORT_CAB-214.md` | ~141 | shimx §11 (CAB-214: vreg reg.c 取込 + username 統一) + §12 (follow-up 後始末 3 件) 全文 (REPORT.md から分割, #584) |
 | `tools/shimx/REPORT_SHX-T8.md` | ~60 | SHX-T8 (#175): 序数 import・Crypt・CP932 (REPORT.md §15 から分割) |
+| `tools/shimx/REPORT_MX-57.md` | ~45 | MX-57 (#4928): FH3 try/IP map → `ShxSehScope` 表 (`shimx_fh3_scopes`) の単体テストの測定 (native clang ASan/UBSan・測定 commit・未測定の emcc 段)。受入 1 (SjLj 形の pad 呼出し) は未達。測定値の正本 |
 | `tools/shimx/REPORT_SHX-T7.md` | ~84 | SHX-T7 (#173): 署名正規化 IR pass + ゲート (REPORT.md §16 から分割) |
 | `tools/shimx/REPORT_SHX-T9.md` | ~84 | SHX-T9 (#177): DllMain 経路の SHIMX_TRACE 収集と残一覧 (REPORT.md §6 の付録。数値は commit 済み results の引用) |
 | `tools/shimx/REPORT_SHX-T9h.md` | ~49 | SHX-T9h (#2489): 現行 `m11_ov.c` から baseline を再生成して unit 23 を shimx 版と比較。測定値の正本。REPORT_SHX-T9.md の旧 §3.3.5 から分割移動 (250 行上限のため) |
