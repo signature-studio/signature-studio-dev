@@ -72,6 +72,13 @@ ABI 表 `patches.py` の `ABI['delay']` に、呼出し 1 件 = 規則 1 件 (�
 - 10 件の呼出し (各 2 行 = 20 行) の型エラーが消えた。他の 10 行 (int-conversion 10 件) も減った。
 - 注: `-w -Wno-error=int-conversion` を付けた測定では error 行が 224 のまま変わらなかった (警告扱いで型不一致が error に出ないため)。REPORT の既定 flags (上表) を正とする。
 
+### 3. main 取り込み後の状態 (round 2・未再測定)
+
+- `origin/main` を取り込んだ head `e304442ca` (main は `4d48c4d2e` まで取り込み可能) では、測定 commit `cf8667a06` との差分が 0 ではない: `git diff cf8667a06 e304442ca -- tools/targets/kilohearts/ghidra_route/` は `patches.py` +7 行 (main 由来 #5401 の `FUN_180fd0ac8` 3 件・`ABI['delay']`)。
+- 上の表 (基点 `342ec0dcd`・測定 commit `cf8667a06`) は取り込み前の値で、現 main 基点の値ではない。
+- 再測定 (基点 `origin/main`・head 両方の `.o` の `cmp`、delay の emcc error 行数) は未実施。理由: `plugins-kilohearts` が `$ARTIFACTS_DIR` に無く、Kilohearts の素材 (`HeartCore.core_64`) を展開できなかった。emcc・Ghidra もこの runner に無い。
+- 素材を指定して再測定するまで、上表の値は main 取り込み前の参考値として扱う。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
