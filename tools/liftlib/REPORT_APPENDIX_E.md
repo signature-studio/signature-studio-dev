@@ -107,7 +107,7 @@ DEFECTS.md 行案 (編集は PM 判断):
 
 - **p1 の処理 (`tools/liftlib/liftlib/passes/p1.py`)**:
   - `shr` reg,imm の handler (line 1455-1466) は値だけ更新し `st["fl"] = None` にする。`shr rax,cl` (レジスタ shift) は handler に入らず、フラグは前段の状態のまま残る。
-  - (LIFTLIB-26 / #4350 で更新) `bsr r,r` の handler を追加し、ZF を flag 種別 `bsrzf` に載せる。`bsr` の直後に読めるのは e/ne/z/nz のみ。CF・SF・OF を読む cc は Unsupported。`shr reg,cl` の CF・`adc`・`cmp rcx,0` の SF/ZF/CF は未実装 (子 issue へ)。4 分岐の `icmp` 再結線も未実施。
+  - (LIFTLIB-26 / #4350 で更新) `bsr r,r` の handler を追加し、ZF を flag 種別 `bsrzf` に載せる。`bsr` の直後に読めるのは e/ne/z/nz のみ。CF・SF・OF を読む cc は Unsupported。`shr reg,cl` の CF は未実装 (子 #6078)。`adc r,imm` は #6079 で実装済み (T33)。`cmp rcx,0` の SF/ZF/CF は既存の `("int", ...)` 経路で正しく読まれることを LIFTLIB-32 (#6080) で確認 (T34・§23.17)。4 分岐の `icmp` 再結線も未実施。
   - `flag_consumers` (line 73) は `defs_before(va,"flags") == {A}` (comis 起点) の jcc だけを拾う。したがって `jae` / `jne` / `jl` / `je` はいずれも comis 由来ではないため、分岐の再構成 (dropped/folded 経路) の対象外になっている。
 - **IR との対応 (VA 順からの推定・未検証)**: `dec_label_pc_1801ba9c8` の `br i1 true` が `jae 0x1801baa70` に、`dec_label_pc_1801baa70` の `br i1 false` が `jne 0x1801baab0` に、`dec_label_pc_1801baab0` の `br i1 false` が `jl 0x1801baae0` に、`dec_label_pc_1801baabd` の `br i1 undef` が `je 0x1801bab00` に当たると読める。どの値が畳まれたかは IR の `%` 定義を追うまで確定しない。
 - **修正の方向 (案)**: p1 に整数 flag 生成 (`shr` reg,cl の CF / `bsr` の ZF / `cmp rcx,0` の SF・ZF) を追加し、上の 4 分岐を `icmp` で再結線する。これは comis 起点の `p1` 経路とは別の経路になる。実装と測定は子 issue に分ける。
@@ -223,8 +223,7 @@ index f66f69b4d..289a1e6c1 100644
     ```
   - 既定経路の不変は、HEAD と main `972b3fa3b` の leafspec A/B (上の 6 件が一致) で示した。
 - §23.10 の「bsr は ZF を追跡しない」は、上の §23.10 の箇条で更新済み。
-- 未解決 (起票先): `shr cl`・`adc`・`cmp rcx,0` → 子 #6078〜#6080 (親 #4350)。
-
+- 未解決 (起票先): `shr cl`・`adc`・`cmp rcx,0` → 子 #6078〜#6080 (親 #4350)。`cmp rcx,0` の SF/ZF/CF は §23.17 で検証済み (#6080)。
 ### 23.16 LIFTLIB-31 (#6079) — `adc r,imm` handler の e2e 実測 (元測定の記録)
 - **変更**: p1 に `adc r64,imm` (`dst = dst + imm + CF`) を追加。入力 CF は `_flag_cf_i1` で flag 状態から読み、CF を作れない経路 (`fl=None`・`bsrzf`) は `Unsupported`。T33 で `icmp ult i64 %a, %b` / `zext i1` / `add i64` ×2 と Unsupported を固定。
 - **単体**: `python3 tests/test_unit.py` → `ALL UNIT TESTS PASS (36)`。
@@ -232,3 +231,13 @@ index f66f69b4d..289a1e6c1 100644
 - **注記**: 上の値は実装 run の測定の記録。後続の run (レビュー fix) では素材 (`work-liftlib` 等) が無く再実行していない。
 - **測定 commit 以降のコード差分**: `git diff 036006d57 HEAD -- tools/liftlib` → 0 行 (測定 commit が最後のコード変更)。
 - IR 側の再測定 (`function_1801ba860` の `adc rax,0`) は未実施。4 分岐の再結線は #4352 (LIFTLIB-27)。
+
+### 23.17 LIFTLIB-32 (#6080) — cmp rcx,0 の SF/ZF/CF の検証
+- **結論**: `cmp rcx,0` の直後の `jl` (SF!=OF)・`je` (ZF)・`jb` (CF) は、既存の `cmp reg,imm` 経路 (`("int", (a, b, False, bits))`) で機械語どおりに読まれる。コード修正は不要 (不一致 0)。テストで固定した。
+- **IR 固定 (T34)**: `cmp rcx,0` → `jl` は `icmp slt i64 %rcx, 0`、`je` は `icmp eq i64 %rcx, 0`、`jb` は `icmp ult i64 %rcx, 0`。`tools/liftlib/tests/test_unit.py` の T34 で、生成 IR の述語を x86 の定義 (SF/ZF/CF/OF) と 13 個の境界値 (0, ±1, ±2, ±5, 2^63±1, 2^63, 2^64-2, 2^31-1, 2^31) で突き合わせる。
+- **実 CPU との突き合わせ**: unicorn 2.1.4 で `cmp rcx,0; pushfq` を実行し、RFLAGS の CF/ZF/SF/OF を x86 モデルと比較 (13 値)。**不一致 0 / 13**。根拠スクリプト `tools/liftlib/work/6080/cmp_flags_check.py` は gitignore のため本 PR からは再現できない (結果の要約のみを記録)。
+- **単体テスト (測定 commit `80ded5996`・`python3 tests/test_unit.py`・rc=0・所要 5 分 29 秒・load 0.6)**: `ALL UNIT TESTS PASS (36)`。この commit では cmp の検証は `t33` という名前だった。main の adc (T33・#6079) と名前が衝突したため、head で T34 に改名した (中身は同一)。
+- **素材**: `work-m6-ott` / `work-liftlib` / `work-icall` / `work-liftlib-targets` を展開。展開前は T1〜T4・T6・T9・T26 が素材不足で FAIL (ファイル不在)。
+- **既定経路**: cmp の変更はテストと REPORT のみ。liftlib の差分は main 由来の #6079 の変更 (`p1.py` の adc handler・25 行) で、本 PR の測定 commit からの差分はこれだけ (`git diff 80ded5996 HEAD -- tools/liftlib/liftlib` = 25 行)。adc は T33 で head でも ok。leafspec の測定値は本 PR では再測定していない。
+- **現 head の全 unit test**: 未実行。`$ARTIFACTS_DIR` に `work-liftlib` / `work-m6-ott` 等が無く (`fl-win64` のみ)、素材が無い状態で head の `test_unit.py` を実行すると、レビュー側の実行では 37 件中 T1・T2・T3・T4・T6・T7・T26 が `FileNotFoundError` で FAIL した (ロジックの失敗ではなく素材のパス不在。本 PR の作業者は未確認)。
+- **未解決 (起票先)**: `shr reg,cl` の CF → #6078 (LIFTLIB-30・OPEN)。`adc` の flag 生成 → #6079 (LIFTLIB-31・CLOSED)。4 分岐の `icmp` 再結線 → #1948 (LIFTLIB-20)。
