@@ -1,7 +1,7 @@
 # icall #6140 (ICALL-126): 18105d9fc の unreachable trap の位置と原因
 
 測定 commit: `55c8efb66` (コードを変えた最後の commit)。
-測定後に変えたのは本付録だけ。`git diff 55c8efb66 HEAD -- tools/icall` の出力は 0 行。
+測定後に変えたのは本付録だけ。コードの差分 0 は `git diff 55c8efb66 HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_6140.md'` の出力が 0 行であることで確認する (本付録自体は同じ範囲に含まれるため除外)。
 
 ## 1. 結論
 
@@ -13,7 +13,9 @@
 
 ## 2. 食い違いの実測 (統合前の chunk 0〜3)
 
-署名が chunk 間で違う `__asm_*` は 9 名。宣言と呼び出しの型が合わない箇所は `__asm_movss` 9・`__asm_movss.3` 10・`__asm_movaps` 4・`__asm_movups` 6・`__asm_movaps.2` 1・`__asm_movq` 2・`__asm_movapd` 8 (`rt_freshair-6140`)。
+署名が chunk 間で違う `__asm_*` は 7 名 (`__asm_movss` / `__asm_movss.3` / `__asm_movaps` / `__asm_movups` / `__asm_movaps.2` / `__asm_movq` / `__asm_movapd`)。宣言と呼び出しの型が合わない箇所は `__asm_movss` 9・`__asm_movss.3` 10・`__asm_movaps` 4・`__asm_movups` 6・`__asm_movaps.2` 1・`__asm_movq` 2・`__asm_movapd` 8 (`rt_freshair-6140`)。
+
+確認できなかった点 (非 blocking・未検証): `ir_merge_restored.py` の `ASM_DECL` は戻り値型を `\S+` で取るため、struct 型 (`{ i64, i64 }` 等) の戻り値を持つ declare は拾えず、食い違いを検出しない。本測定の IR (`rt_freshair-6140`) には当該型が含まれるかを確認していない。また改名は chunk 1 以降の全 `@name` に効くため、`__asm_*` が define されているかも未確認 (`tools/icall/work` が本 run に無く、再測定できなかった)。
 
 ## 3. 測定
 
@@ -36,9 +38,9 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `18100cc50` が `unreachable` (wasm_err 8) | sweep の wasm のみ err 3 件のうち 1 件 | 未調査。同じ宣言不一致が原因かは未確認 |
-| `181057b38` `180c8b280` が `memory access out of bounds` | sweep の wasm のみ err | 本 issue の範囲外 (既存の記録どおり) |
-| `180da4030` が値の不一致 (wasm の xmm0 が 0 でない) | sweep の値の不一致 1 件 | 本 issue の範囲外 |
+| `18100cc50` が `unreachable` (wasm_err 8) | sweep の wasm のみ err 3 件のうち 1 件 | 親 #4290 へ提案 (ICALL-97 の未解決として追跡・同じ宣言不一致が原因かは未調査) |
+| `181057b38` `180c8b280` が `memory access out of bounds` | sweep の wasm のみ err | 親 #4290 へ提案 (本 issue の範囲外) |
+| `180da4030` が値の不一致 (wasm の xmm0 が 0 でない) | sweep の値の不一致 1 件 | 親 #4290 へ提案 (本 issue の範囲外) |
 
 ## 5. 再現
 
