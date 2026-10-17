@@ -44,7 +44,7 @@ python3 tools/m11/ldfix/callers_5994.py work/boot_final3.ll 101d180 db6480 dc27c
 
 前回 run の残件 (committed と同じ build での計装) は、同梱 obj を再コンパイルせず、HEAD の C から作り直した build で取った。
 
-- 手順: `FL_WIN64_DIR` に `fl-win64` の `block00031_PE.bin` を置き、`m11_gen_ir2.sh` (rc 0・490790 行・`ir_conditions.json` 生成) → `m11_build.sh` (rc 0・wasm-ld signature mismatch 0・undefined symbol 0) → `ldfix/reach_509.sh` の順で実行。`EMSDK_ENV=/opt/emsdk/emsdk_env.sh`。
+- 手順: `FL_WIN64_DIR` に `fl-win64` の `block00031_PE.bin` を置き、`m11_gen_ir2.sh` (rc 0・490790 行・`ir_conditions.json` 生成) → `m11_build.sh` (rc 0・wasm-ld signature mismatch 0・undefined symbol 0) → `ldfix/reach_509.sh` の順で実行。`EMSDK_ENV` に [EMSDK] の `emsdk_env.sh` を指定。
 - 再生成した `work/boot_final3.ll` は sha256 先頭 16 桁 `a69dd5dace9384af`・529644 行。§2 の入力 (`010451add5147d37`・529468 行) とは一致しない。以後の結果は再生成した IR に対するもの。
 - 計装: 21 関数 (10 対象 + 1 段目の直接呼び出し元 11)。`ldfix/results/reach_5994.json` (942 unit)。
 - kind 分布: ok 873・miss 47・oob 15・halt0 6・noproc 1。committed (`reach_930.json`: ok 870・miss 47・halt0 7・oob 16・other 1・noproc 1) と近い。miss 47 は一致。
