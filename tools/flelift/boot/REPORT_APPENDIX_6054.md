@@ -165,21 +165,22 @@ A	tools/flelift/boot/rsi_zero_variant.sh
 - 書込み元 (受入 2・rc 3 の診断 run での観測 = `pcF`・mode 1 (shim)): 2 slot を 0 にする書込みの呼出し連鎖は `fle_wwatch` ← `STX` ← **`f_6a7b70`** ← `ott_dispatch` ← `f_6c7610` ← `f_815050` ← `f_815e10`。§17 の書込み元と一致する。`f_6a7b70` は既定経路でも root 化されている (`FLE_EXTRA_ROOTS=0x6a7b70`)。
 - 未解決 (起票先: #5337): (a) mode 3 で `f_6a7b70` が呼ばれて別の範囲を塗るのか、呼ばれないのかは未計測。mode 3 の監視で 0 件だったことは、呼ばれないことを意味しない。(b) mode 1 と mode 3 で `f_6a7b70` の呼出し引数 (`dst`・`cnt`) がどう違うか。`0x6a7b70` の root 化は本件の範囲外 (PM 判断 blocklist) のまま。
 
-測定 (いずれも `fle6_measure.sh`・`FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs"`・rc は各 run の結果。所要は各 run の `time`):
+測定 commit: `02d46f1fc` (表の pcA〜pcF は `fle_boot.c` の #5415 watch 追加前の build)。main 取り込み後の HEAD `da76436b7` で default・4464 tol を再測定 (表の「HEAD 再測定」の行)。`git diff 02d46f1fc da76436b7 -- tools/flelift ':!*.md'` は `fle_boot.c` の 8 行 (#5415 の watch 追加・挙動は変えない)。
 
 | run | 条件 | rc | 所要 |
 |---|---|---|---|
-| default | mode 3・監視 `0x5ac308,0x11f6100` | 0 | 3 分 49 秒 |
-| 4464 tol | mode 1・寛容・root `0x6a7b70,0x1375990` | 0 | 3 分 46 秒 |
+| default | mode 3・監視 `0x5ac308,0x11f6100` | 0 | 3 分 49 秒 (02d46f1fc) / 3 分 40 秒 (HEAD 再測定) |
+| 4464 tol | mode 1・寛容・root `0x6a7b70,0x1375990` | 0 | 3 分 46 秒 (02d46f1fc) / 3 分 50 秒 (HEAD 再測定) |
 | pcA | mode 3・root `0x6a7b70,0x1375990` | 0 | 3 分 35 秒 |
 | pcB | mode 1・寛容・root `0x6a7b70` | 0 | 3 分 51 秒 |
 | pcD | mode 3・読取り probe (`FLEBOOT_SLOT6213`) | 0 | 3 分 19 秒 |
 | pcE | mode 1 (shim)・監視 2 slot | 3 | 3 分 53 秒 |
 | pcF | mode 1 (shim)・`FLE_WWATCH_JS` | 3 | 3 分 47 秒 |
 
+- HEAD 再測定の結果: default は `units_run=895`・監視 0 件、tol は `units_run=209`・監視 2 件 (`old=0x40f960`・`old=0x4820498b48000000` → `new=0`)。どちらも 02d46f1fc の結果と一致。
 - rc 3 は IPP 判定 NG (mode 1 では `ptr_15F34A0=0x0`・`ok:false`)。pcE・pcF は判定 NG を想定した診断 run で、boot の停止位置 (unit 209) の確認が目的。
-- boot 単独 (同じ build・`--boot-only`): mode 3 は 895 unit・mode 1 は 209 unit。どちらも約 10 秒。
-- 測定時の load: 1.1〜2.8 (4 vCPU)。
+- boot 単独 (HEAD 再測定の `boot ... done`): mode 3 は 895 unit で 11 秒、mode 1 は 209 unit で 26 秒。
+- 測定時の load (HEAD 再測定): 1.6〜2.1 (4 vCPU)。
 
 素材: `oc_artifacts: fl-win64 toolchain-emsdk`。
 再現:
