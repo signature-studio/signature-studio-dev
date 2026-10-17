@@ -22,7 +22,7 @@
 - 変更: `shimx_fh3_unwind_scopes` (`tools/shimx/src/seh_fh3.c`)。IP 範囲ごとに、state から prev を辿って action を持つ state を内側から順に kind 0 scope にする。単体テスト `t_unwind_scopes` (`test/test_fh3.c`) を追加。
 - 測定 commit: `573444dba` (コードと生成物を変えた最後の commit。以降は本 REPORT の更新のみ)。
 - コード差分 (`git diff 573444dba HEAD -- tools/shimx/src tools/shimx/test`): 空。
-- 環境: emcc 6.0.12 (`/opt/emsdk`)・node 22.23.3・load average 0.95 0.53 0.25 (test.sh 実行中)。
+- 環境: emcc 6.0.12 (emsdk, `[EMSDK]` 参照)・node 22.23.3・load average 0.95 0.53 0.25 (test.sh 実行中)。
 - 結果:
   - ST: `fh3 OK`・`ALL PASS (build=st)`・exit 0 (単体の node 実行 real 178 ms)。
   - MT: `fh3 OK`・`ALL PASS (build=mt(pthreads))`・exit 0。
