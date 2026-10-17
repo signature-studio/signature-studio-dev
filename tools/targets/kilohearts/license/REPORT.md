@@ -237,4 +237,9 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - 前 run の記録 (測定 commit `876bb09f7`・素材 `plugins-kilohearts` 展開): rc=0・0.017 s・出力 66,146 B・不一致 0 件・ネガコン (比較の向きを反転) で 200 行の不一致・`HeartCore.core_64` sha256 一致 (`d55ce8b4c0ad7ebedf1a4a1f74443a91d255596be887a514e54269ec8751441e`、76,642,304 B)。
 - **本 run で未再実行**: `$ARTIFACTS_DIR` (`fl-win64` のみ) に `HeartCore.core_64` が無く、正しいコマンドの再測定ができなかった。上の前 run 値は再確認されていない。再測定は `oc_artifacts: fl-win64 plugins-kilohearts` を付けた run で行う。
 - 未確認: ymm 経路 (flag 0x20) に入ったことを示すトレース・分岐カウントは未記録。
-- 関数 B (0x180fb6124) は未実装。wasm 側の突合 (`compare.mjs`) と `modules.F.lift` 追加は未実施 (#4413 の次 run)。
+- 関数 B (0x180fb6124) は未実装。`modules.F.lift` 追加は未実施 (#4413 の次 run)。
+- 経路フラグの wasm 切替: `lic_build.py --module K` (lift 集合は A `0x180f89cf0` のみ・`0x180fb6124` を含む 2 関数) で、`.data` の `0x182989344` / `0x182989340` を setter `kh_set_flag_a/b` から書き換え可能にした (`globals.c` の `const` を外す)。`compare.mjs --path-flags` が trial ごとに `kh_set_flag_a` へ書く (偶数 0x20 / 奇数 0x2、scen_kclp.h と同規則)。
+- 突合 (測定 commit: 本 PR の HEAD。素材 `plugins-kilohearts` 展開・`HeartCore.core_64` sha256 `d55ce8b4c0ad7ebe` 一致): `native_ref kclp 200 1` rc=0 → `compare.mjs --path-flags` **200/200 bit-exact (200 calls)**・ネガコン (`--neg-ctrl`) **0/200**・フラグ無し (`compare.mjs` 既定) 200/200。
+- 解釈: フラグ切替後も突合が一致し、ネガコンで FAIL するため比較は機能している。ただし `find32` は両経路で同じ結果を返すため、経路の違い自体は突合で検出していない。ymm 経路に入った証拠 (分岐カウント) は未取得。
+- wasm: `licK/mod.wasm` 29,276 B・`undefined_imports` 空・`sha256 445ad93b6258bdf3…`。
+- 未実施: 関数 B (0x180fb6124) の scenario と突合、`modules.F.lift` 追加、`excluded_i256` 除去、`lic_build --module F`・`kh249_check.mjs` 回帰。

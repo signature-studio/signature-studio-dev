@@ -307,6 +307,7 @@
     }
    }
   },
+  "K": {"comment": "#4413 試行 (KH-98): ymm 2 関数 0x180f89cf0 / 0x180fb6124 のみを lift する。経路フラグ .data (0x182989344 / 0x182989340) は compare 側で書き換える。product (F) へは入れない。", "lift": ["180f89cf0", "180fb6124"], "stub_all": false, "stub_only": [], "shims": {"180f878e0": "new", "180f8791c": "delete", "181384040": "memcpy", "180107430": "getManager", "1813846e0": "memset"}, "raw_va": true, "rdata_str": true, "volatile_ret": true, "synth_zeroarg": true, "emcc_opt": "-O1", "flag_setters": {"182989344": "kh_set_flag_a", "182989340": "kh_set_flag_b"}},
   "F": {
    "comment": "KH-11b (#249) snap-in ブラウザ分類 0x180ef7fc0 の lift 試行。製品 id 表引き 0x18004c780・ライセンス状態 getStatus(stub 9)・分類 thunk A/C 実 IR・map/string/vector は未 lift (fail-fast)。",
    "lift": [
