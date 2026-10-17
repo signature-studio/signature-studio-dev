@@ -91,6 +91,16 @@ IR の差分 (修正 pass による変換):
 | 既定 ON にする判断 | 効果が出ないため判断材料なし | PM 判断 |
 | 脱出後の `call 0x12df760` (機械語 `[rsi+0x18]`) の callee の意味 | 第 1 引数は `*arg1` に直したが、callee の意味は未確認 | #5995 の未確認項目 |
 
+## 5b. 受入 3: 引数を照合する判定器 (本 run)
+
+- 追加: `ldfix/judge_arg1_5999.py` (判定)・`ldfix/test_arg1_5999.py` (規則を固定するテスト)。`m11_gen_ir2.sh` は `M11_FIX_F552A0=1` のとき fix の直後に判定を走らせる (NG なら `set -e` で生成が止まる)。
+- 判定の規則: function_f552a0 の各 call (計 6 件) について、第 1 引数の値の出所を def-use でたどる。期待値は `*%arg1` (`load i64, ptr (inttoptr %arg1)`) の 1 種類だけ。`%arg1` そのもの・境界値 (`%21`) は NG。件数が 6 件でなければ fail-closed。
+- 実測 (素材 `tools/m11/work/boot_final.ll`・修正前の生成物):
+  - 判定 `judge_arg1_5999.py`: calls=6 ok=0 ng=6 (終了コード 1)。第 1 引数は `%rcx.0.reload` ×4・`%21`・`%rcx.1.reload` の出所が `{arg1, %21}`。
+  - `fix_f552a0.py` の適用後 (`/tmp/opencode/boot_fixed.ll`): calls=6 ok=6 ng=0 (終了コード 0)。
+- テスト: `test_arg1_5999.py` (修正前 NG・修正後 OK・件数不足で fail-closed の 3 件)。判定の `ok` 条件を常に真に壊すと、修正前 NG のテストが落ちることを確認した。
+- 受入 3 の範囲: 「引数を照合する判定器」は IR 上の第 1 引数の出所の判定まで。実行結果 (e2e) との対応は本 run では測っていない (§3.2 の既存の結論のまま)。
+
 ## 6. コードの測定 commit と差分
 
 - 測定 commit: `bebd3e2b32c1114a752638c25d75e65bcea6f1cd` (§3.2 の全数値はこの commit の IR・コードによる)。
