@@ -129,10 +129,12 @@ def parse_mem(op, ins):
                 "target": ins.address + ins.size + d, "size": size}
     base, disp, index = None, 0, False
     for sign, term in re.findall(r"([+-]?)([^+-]+)", inner):
-        if "*" in term or (term not in ALIAS and not term.startswith("0x")):
+        if "*" in term or (term not in ALIAS and not term.startswith("0x") and not term.isdigit()):
             index = True
         elif term.startswith("0x"):
             disp += -int(term, 16) if sign == "-" else int(term, 16)
+        elif term.isdigit():
+            disp += -int(term) if sign == "-" else int(term)
         elif sign != "-" and base is None:
             base = ALIAS[term][0]
         else:
