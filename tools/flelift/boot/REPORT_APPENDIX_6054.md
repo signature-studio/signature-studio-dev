@@ -138,9 +138,10 @@ A	tools/flelift/boot/rsi_zero_variant.sh
   | 分類 | 語数 | 意味 |
   |---|---|---|
   | unstable | 4 | base / zero の run 間で値が揺れる (非決定) |
-  | placement | 278 | base と zero の両方が heap/stack 範囲のポインタ (配置のずれ) |
+  | placement | 278 | base と zero の両方が heap 範囲 (`0x11D00000`〜`0x13400000`) のポインタ (配置のずれ) |
   | content | 1 | `.bss 0x11f6100`: base `0x115cd2d8` → zero `0x115cd2e8` (+0x10) |
-- content 1 語は、スタック範囲 (base `[0x115d21a0, 0x11dd21a0)`・zero `[0x115d21b0, 0x11dd21b0)`) の外、スタック下端の少し下の値。ヒープ域のポインタの 0x10 ずれと読めるが、断定はしていない。
+- 分類の定義は heap 範囲 (`0x11D00000`〜`0x13400000`) だけで判定する (`zero_diff_classify.py` の `HEAP_LO`/`HEAP_HI`)。スタック範囲 (base `[0x115d21a0, 0x11dd21a0)`・zero `[0x115d21b0, 0x11dd21b0)`) のうち heap 範囲外の下端部分の差は、placement に入らず content に数えられる。
+- content 1 語 (`0x115cd2d8`) は heap 範囲より下・スタック範囲の下端より下の値。ヒープ域のポインタの 0x10 ずれと読めるが、断定はしていない。
 
 ### 判定 (受入 1)
 

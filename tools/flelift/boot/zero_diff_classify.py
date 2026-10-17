@@ -4,7 +4,8 @@
 # 入力: <dump dir> の outmem_<label>_r<i>.bin (fle_boot.mjs の FLE_OUTMEM_DUMP)。label 既定 rsz_base / rsz_zero・i は 1..3。
 # 分類 (書込み可能セクション内, 4 バイト単位):
 #   unstable : base または zero の run 間で値が揺れる位置 (非決定。マスクの候補)
-#   placement: base と zero の両方が heap/stack 範囲のポインタ (配置のずれ。内容差ではない)
+#   placement: base と zero の両方が heap 範囲 (HEAP_LO〜HEAP_HI) のポインタ (配置のずれ。内容差ではない)。
+#              スタック範囲のうち heap 範囲外の部分 (HEAP_LO 未満) の差はここに入らず content に数える。
 #   content  : それ以外で base と zero が違う位置 (内容の差。残骸の影響の候補)
 import os, sys
 
