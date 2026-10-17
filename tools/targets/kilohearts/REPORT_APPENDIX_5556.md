@@ -153,18 +153,18 @@ ACFStartup() = 0 (0x0)
 
 ### 8.1 GUID の名前
 
-- Web 検索 (`382B6A96…`・`88882C2D…`・`96D42C2D…` を含むクエリ) は本 run でも失敗 (`Web search cancelled`)。
-- `strings` で `HeartCore.core_64` を検索したが、GUID と型名の対応は取れなかった (RTTI の型名のみ)。名前は未特定。
+- 第 4 run の記録では、Web 検索 (`382B6A96…`・`88882C2D…`・`96D42C2D…` を含むクエリ) は失敗 (`Web search cancelled`)。本 run では再実行していない。
+- 第 4 run の記録では、`strings` で `HeartCore.core_64` を検索したが、GUID と型名の対応は取れなかった (RTTI の型名のみ)。名前は未特定。本 run では `HeartCore.core_64` を取り出していない。
 
 ### 8.2 検証情報
 
-- 素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` (zip) → 内の `HeartCore.core_64` (76,642,304 B)。sha256 `d55ce8b4…1441e` (§2 と一致)。
-- 注意: `windows.zip/1ccb1df8c8f10745` 自体は `HeartCore.core_64` ではなく、プラグイン群の zip。そこから取り出す必要がある。
-- `loader_qi_ok.c` の再現 (本 run): LOAD OK・QI S_OK・slot[3] 3 回・slot[2] 1 回・戻り値 0・exit 0 (§7 と一致)。これは §7 の生ログの再現で、`loader_branch` の結果ではない。
+- 素材の展開経路と sha256 は §8.3 を参照。
+- `loader_qi_ok.c` は第 4 run で LOAD OK・QI S_OK・slot[3] 3 回・slot[2] 1 回・戻り値 0・exit 0 (§7 と一致) を記録している。これは §7 の生ログの記録で、`loader_branch` の結果ではない。本 run では wine が無いため再実行していない。
 
 ### 8.3 再現情報と未採取の範囲
 
-- ビルド: `x86_64-w64-mingw32-gcc -O0 -o loader_branch.exe loader_branch.c` (`runtime_wine/` で実行)。第 4 run の `loader_branch.exe` sha256 `16ab2917…` は記録値。本 run では再ビルドしていないため照合していない。
+- 素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` (zip) → 内の `HeartCore.core_64` (76,642,304 B)。sha256 `d55ce8b4…1441e` (§2 と一致)。`windows.zip/1ccb1df8c8f10745` 自体は `HeartCore.core_64` ではなく、プラグイン群の zip。そこから取り出す必要がある。
+- ビルド: `x86_64-w64-mingw32-gcc -O0 -o loader_branch.exe loader_branch.c` (`runtime_wine/` で実行)。第 4 run の `loader_branch.exe` sha256 `16ab2917…` は記録値。本 run では再ビルドできなかったため照合していない。
 - 実行: `WINEDEBUG=-all wine ./loader_branch.exe "$PWD/HeartCore.core_64" <QI の戻り値 16 進> <slot 戻り値 16 進>`。表の 4 条件は `(0 0)`・`(0 1)`・`(0 80004005)`・`(80004002 0)`。第 4 run では全条件 exit 0・stderr 空と記録されている (未検証)。
 - 素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` (zip) → 内の `HeartCore.core_64` (76,642,304 B)。sha256 `d55ce8b4…1441e` (§2 と一致)。`windows.zip/1ccb1df8c8f10745` 自体は `HeartCore.core_64` ではなく、プラグイン群の zip。そこから取り出す必要がある。
 - stdout の生ログ (各条件の全行): **未採取**。第 4 run の stdout は保存されていない。再採取の条件は素材 `plugins-kilohearts`・Wine 9.0・MinGW `x86_64-w64-mingw32-gcc`。採取後にここへ全行と `loader_branch.exe` の sha256 を追記する。
