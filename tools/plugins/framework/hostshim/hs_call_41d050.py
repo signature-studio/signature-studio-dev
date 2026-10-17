@@ -52,27 +52,37 @@ def main():
             i = allins[j]
             print('  0x%x %s %s' % (i.address, i.mnemonic, i.op_str))
 
-    blob = rd(0x400000, 0x13a44b0 - 0x400000 + 0x1000)
+    chunks = []
+    for s in pe.sections:
+        va = base + s.VirtualAddress
+        if 0x400000 <= va < 0x13a44b0 + 0x1000:
+            chunks.append((va, rd(va, s.Misc_VirtualSize)))
 
     def refs(target):
-        absn = sum(1 for p in range(len(blob) - 4)
-                   if struct.unpack('<I', blob[p:p + 4])[0] == target)
-        rvan = sum(1 for p in range(len(blob) - 4)
-                   if struct.unpack('<I', blob[p:p + 4])[0] == target - 0x400000)
-        relc = 0
-        for p in range(len(blob) - 5):
-            if blob[p] in (0xe8, 0xe9):
-                rel = struct.unpack('<i', blob[p + 1:p + 5])[0]
-                if 0x400000 + p + 5 + rel == target:
-                    relc += 1
-        return relc, absn, rvan
+        absn = abs64 = rvan = relc = 0
+        for va, blob in chunks:
+            for p in range(len(blob) - 4):
+                v = struct.unpack('<I', blob[p:p + 4])[0]
+                if v == target:
+                    absn += 1
+                if v == target - 0x400000:
+                    rvan += 1
+            for p in range(len(blob) - 8):
+                if struct.unpack('<Q', blob[p:p + 8])[0] == target:
+                    abs64 += 1
+            for p in range(len(blob) - 5):
+                if blob[p] in (0xe8, 0xe9):
+                    rel = struct.unpack('<i', blob[p + 1:p + 5])[0]
+                    if va + p + 5 + rel == target:
+                        relc += 1
+        return relc, absn, abs64, rvan
 
-    print('== 0x%x の参照 (0x400000..0x13a44b0 の生バイト)' % FUNC)
-    relc, absn, rvan = refs(FUNC)
-    print('  rel32 call/jmp: %d 件 / 絶対 32bit: %d 件 / RVA 32bit: %d 件' % (relc, absn, rvan))
+    print('== 0x%x の参照 (0x400000..0x13a44b0 の生バイト・セクション単位)' % FUNC)
+    relc, absn, abs64, rvan = refs(FUNC)
+    print('  rel32 call/jmp: %d 件 / 絶対 32bit: %d 件 / 絶対 64bit: %d 件 / RVA 32bit: %d 件' % (relc, absn, abs64, rvan))
     print('== control 0x41d110 の参照 (同じ生バイト走査)')
-    relc, absn, rvan = refs(0x41d110)
-    print('  rel32 call/jmp: %d 件 / 絶対 32bit: %d 件 / RVA 32bit: %d 件' % (relc, absn, rvan))
+    relc, absn, abs64, rvan = refs(0x41d110)
+    print('  rel32 call/jmp: %d 件 / 絶対 32bit: %d 件 / 絶対 64bit: %d 件 / RVA 32bit: %d 件' % (relc, absn, abs64, rvan))
 
 
 if __name__ == '__main__':
