@@ -11,7 +11,7 @@
 ## 2. 測定
 
 - 測定 commit: 本 PR のコード commit (`ldfix/survey_reason_5993.py` を追加した commit)。
-- IR: `m11_gen_ir2.sh` (rc 0・ldfix=applied・`boot_final.ll` 490790 行) → `m11_build.sh` (rc 0・wasm-ld signature mismatch 0 / undefined symbol 0)。素材は `fl-win64` の `block00031_PE.bin` のみを展開、`toolchain-emsdk` を `/opt/emsdk` で使用。`work-m11` は `work/` に既存のものを使った。
+- IR: `m11_gen_ir2.sh` (rc 0・ldfix=applied・`boot_final.ll` 490790 行) → `m11_build.sh` (rc 0・wasm-ld signature mismatch 0 / undefined symbol 0)。素材は `fl-win64` の `block00031_PE.bin` のみを展開、`toolchain-emsdk` は [EMSDK] で使用。`work-m11` は `work/` に既存のものを使った。
 - 計装: `ldfix/reach_509.sh` (`reach_survey.mjs`、942 unit、kind は ok/miss/oob/halt0/noproc)。
 - 対照 (同じ build): 44f040 = 3 unit、47ad70 = 7 unit。REPORT_1325 §4 と一致し、計装が機能していることを確認。
 - 出力: `results/reach_5993.json` (27 関数 = 10 対象 + 直接呼び出し元 17、全 942 unit)、`results/reach_5993_roots.json` (14 関数 = 対象 10 + 閉包の根 4)。
