@@ -121,6 +121,7 @@ DEFECTS.md 行案 (編集は PM 判断):
 - **素材**: `work-m6-ott` / `work-liftlib` / `work-icall` / `work-liftlib-targets` / `analysis-ott-binaries` / `toolchain-*` を展開 (`$ARTIFACTS_DIR`)。
 - **IR の現状** (`ott_leaf_fixed.ll`・`function_1801ba860`): `br i1 true` (jae 0x1801baa53) / `br i1 false` (jne 0x1801baa94) / `br i1 false` (jl 0x1801baabb) / `br i1 undef` (je 0x1801baabd)。4 分岐すべてが畳まれたまま。
 - **p1 の未対応 (機械語)**: `shr rax,cl` (レジスタ count) / `bsr` / `adc rax,0` / `cmp rcx,0` は p1 に flag 生成の handler が無い。`bts`・`btr`・`mul`・`not`・`movd xmm4` 等も同じ block にある。
+  - **LIFTLIB-31 (#6079)**: `adc r,imm` の handler を追加 (入力 CF は `_flag_cf_i1` で flag 状態から読む。CF を作れない経路は Unsupported)。合成機械語の unit test T33 で固定。`adc rax,0` のある `function_1801ba860` の IR 側の再測定は未実施 (4 分岐の再結線は #4352 の範囲)。
 - **leafspec 実測** (`targets/ott_leaf.json --n 40`、16.4 s、開始 load 1.54 / 終了 1.49):
 
   | spec | match | mismatch | native_crash | wasm_trap |
