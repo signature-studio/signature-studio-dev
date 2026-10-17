@@ -38,7 +38,11 @@
 - 結論: Index (r9) の作りは未確定。受入 1 の『供給元の値』は、この 2 件の呼出側と `[rbp+0x60]`・`[rbp+0x98]` の書込み元を追えるまで決まらない。
 - 測定: 全 .text の線形走査 1 回で `real 1m4s`、rc=0、起動直後の load 0.89 (`uptime`)。`hs_store_111c.py` (機械語のみ) の出力は §5.3.1 と一致。
 
-#### 5.3.3 (c) 2 件の呼出元関数の r9 元 (`hs_r9_locals.py`・機械語のみ・再測定なし)
+#### 5.3.3 (c) 2 件の呼出元関数の r9 元 (`hs_r9_locals.py`・機械語のみ)
+
+- 再現コマンド: `FL_WIN64_DIR=<展開先の親> PYTHONPATH=<unicorn,pefile,capstone,tools/shared の site-packages> python3 hs_r9_locals.py` (`hostshim/` で実行。素材は `fl-win64` の `extracted/block00031_PE.bin`)
+- 測定 commit: `f522fb030` (`hs_r9_locals.py` の `TARGETS` を `[rbp + 0x60]`・`[rbp + 0x98]` に絞った commit。以前の測定 commit `fa20228f7` の出力と差は無い)
+- 測定 (`f522fb030`): `real 54.4 秒`、rc=0、起動直後の load 0.73 (`uptime`)。
 
 - 2 件 (`0x1090dc4`・`0x1090ff9`) は同じ関数 `0x1090cb0` 内にある (先頭は `push rbp` の直前が `ret`/`int3`/`nop` のものを後方探索)。
 - `0x1090cca mov [rbp+0x60], r9`: 関数入口の r9 (= この関数の呼出元が渡した Index) を保存する。よって `0x1090dc4` の `r9 = [rbp+0x60]` は、この関数の呼出元の Index に依る。
