@@ -113,3 +113,28 @@ PE: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.p
 | `showPicker` の arg1・arg2 の意味: 受け側の picker オブジェクト `*(*(G)+0x54)` のクラスと、vtbl[+0x48] の実装 VA | 引数の意味が未確定。作用は no-op | 子 issue #3734 (PY-242) |
 | `openEventEditor` の eventId の上位 16 bit の意味 (`0xe3d690` の引数)、ID が何の対象か | ID の体系が未確定。C/mock は ID を検査しない | 子 issue #3734 (PY-242) |
 | `openEventEditor` の newWindow=2 の委譲先 `0xe3d440` の作用、mode の種類名 (0・1・2 が何のエディタか) | 分岐の形は確定。作用は no-op | 子 issue #3734 (PY-242) |
+
+## 追補 (#5991・親 #4820): 実行時 VA の採取 (未確認・命中なし)
+
+- 目的: `0xd82dc6` の `call qword ptr [rbx]` (例外投入) と `0x1330c70` の `[rsi+0xe0]` 仮想呼出しの実行時の呼出し先を gdb で採る。
+- 対象モジュール: `FLEngine_x64.dll` (`block00031_PE.bin`・image base `0x400000`)。上の VA は絶対 VA。実行時アドレス = ロード先 + (VA − 0x400000)。ロード先は wine のログ (`mapping PE file`) から取る。
+- 手順: `tools/flp/s5991_gdb_dll_probe.sh` (FL64.exe を起動し、DLL のロード先を読み、gdb `-p` で両 VA に `break`、`continue`)。前提は `tools/flp/REPORT_APPENDIX_5649.md` §4 と同じ (wine64 9.0・gdb 15.1・`ptrace_scope=0`・`fl-install` 組立て済み)。
+- 実測:
+  - `s1_wine_probe.sh` で `fl-install` を組立て (G03 パッチ済み)。起動は `S1 rc=124` (120 s で終了せず GUI 継続)。
+  - DLL のロード先 `0x7a730000` → 実行時 `0x7b0b2dc6` (`0xd82dc6`)・`0x7b660c70` (`0x1330c70`)。gdb は両方に `Breakpoint` を張れた (`gdb` の `Breakpoint 1 at 0x7b0b2dc6`・`Breakpoint 2 at 0x7b660c70`)。
+  - 命中: **なし**。60 s の試行 (gdb rc=124・real 1 m 1 s) と 200 s の試行 (gdb rc=124・real 3 m 21 s) の両方で、どちらの VA にも停止しなかった。
+- 判定:
+  - 受入 1 (`0xd82dc6` の呼出し先 VA の採取と例外型): **未確認 (命中なし)**。
+  - 受入 2 (`0x1330c70` の呼出し先 VA の採取と戻り値 1 の経路): **未確認 (命中なし)**。
+  - 受入 3 (本追補への記録): 達成 (本節)。
+- 理由 (推定・未検証): 両 VA は Python 側の `ui.*` 呼出し経路 (`launchAudioEditor`・`openEventEditor` の dispatch と、その例外経路) の中にある。GUI の起動だけでは Python の `ui.*` 呼出しは発生しないと考えられる。命中させるには、この関数を呼ぶ Python スクリプトを FL 内で実行する必要がある (その駆動手段は未確立)。
+- 製品 KPI (起動・GUI に関わる): FLEngine 起動の dispatch 数・通過 unit 数 (`tools/flelift/boot/REPORT.md`)・最初のウィンドウの有無は **動かしていない** (本 PR は計測のみで起動経路を変えていない。KPI は測定していない)。
+- 測定 commit: `56ddce822` (`tools/flp/s5991_gdb_dll_probe.sh` を追加した commit。処理は測定時と同一。測定後の変更はコメント行のみ)。runner 4 core・load average 1.93 (02:42)・`ptrace_scope` は測定前に `0` へ変更。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `0xd82dc6` の `call [rbx]` の実行時の呼出し先 (VA)・例外型 | 例外型は未確定のまま (PY-106・REPORT_PY61 §4-2 の未確定が続く) | 本 issue #5991 (命中させる駆動手段が必要) |
+| `0x1330c70` の `[rsi+0xe0]` の実行時の呼出し先 (VA)・戻り値 1 の経路 | launchAudioEditor 系の戻り値の意味は未確定 (#3734 の範囲) | 本 issue #5991 |
+| 両 VA を命中させる駆動手段 (FL 内で `ui.launchAudioEditor`・`openEventEditor` を呼ぶ手段) | 命中が得られない限り受入 1・2 は未確認 | 子 issue なし (駆動手段は要設計。PM 判断) |

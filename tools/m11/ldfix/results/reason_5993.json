@@ -1,0 +1,171 @@
+{
+ "101d180": {
+  "direct_callers": [
+   "1016600",
+   "1019da0",
+   "101b780"
+  ],
+  "closure_size": 215,
+  "unit_procs_in_closure": [],
+  "roots": [
+   "12ddfe0",
+   "1306110"
+  ],
+  "roots_noncall_ref": [],
+  "roots_tr_ref": [
+   "12ddfe0",
+   "1306110"
+  ]
+ },
+ "1050f90": {
+  "direct_callers": [
+   "ddf630",
+   "e3d440"
+  ],
+  "closure_size": 190,
+  "unit_procs_in_closure": [],
+  "roots": [
+   "12ddfe0",
+   "1306110"
+  ],
+  "roots_noncall_ref": [],
+  "roots_tr_ref": [
+   "12ddfe0",
+   "1306110"
+  ]
+ },
+ "10626e0": {
+  "direct_callers": [
+   "e2a280"
+  ],
+  "closure_size": 197,
+  "unit_procs_in_closure": [],
+  "roots": [
+   "12ddfe0",
+   "1306110"
+  ],
+  "roots_noncall_ref": [],
+  "roots_tr_ref": [
+   "12ddfe0",
+   "1306110"
+  ]
+ },
+ "10628d0": {
+  "direct_callers": [
+   "12d1760",
+   "e391b0"
+  ],
+  "closure_size": 191,
+  "unit_procs_in_closure": [],
+  "roots": [
+   "12ddfe0",
+   "1306110"
+  ],
+  "roots_noncall_ref": [],
+  "roots_tr_ref": [
+   "12ddfe0",
+   "1306110"
+  ]
+ },
+ "12f9730": {
+  "direct_callers": [
+   "de43b0"
+  ],
+  "closure_size": 195,
+  "unit_procs_in_closure": [],
+  "roots": [
+   "12ddfe0",
+   "1306110"
+  ],
+  "roots_noncall_ref": [],
+  "roots_tr_ref": [
+   "12ddfe0",
+   "1306110"
+  ]
+ },
+ "5c44b0": {
+  "direct_callers": [
+   "5c5170"
+  ],
+  "closure_size": 9,
+  "unit_procs_in_closure": [],
+  "roots": [
+   "623840"
+  ],
+  "roots_noncall_ref": [],
+  "roots_tr_ref": [
+   "623840"
+  ]
+ },
+ "6905f0": {
+  "direct_callers": [
+   "690b40",
+   "690f00",
+   "69b340"
+  ],
+  "closure_size": 236,
+  "unit_procs_in_closure": [],
+  "roots": [
+   "12ddfe0",
+   "1306110",
+   "ebb3b0"
+  ],
+  "roots_noncall_ref": [],
+  "roots_tr_ref": [
+   "12ddfe0",
+   "1306110",
+   "ebb3b0"
+  ]
+ },
+ "75a180": {
+  "direct_callers": [
+   "759e10"
+  ],
+  "closure_size": 194,
+  "unit_procs_in_closure": [],
+  "roots": [
+   "12ddfe0",
+   "1306110"
+  ],
+  "roots_noncall_ref": [],
+  "roots_tr_ref": [
+   "12ddfe0",
+   "1306110"
+  ]
+ },
+ "786d50": {
+  "direct_callers": [
+   "787f20",
+   "78bab0"
+  ],
+  "closure_size": 330,
+  "unit_procs_in_closure": [],
+  "roots": [
+   "12ddfe0",
+   "1306110"
+  ],
+  "roots_noncall_ref": [],
+  "roots_tr_ref": [
+   "12ddfe0",
+   "1306110"
+  ]
+ },
+ "787380": {
+  "direct_callers": [
+   "7878c0",
+   "787f20",
+   "78bab0"
+  ],
+  "closure_size": 330,
+  "unit_procs_in_closure": [],
+  "roots": [
+   "12ddfe0",
+   "1306110"
+  ],
+  "roots_noncall_ref": [],
+  "roots_tr_ref": [
+   "12ddfe0",
+   "1306110"
+  ]
+ }
+}

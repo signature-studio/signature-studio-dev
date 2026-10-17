@@ -534,7 +534,9 @@
 | `tools/m11/ldfix/REPORT_3450.md` | ~100 | CI-163 (#3450・親 #3426): `function_41c8c0` (WideCharToMultiByte の薄いラッパ) を 8 引数化し、呼出元 4 site を機械語の rcx〜r9 と照合して接続。e2e 実測 (stage4・survey 不変)・DEFECTS D26 の行案 |
 | `tools/m11/ldfix/REPORT_3088.md` | ~70 | LD-146 (#3088): unexec 4 関数 (5c1030 / 737d10 / 7ff6e0 / d243c0) の native 実行条件。古い `work/ld_native` (vmslot 無し) を `ensure_native` で作り直し、this 疑似オブジェクトを与えて 4/4 を突合 (判定 mismatch・icall_drop = D15) |
 | `tools/m11/ldfix/REPORT_3195.md` | ~90 | LD-149 (#3195): #1325 の見送り 10 組の不能理由を本体 `Machine` で判定し直して関数ごとに記録 (修復 0 組)。6905f0 の理由を訂正 (前段パスではなく生の使用の位置)。判定は `residual_3195.py` |
+| `tools/m11/ldfix/REPORT_5993.md` | ~90 | LD-294 (#5993): first-deref-not-entry の 10 関数 (101d180・1050f90・10626e0・10628d0・12f9730・5c44b0・6905f0・75a180・786d50・787380) の survey 到達理由を呼び出し元と閉包の根で記録 (#3194 受入 4 の分割) |
 | `tools/m11/ldfix/REPORT_1325.md` | ~110 | LD-46 (#1325): first-deref-not-entry の支配関係つき修復。deref の IR ブロックが置換対象の全使用を支配する 11 組を修復し、残り 10 組は見送り理由を記録。survey 到達 (23 関数) を再測定 (#1134・#3194・#3195) |
+| `tools/m11/ldfix/REPORT_5994.md` | ~70 | LD-295 (#5994): first-deref-not-entry 修復 関数群 B (10 関数) の直接呼び出し元 (IR 静的) を関数ごとに記録。survey の呼び出し元到達は未測定 (同梱 obj から committed と一致する build を再現できず)。`callers_5994.py` で再現 (#3194) |
 | `tools/m11/ldfix/REPORT_2688.md` | ~104 | LD-123 (#2688): spill 宛 判定不能 9 site の F3d 適用 IR 再検証。上流 xor 0 の 4 site は OK_LOAD 候補 (本番 IR は未修復・配線は #2834)、残り 5 site は UNDETERMINED |
 | `tools/m11/ldfix/REPORT_3753.md` | ~100 | LD-175 (#3753): spill 宛 UNDETERMINED 5 site のうち 4 site (128d495・dcdeee・c3460e・12900c4) を機械語 2 段 deref と IR 1 段読みのブロック単位の結線で TRUE_DROP に確定。1284dab は子 #3793 (LD-178)。突合 `ld175_site_link.py` |
 | `tools/m11/ldfix/REPORT_5435.md` | ~60 | LD-270 (#5435): spill 宛 `128f9e0` の 12 site の機械語 BFS 到達経路 (全 site が欠落区間 `0x1290645`〜 を通る) と frame F=2088 の site ごと照合 (`stack_var_-(F-disp)` は IR に alloca・言及なし)。`ld270_bfs_frame.py` が生成。判定は UNDETERMINED のまま (#2705・#4959 の残り) |
@@ -1110,7 +1112,7 @@
 | `tools/targets/serum2/gui/REPORT_SR58.md` | ~70 | SR-58 (#4097): NODOM 242 件の理由別分類 (間接 jmp 89・back-edge 79・merge 74)・`receiver_this_trace.py --nodom-tsv`。支配判定の変更と偽陰性・偽陽性は未達 (子 issue)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR59.md` | ~95 | SR-59 (#4122, SR-48 残): 所属関数の入口がデータ表 (vtable) に載る RTTI の分類 (`arg_vtable_callers.py`)。ARG の型は未確定 (SC 0 件)。THIS-CHILD の SC 証拠 6 件 (5 関数)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR60.md` | ~110 | SR-60 (#4164, SR-59 残): 表の先頭の探索窓の修正 (64→4096)、直接 call の呼出元の引数の出所 (`arg_caller_types.py`)。ARG の型は未確定 (SC 0 件)。vtable 経由の呼出元と表の境界は子 [SR-82] (#4930)。測定値の正本 |
-| `tools/targets/serum2/gui/REPORT_SR94.md` | ~105 | SR-94 (#5612, SR-82 #4930 受入 1 の子): ARG 240・ARG-CHILD 68 の確定 0・非確定 308 (証拠の有無の内訳は未検証)。vtable 候補の受け手 (`arg_vt_args.py`) は NODOM・CLOBBER が多く、SC の this の確定は 0 件。測定値の正本 |
+| `tools/targets/serum2/gui/REPORT_SR94.md` | ~119 | SR-94 (#5612, SR-82 #4930 受入 1 の子): ARG 240・ARG-CHILD 68 の確定 0・非確定 308 (証拠の有無の内訳は未検証)。vtable 候補の受け手 (`arg_vt_args.py`) は NODOM・CLOBBER が多く、SC の this の確定は 0 件。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR82.md` | ~80 | SR-82 (#4930, SR-60 残): vtable 経由の間接 call の候補の列挙 (`arg_vt_indirect.py`)。候補の列挙 (件数は REPORT_SR82 §2)。宛先は未確定 (disp のみの照合)。ARG・THIS の型と表の境界は未達。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR57.md` | ~73 | SR-57 (#3626, SR-28 受入 3): patch 後の demo 表示経路の静的確認。demo 表示 `0x18004fc9c` は patch 後に関数内で到達不能 (証明)、`0x1800501c0` は汎用ヘルパで非 demo の呼出元が残るため受入文の前提は不成立、overlay_demo_version は呼出元 0 件。解析は `demo_dialog_reach.py` / `demo_dialog_strings.py` |
 | `tools/targets/serum2/gui/REPORT_M7_CANVAS.md` | ~120 | SR-7 (#68) の M7 接続照合 (静的): CanvasFrame を tools/gui の surface・out ring の記号と照合 (`gui/m7_canvas_connect.py`)。設計上は接続可・実装は一部のみ・画素形式が不一致。数値の正本は本体 §0・§2 |
