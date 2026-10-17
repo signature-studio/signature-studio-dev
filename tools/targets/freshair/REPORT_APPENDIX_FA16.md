@@ -151,10 +151,10 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
   - `FA_NODE1=1 FA_DA9ONLY=1`: ERR 8/8 (`rip=180c9d741 addr=0`)。FA9DA 0 件。
   - `FA_NODE1=1 FA_NODE1_ZOBJ=1 FA_DA9ONLY=1`: **ERR 0/8・FA9DA 0 件**。setter は最後まで進むが 0x180da6c00 に届かない。
   - `FA_NODE1=1 FA_NODE1_ZOBJ=1 FA_PROBE9=1 FA_P9GUARD=1`: ERR 8/8 (FA9CA 8/8 で found=0)。probe 下では ca1480 が out[0]=0 を返す (§12 と同じ)。
-- 機構 (逆アセンブル `0x180c9d700`・SlateCore.core_64): `call [rax+0x18]` の戻り (`[rsp+0x28]`) が 0 なら `je 0x180c9d7a8` で `0x180da6c00` (`0x180c9d791`) を飛ばす。G5 の偽オブジェクトの slot +0x18 (`fz_ret`) は `{NULL, NULL}` を返すため、この分岐に入る。
+- 機構 (静的読み・未検証): `call [rax+0x18]` の戻り (`[rsp+0x28]`) が 0 なら `je 0x180c9d7a8` で `0x180da6c00` (`0x180c9d791`) を飛ばすと読める。G5 の偽オブジェクトの slot +0x18 (`fz_ret`) は `{NULL, NULL}` を返すため、この分岐に入る。**逆アセンブルの抜粋は未取得**: 本 run では `SlateCore.core_64` (素材 `plugins-freshair`) が展開されておらず、2 命令の確認はできていない。確認するまでこの機構は仮説として扱う。
 - 結論: 0x180da6c00 到達には、`[out0+0x10]` の object の `+0x18` が**非 NULL の shared_ptr を返す**必要がある。その実機の値は本ハーネスでは未観測 (#2207 FA-31 の範囲)。
 - 測定 commit: `ebf1fb66c` (lift2 のコードを変えた最後の commit)。
   - `bash tools/targets/freshair/lift2/run_fa9.sh`: GATE PASS / (a) ERR=0・ca1480=72・found=0・da6c00=0 / (b) ERR=8/8 / (b-wasm) ERR=8/8 / (c) 差分 395 トークン (wall 2.9 s)
   - `bash tools/targets/freshair/lift2/run_ctrl.sh 2 5`: BIT-EXACT 15/15 (rc=0, wall 2 s)
   - `bash tools/targets/freshair/lift2/fa32_node1.sh`: R1 8/8・R2 8/8・G1 8/8・G5 0/8・C 8/8 (前 commit の表と同一)
-  - 測定 commit から HEAD までの lift2 差分: `git diff ebf1fb66c HEAD -- tools/targets/freshair/lift2` (本 REPORT 追記 commit 時点で 0 行)
+  - 測定 commit から HEAD までの lift2 差分: `git diff ebf1fb66c HEAD -- tools/targets/freshair/lift2` は `native_ctrl.c` の 1 行ガード (`FA_PROBE9` 指定時に `FA_DA9ONLY` を無効化) のみ。`FA_PROBE9` を指定しない実行と `FA_DA9ONLY` 単独の実行は変わらない。両方同時指定の挙動は本 run で再測定していない (素材不足・下記)。
