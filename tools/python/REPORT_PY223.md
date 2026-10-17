@@ -201,6 +201,22 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
 |---|---|---|
 | 関数をまたぐ値・分岐合流・メモリ経由の値で 0xed0bb0 を作る経路 | 受入 2 の残り | #3888 (親) |
 
+### PY-4914 追補: 即値・RIP 相対・データ領域の静的格納 (#5348)
+
+- 検査: `analysis/py4914_imm_data_scan.py` (block00031・`.text` 5,022,299 命令)。候補 0xed0bb0・0xed0c28 を、相対形と絶対形 (ImageBase 0x400000 + 相対) の両方で、非分岐命令の即値・RIP 相対の番地・`.text` 以外の 4 byte 値に対して照合。
+- 陽性対照: 0x13acb88 の RIP 相対 `lea` (0x44a867) を検出 (PASS)。
+- 実測 (n=1): FL_WIN64 素材 `fl-win64` の block00031 のみ展開 (2.9 秒)。所要 64.9 秒・load average 0.81。`rc=1` は、下の `.pdata` の 1 件を機械的に数えたため。
+- 結果:
+  - 非分岐命令の即値・RIP 相対で候補を指す命令: **0 件**。
+  - `call 0x12d0bb0` の飛び先 (絶対形 0xed0bb0 と一致): 8 件。これは関数 0x12d0bb0 への直接 call で、vptr の格納ではない。
+  - `.pdata` の 4 byte 値 0xed0bb0 (`0x1aa9ef4`): 1 件。`.pdata` エントリ 55615 の begin (関数開始 RVA) で、0x12d0bb0 の unwind 情報。vptr ではない。
+  - `.data`・`.rdata`・その他のセクションの 4 byte 値: 0 件。`.data`・`.rdata` の 8 byte 値 (絶対・相対): 0 件。
+- 判定: 0xed0bb0 を vptr として格納する静的な経路 (即値・RIP 相対・データ領域) は 0 件。関数をまたぐ値・メモリ経由の動的な経路は未検査 (上の未解決表のまま)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 関数をまたぐ値・分岐合流・メモリ経由の動的な経路で 0xed0bb0 を作る経路 | 受入 2 の残り | #3888 (親) |
+
 ## PY-266 (#3890): flag `+0x49e` の書込み元 (部分達成)
 
 - 測定 commit: `251f0e1a5` (`analysis/py266_0x49e_writers.py` の追加 commit)。素材 `fl-win64`・block00031 のみ展開 (1.6 秒)。`.text` 5,022,299 命令・`.pdata` 57,816 関数。
