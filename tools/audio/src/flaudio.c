@@ -55,7 +55,7 @@ static int wait32(uint32_t *addr, uint32_t expect, int64_t timeout_ns) {
 }
 static void wake32(uint32_t *addr) { __builtin_wasm_memory_atomic_notify((int *)addr, 0x7fffffff); }
 /* 診断 (判定に使わない): out_wait の wait32 1 回ごとの [開始 ms, 終了 ms, rc]。flasio.c が設定する */
-void (*fla_wait_trace_hook)(double t0, double t1, int rc, uint32_t fill, uint32_t max_fill) = 0;
+void (*fla_wait_trace_hook)(double t0, double t1, int rc, uint32_t fill, uint32_t max_fill, uint32_t fill1) = 0;
 
 static void require_worker(const char *api) {
     if (emscripten_is_main_browser_thread())
@@ -212,7 +212,7 @@ int fla_out_wait_fill_le(uint32_t max_fill, uint32_t timeout_ms) {
         double wt0 = fla_wait_trace_hook ? fla_now_ms() : 0;
         uint32_t wf0 = w - r2;
         int rc = wait32(&c->out_read, r2, (int64_t)(left * 1e6));
-        if (fla_wait_trace_hook) fla_wait_trace_hook(wt0, fla_now_ms(), rc, wf0, max_fill);
+        if (fla_wait_trace_hook) fla_wait_trace_hook(wt0, fla_now_ms(), rc, wf0, max_fill, w - LD(c->out_read));
         if (rc == 0) {
             __atomic_add_fetch(&c->wake_count, 1, __ATOMIC_RELAXED);
             int32_t d = (int32_t)((uint32_t)(uint64_t)fla_now_ms() - LD(c->notify_ms));
