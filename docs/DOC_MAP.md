@@ -118,6 +118,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_970.md` | ~100 | PERF-P14 (#970) の付録: boot closure の -O0 / -O2 / -O2 -flto 変種の build (wasm bytes・所要時間・ピーク RSS)、node 実行時間 (n=10)・署名の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4983.md` | ~70 | FLE-37 (#4983): 既定経路 `run_boot default` で `FLE_BOOT_LOG_CAP` が効かない不具合の修正 (`${6:-0}` → 環境変数を読む式)・修正前後の `log_cap` の実測・上限超過時の `hit` の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5177.md` | ~70 | FLE-43 (#5177): 既定経路の出力 hash 非決定 (8 run・非決定 9 バイトの VA)・判定指標 (`image_writable` から非決定位置を除いた値・`outmem_judge.py`)。測定値の正本 |
+| `tools/flelift/boot/REPORT_APPENDIX_5830.md` | ~40 | FLE-48 (#5830): 既定経路の非決定 9 バイトを含む 8B ワードの変化 unit 帰属 (site 1・2・8 の監視点)。書込み命令は未特定。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5897.md` | ~60 | #5897 (PY-5398): slot 35 (`call [reg+0x118]` 151 箇所) の実行時 VMT 採取 probe (`slot35_vmt_probe.sh`)。採取 0 件・陽性対照の発火・未解決 (boot を 895 より先へ)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5168.md` | ~20 | PY-4877 (#5168): boot 後の `patternCount` (0xd64d40) 直接呼出し driver の測定 (述語 999 回呼出し・icall-miss (0xd64d7a) で戻り値 0 は信用不可・E[1..999] は全 0・測定 commit `8613de75b`)。probe は `py4877_pred_e_probe.sh` |
 | `tools/flelift/boot/REPORT_APPENDIX_5215.md` | ~70 | PY-4887 (#5215): 選択リスト G の初期化 `0xe38870` の既定 boot での実起動確認 (G・isPatternSelected・呼出元 5 観測点は未到達・制御 1 件発火)。probe は `py5215_g_init_probe.sh` |
