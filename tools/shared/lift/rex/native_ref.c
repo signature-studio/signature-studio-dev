@@ -20,6 +20,7 @@ static uint64_t __attribute__((ms_abi)) st_wait(uint64_t h, uint64_t ms) { (void
 static uint64_t __attribute__((ms_abi)) st_release(uint64_t h) { (void)h; hits++; return 1; }
 static uint64_t __attribute__((ms_abi)) st_rtlpc(uint64_t pc, uint64_t b) { (void)pc; (void)b; hits++; return 0; }
 static uint64_t __attribute__((ms_abi)) st_raise(uint64_t c, uint64_t f, uint64_t n, uint64_t p) { (void)c; (void)f; (void)n; (void)p; fprintf(stderr, "[rex] RaiseException reached (fail-fast)\n"); exit(3); }
+static uint64_t __attribute__((ms_abi)) st_noop(void) { hits++; return 0; }   /* dllmain: rex_imp_noop.c と同じ no-op */
 
 typedef uint64_t (__attribute__((ms_abi)) *FN)(uint64_t, uint64_t, uint64_t, uint64_t);
 #include <setjmp.h>
@@ -67,16 +68,42 @@ int main(int argc, char **argv) {
     if (!fc || !fo) DIE("open cases/out\n");
     uint32_t ncase; rd_exact(fc, &ncase, 4);
     uint8_t *rec = malloc(REX_ARENA_SZ);
+    /* REX_DLLMAIN=1: IAT 全件を 0 を返す no-op で敷き、DllMain(reason=1) を 1 回実行した後の image を各 case の基準にする。
+     * 既定 (0): 従来どおり 5 件のスタブだけ敷く (ok / neg-* の既存結果は変えない)。 */
+    int dllmain = getenv("REX_DLLMAIN") != NULL && getenv("REX_DLLMAIN")[0] == '1';
+    uint8_t *base_img = imgbuf;
+    if (dllmain) {
+        memcpy(img, imgbuf, REX_IMG_SIZE);
+        FILE *fs = fopen(getenv("REX_IAT_SLOTS"), "r");
+        if (!fs) DIE("REX_IAT_SLOTS not set\n");
+        unsigned int s; char nm[256];
+        while (fscanf(fs, "%x %255s", &s, nm) == 2) *(uint64_t *)(img + s) = (uint64_t)(uintptr_t)st_noop;
+        fclose(fs);
+        *(uint64_t *)(img + REX_IAT_WAIT_RVA) = (uint64_t)(uintptr_t)st_wait;
+        *(uint64_t *)(img + REX_IAT_RELEASE_RVA) = (uint64_t)(uintptr_t)st_release;
+        *(uint64_t *)(img + REX_IAT_RTLPC_RVA) = (uint64_t)(uintptr_t)st_rtlpc;
+        *(uint64_t *)(img + REX_IAT_RAISE_RVA) = (uint64_t)(uintptr_t)st_noop;
+        *(uint64_t *)(img + REX_IAT_GLE_RVA) = (uint64_t)(uintptr_t)st_noop;
+        ((FN)(img + REX_DLLMAIN_RVA))(REX_BASE, 1, 0, 0);
+        base_img = malloc(REX_IMG_SIZE);
+        memcpy(base_img, img, REX_IMG_SIZE);
+        FILE *fd = fopen(getenv("REX_DATA_BASE_OUT"), "wb");
+        if (!fd) DIE("REX_DATA_BASE_OUT\n");
+        fwrite(img + REX_DATA_RVA, 1, REX_DATA_SZ, fd);
+        fclose(fd);
+    }
     for (uint32_t c = 0; c < ncase; c++) {
         uint32_t fn, pad; uint64_t a[4], ctx;
         rd_exact(fc, &fn, 4); rd_exact(fc, &pad, 4); rd_exact(fc, a, 32); rd_exact(fc, &ctx, 8);
         rd_exact(fc, rec, REX_ARENA_SZ);
-        memcpy(img, imgbuf, REX_IMG_SIZE);
-        *(uint64_t *)(img + REX_IAT_WAIT_RVA) = (uint64_t)(uintptr_t)st_wait;
-        *(uint64_t *)(img + REX_IAT_RELEASE_RVA) = (uint64_t)(uintptr_t)st_release;
-        *(uint64_t *)(img + REX_IAT_RTLPC_RVA) = (uint64_t)(uintptr_t)st_rtlpc;
-        *(uint64_t *)(img + REX_IAT_RAISE_RVA) = (uint64_t)(uintptr_t)st_raise;
-        *(uint64_t *)(img + REX_IAT_GLE_RVA) = (uint64_t)(uintptr_t)st_gle;
+        memcpy(img, base_img, REX_IMG_SIZE);
+        if (!dllmain) {
+            *(uint64_t *)(img + REX_IAT_WAIT_RVA) = (uint64_t)(uintptr_t)st_wait;
+            *(uint64_t *)(img + REX_IAT_RELEASE_RVA) = (uint64_t)(uintptr_t)st_release;
+            *(uint64_t *)(img + REX_IAT_RTLPC_RVA) = (uint64_t)(uintptr_t)st_rtlpc;
+            *(uint64_t *)(img + REX_IAT_RAISE_RVA) = (uint64_t)(uintptr_t)st_raise;
+            *(uint64_t *)(img + REX_IAT_GLE_RVA) = (uint64_t)(uintptr_t)st_gle;
+        }
         *(uint64_t *)(img + REX_CTX_RVA) = ctx;
         memcpy(arena, rec, REX_ARENA_SZ);
         hits = 0;

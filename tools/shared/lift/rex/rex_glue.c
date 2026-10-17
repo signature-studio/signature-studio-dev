@@ -34,6 +34,7 @@ void rex_reset(void) {
 }
 
 uint64_t rex_hits_get(void) { return rex_hits; }
+void rex_hit(void) { rex_hits++; }   /* DllMain 経路の no-op import (rex_imp_noop.c) が呼ぶ */
 
 void imp_WaitForSingleObject(void) { rex_hits++; R[RAX] = 0; R[RSP] += 8; }
 void imp_ReleaseMutex(void) { rex_hits++; R[RAX] = 1; R[RSP] += 8; }
