@@ -1,6 +1,6 @@
 # PY-73 (#2547): channels.incEventValue・channels.midiNoteOn の PE 意味論 (途中記録)
 
-親: #2500 (PY-70)。兄弟: #2499 (selectOneChannel)、#2544 (processRECEvent)、#2548 (setStepParameterByIndex)。前段: `tools/python/REPORT_PY39.md`。
+親: #2500 (PY-70)。兄弟: #2499 (selectOneChannel)、#2544 (processRECEvent)、#2548 (setStepParameterByIndex)。前段: `tools/python/REPORT_PY39.md`。表 `[ctx-0xc0]` の entry 実測 (#5458): 判定不能・付録 `REPORT_PY73_APPENDIX_5458.md`。
 既知類型との関係: 該当なし (lift 作業ではない。逆アセンブルによる解析)。
 
 ## 結論
