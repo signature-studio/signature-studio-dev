@@ -59,8 +59,30 @@ $ git diff 390061627 HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
 - そこで IR 側は `@fx61_buf` (global) に書き、C 側は読み出し関数だけを持つ形にした。リンクは通った。
 - ただし hang 中は `run_trace.mjs` が JS に制御を戻さないため、`fx61_buf` を読めない。
 
-## 5. 未実装・未解決
+## 5. 読み出し経路 (本 run・trap 方式)
 
-- `fx61_rec.c` の `fx61_count` / `fx61_self` / `fx61_c4c` / `fx61_c48` を呼ぶ JS 側の経路は無い。読み出し口は定義済みだが未使用。
-- hang 中の `@fx61_buf` を読む経路 (wasm メモリを hang 後に読む、または回数上限で callee から戻す計装)。起票先: #5855 (本 PR の Refs 先) の本文「次段の残り」チェックリスト。fix round 1 で追記済み。
+- hang の前に記録を読むため、呼出し回数が `FX61_LIMIT` (既定 100000) を超えたら IR の `unreachable` で trap させる (`fix_shx_t61.py`)。trap は wasm 例外として JS に戻るため、`run_trace.mjs` は `_fx61_count` / `_fx61_self` / `_fx61_c4c` / `_fx61_c48` を読んで run.json の `fx61` に入れる (`build.sh` は計装の IR のときだけ export する)。
+- 実測 (commit は本 PR の HEAD。ON = `M11_FIX_SHX_T40=1 M11_FIX_SHX_T61=1`・trace_soft):
+
+| `FX61_LIMIT` | 結果 | `count` (呼出し回数) | `c4c` (this+0x4c) | `c48` (this+0x48) | 所要 |
+|---|---|---|---|---|---|
+| 0 | trap (unreachable) | 1 | 1 | 0 | 未計測 |
+| 1 | trap | 2 | 2 | 1 | 未計測 |
+| 2 | trap | 3 | 3 | 2 | 未計測 |
+| 3 | trap | 4 | 4 | 3 | 未計測 |
+| 5 | trap | 6 | 6 | 5 | 未計測 |
+| 100000 (既定) | trap | 100001 | 100001 | 100000 | 0.25 s (`time` の real。run_trace.mjs 単体) |
+
+- 読み取り: callee は呼ばれるたびに `this+0x4c`・`+0x48` を 1 ずつ増やし、`this` (`fx61_self`) は全呼出しで同じ値 (親の `%stack_var_-104` alloca)。これは callee が親の alloca を書換えていることを実行で示す。
+- 負荷: 実行 0.25 秒 (上限まで hang しない)。前 run の hang (rc 124・100 s 以上) とは挙動が違う。前 run で hang と見えたのは、trap しない版で制御が戻らなかったためと推測する (未確認)。
+
+## 6. 静的な読み (親 IR の loop 条件)
+
+- 親 `function_448490` の外側 loop は `dec_label_pc_4484f4` の `-32` (SSA の `stack_var_-32.0.reload` / `stack_var_-32.2.reload`) で進み、`dec_label_pc_448731` で `%9` (`[arg2-4]` の値) と比べる。
+- callee `function_4483f0` が書く `this+0x48`・`+0x4c` は、この loop 条件 (`%9`・`%12`) の入力に入っていない。callee の書換えは親の SSA 変数に届かない。
+- 静的にはこれが、`+0x4c` 初期 store で callee の書換えが loop を抜けさせない理由と整合する。ただし loop が抜けない具体的な分岐は未確定。
+
+## 7. 未解決
+
+- hang の位置 (どの分岐で親の loop が抜けないか) は未確定。trap 方式は callee の呼出し回数と値を読めたが、親の loop のどの分岐を通り続けるかは見ていない。次段は、親 loop 内の分岐 (`dec_label_pc_448681`・`dec_label_pc_44870f`・`dec_label_pc_448731`) ごとに通過回数を同じ方式で記録すること。
 - 修復 ON の hang の機序 (#5846 受入 1 の続き)。起票先: #5855 (受入 1 の続き)。#5846 の現タイトル (「(#4121 残件)」) とは対応しないため、#5846 へは追記しない。
