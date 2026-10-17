@@ -8,8 +8,10 @@
 - (3) 0x40fb40 のリスト走査は `[rsi + r9]` に書く。r9 はレコードの dword (+0x18) なので、
   書込み先オフセットは静的に決まらない (出力に記録するだけ)。
 - (4) 0x409410: 確保の入口。IAT 間接呼出し `call [rip+..]` の戻りを返す。
+- (5) データ: `[0x855878]`=0x855940、仮想呼出し先 qword `0x855910`=0x40f960、dword `0x8558c0`=728 を読む。
 """
 import os
+import struct
 
 import capstone
 import pefile
@@ -27,6 +29,14 @@ def fo(va):
         if s.VirtualAddress <= rva < s.VirtualAddress + max(s.Misc_VirtualSize, s.SizeOfRawData):
             return s.PointerToRawData + rva - s.VirtualAddress
     raise SystemExit(f"VA {va:#x} が section 外")
+
+
+def qword(va):
+    return struct.unpack_from("<Q", RAW, fo(va))[0]
+
+
+def dword(va):
+    return struct.unpack_from("<I", RAW, fo(va))[0]
 
 
 def fn(start, end):
@@ -58,6 +68,16 @@ def main():
           sum(1 for i in f40b if i.mnemonic == "mov" and "[rsi + r9]" in i.op_str))
     show("(4) 確保 0x409410", 0x409410, 0x409436)
     assert any(i.mnemonic == "call" and "qword ptr [rip" in i.op_str for i in f410)
+    print("(5) data:")
+    v878 = qword(0x855878)
+    v910 = qword(0x855940 - 0x30)
+    v8c0 = dword(0x855940 - 0x80)
+    print(f"    [0x855878] = {v878:#x}")
+    print(f"    [0x855940-0x30] (0x855910) = {v910:#x}")
+    print(f"    dword [0x855940-0x80] (0x8558c0) = {v8c0}")
+    assert v878 == 0x855940, "[0x855878] が 0x855940 でない"
+    assert v910 == 0x40F960, "仮想呼出し先が 0x40f960 でない"
+    assert v8c0 == 728, "確保サイズが 728 でない"
     print("ok")
 
 
