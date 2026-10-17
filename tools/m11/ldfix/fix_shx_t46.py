@@ -24,11 +24,15 @@ SLOT_DEF_RE = re.compile(r'^  %stack_var_-32\.[A-Za-z0-9.]+\.reg2mem = alloca i3
 ENTRY_ANCHOR = '  store ptr null, ptr %stack_var_-48, align 8\n'
 ENTRY_NEW = (ENTRY_ANCHOR +
              '  %fx46cnt = getelementptr i8, ptr %stack_var_-104, i64 72\n')
+LEN_EXTRA = ('  %fx46home = getelementptr i8, ptr %stack_var_-104, i64 112\n'
+             '  store i64 %arg1, ptr %fx46home, align 8\n'
+             '  %fx46len = getelementptr i8, ptr %stack_var_-104, i64 76\n'
+             '  store i32 1, ptr %fx46len, align 4\n')
 STORE_RE = re.compile(r'^(  store i32 [^,\n]+, ptr )(%stack_var_-32\.[A-Za-z0-9.]+\.reg2mem)(, align 4)?$', re.M)
 LOAD_RE = re.compile(r'^(  %[^ ]+ = load i32, ptr )(%stack_var_-32\.[A-Za-z0-9.]+\.reg2mem)(, align 4)?$', re.M)
 
 
-def patch(fn):
+def patch(fn, length=False):
     assert fn.startswith(DEF_HEAD), 'function_448490 の仮引数が想定と違う'
     assert 'fx46' not in fn, '適用済み (二重適用)'
     assert len(ALLOCA_RE.findall(fn)) == 1, 'object の alloca 行が 1 件でない'
@@ -45,6 +49,9 @@ def patch(fn):
     assert n_st >= 1 and n_ld >= 1, 'count スロットの store/load が無い'
     fn = ALLOCA_RE.sub(ALLOCA_NEW, fn)
     fn = fn.replace(ENTRY_ANCHOR, ENTRY_NEW)
+    if length:
+        assert fn.count(ENTRY_NEW) == 1, 'entry の挿入位置が 1 件でない'
+        fn = fn.replace(ENTRY_NEW, ENTRY_NEW + LEN_EXTRA)
     fn = STORE_RE.sub(lambda m: m.group(1) + '%fx46cnt' + (m.group(3) or ''), fn)
     fn = LOAD_RE.sub(lambda m: m.group(1) + '%fx46cnt' + (m.group(3) or ''), fn)
     assert len(SLOT_RE.findall(fn)) == n_def, 'slot の置換が不完全'
@@ -52,14 +59,16 @@ def patch(fn):
 
 
 def main():
-    src = open(sys.argv[1], errors='replace').read()
+    length = '--length' in sys.argv
+    args = [a for a in sys.argv[1:] if a != '--length']
+    src = open(args[0], errors='replace').read()
     fns = list(FN.finditer(src))
     assert len(fns) == 1, 'function_448490 の定義が 1 件でない: %d' % len(fns)
     f = fns[0].group(0)
-    out = src[:fns[0].start()] + patch(f) + src[fns[0].end():]
+    out = src[:fns[0].start()] + patch(f, length) + src[fns[0].end():]
     assert out != src
-    open(sys.argv[2], 'w').write(out)
-    print('[fix_shx_t46] function_448490: count (-32) の 6 スロットを object +0x48 のメモリに統合 (実験)')
+    open(args[1], 'w').write(out)
+    print('[fix_shx_t46] function_448490: count (-32) の 6 スロットを object +0x48 のメモリに統合 (実験)' + (' + entry の +0x70 / +0x4c 初期化' if length else ''))
 
 
 if __name__ == '__main__':
