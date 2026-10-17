@@ -179,6 +179,26 @@
 - 未解決 (起票先): 可変長整数の符号化、unwind map / try map / IP-to-state map の中身、funclet RVA の全数取り出し、独立再計算、2 件の画像外ポインタ → [MX-42] (#3807・親 #3791)。
 - 検証差分 (docs/WORKFLOW.md §6): 測定 commit 62a3fda35 より後のコード差分は §7 のとおり (0 行)。
 
+### 8.1 可変長整数 (compressed int) の符号化 (MX-48・#4787)
+
+- 一次資料: `ehdata4_export.h` の公開写し (trcrsired/windows-msvc-sysroot `include/ehdata4_export.h`)。`ReadUnsigned` と `getNETencoded` の規則を `scripts/mx6_fh4_cint.py` に移植。先頭 byte の下位 4 bit で長さ L を決め、値は LE(bytes[pb:pb+L]) >> L (L=5 は flag 0x0F で、後続 4 byte の LE32)。pb は前から L 進める。`s_negLengthTab` と一致。
+- 測定 commit = **eecfb86a9** (測定したコード。素材 `plugins-massivex` の `Massive X.vst3` md5 `622993e7` 一致)。3239e912d で `scripts/mx6_fh4_cint.py` を追加した後、eecfb86a9 までに SepIPtoStateMap 対応を含む修正あり。再現: `python3 scripts/mx6_fh4_cint.py --selftest` と `python3 scripts/mx6_fh4_cint.py "$PE" "$RUNNER_TEMP/fh4_cint.json"`。所要 3.55〜3.6 秒 (eecfb86a9 の census 実行・reviewer と実施者の各 run)。load は eecfb86a9 の run では未記録 (旧 run の 0.13→0.20 は 3239e912d 時点の値のため、本測定の値として書かない)。
+
+| 項目 | 結果 |
+|---|--:|
+| NC (往復 20,014 値・連続読み 500 値・表との一致) | 3/3 PASS |
+| FH4 entry / 相異なる fi | 2,542 / 2,117 |
+| 固定部が読めない entry (既知の画像外 2 件) | 2 |
+| UnwindMap entry (5,621 件・nextOffset の戻り先が state -1 (buffer 前) か entry 先頭) | 不整合 0 |
+| TryBlockMap entry (185 件・tryLow ≤ tryHigh ≤ catchHigh) | 不整合 0 |
+| IPtoStateMap entry (9,850 件) | 測定 (`eecfb86a9`・`plugins-massivex` md5 `622993e7`)。`ip_kind` は **全 2,542 行が `plain`**。`isSeparated` は全 fi で 0 (分離経路 `sep_*` は実 PE で 1 回も通らない) |
+| IP map 範囲外 | **11 行 (10 fi)**・全て `plain`・分離・非分離の別はなし |
+
+- 分離経路 (`ip_map_for` の SepIPtoStateMap 読み) は selftest の合成ケース (`sep_match` / `sep_nomatch`) でのみ検証した。実 PE の 11 行は分離 code 由来ではない。
+- 11 行の内訳 (`ip_out_of_range_detail`): `dispIPtoStateMap_at_fi_plus` は fi+1 が 1 件、fi+5 が 7 件、fi+9 が 3 件、fi+27 は 0 件。修正前の記述にあった「4 件 (fi+9 / fi+27)」は現行 census から再現できないため取り消す。
+- 再現: `python3 scripts/mx6_fh4_cint.py --selftest` と `python3 scripts/mx6_fh4_cint.py "$PE" "$RUNNER_TEMP/fh4_cint.json"` (`$PE` = `plugins-massivex` の `Massive X.vst3`)。
+- 受入 1 の未解決: 11 行の原因は未特定 (符号化の誤りかは未判定)。「確定」とは書かない → `Refs #4787`。
+
 ## 9. MX-39 (#3776): 付録へ分割移動
 
 MX-39 の深い closure 到達・E8/E9 候補の由来・MSVC funclet の取り込み方式 (U4d・U4e) の節 (§9) は付録 `REPORT_APPENDIX_3776.md` §9 にある (250 行上限のため分割移動)。
