@@ -444,6 +444,24 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     cfi: cfi && { rc: cfi.rc, threw: cfi.threw && cfi.threw.cls, longjmp: cfi.longjmp, exit: cfi.exit },
 }));
 console.log('FLEBOOT_UNDO ' + JSON.stringify(undoProbe));
+// PY-4877 (#5168): FLE_PY4877_PC=1 のとき、boot 停止後に patternCount (0xd64d40) を直接実行し、呼出し前の E[1..999] を読む (計測のみ)。
+// 読みは呼出し前 (pre) と呼出し後 (post) の両方を取る。summary の書出し後なので boot の計数には影響しない。
+if (process.env.FLE_PY4877_PC === '1') {
+    const rowsNz = (tag) => {
+        const rows = [];
+        for (let i = 1; i <= 999; i++) {
+            const v = { i, p84: m._fle_py_e_u8(i, 0x84), p10: m._fle_py_e_u32(i, 0x10), p14: m._fle_py_e_u8(i, 0x14), p20: m._fle_py_e_u64(i, 0x20), p28: m._fle_py_e_u64(i, 0x28) };
+            if (v.p84 || v.p10 || v.p14 || v.p20 || v.p28) rows.push(v);
+        }
+        console.log('FLEBOOT_PY4877_' + tag + ' ' + JSON.stringify({ nonzero_rows: rows.length, rows: rows.slice(0, 40).map((r) => ({ i: r.i, p84: '0x' + r.p84.toString(16), p10: '0x' + r.p10.toString(16), p14: '0x' + r.p14.toString(16), p20: '0x' + BigInt(r.p20).toString(16), p28: '0x' + BigInt(r.p28).toString(16) })) }));
+        return rows.length;
+    };
+    rowsNz('PRE');
+    let pcRet = null, pcThrew = null;
+    try { pcRet = m._fle_py_pattern_count(); } catch (e) { pcThrew = classify(e); }
+    console.log('FLEBOOT_PY4877_CALL ' + JSON.stringify({ ret: pcRet, threw: pcThrew }));
+    rowsNz('POST');
+}
 // PY-106 (#2909): 束縛関数 0xc395a0 を boot 停止後に直接実行し、resolver が引いた名前と slot の値を読む (FLE_PY106_BIND=1 のときだけ。
 // summary の書出しの後で行うので boot の計数・outmem には影響しない)。sink 0xd82daf と同じ 3 段 load を実メモリで辿る。
 if (process.env.FLE_PY106_BIND === '1') {

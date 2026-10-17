@@ -44,6 +44,6 @@ echo "[py4877] probe 挿入行数: $(grep -c 'PY4877' "$DBG"/fle_lifted_s*.c | a
 FLE_LIFT_DIR="$DBG" FLE_LABEL=e4877 FLE_SHARDS=8 SS_EMSDK_ENV="$SS_EMSDK_ENV" bash "$HERE/build.sh" plain
 
 LOG="$W/run_py4877_probe.log"
-FLE_DIAG_NULLFILL=0 FLE_BOOT_VARIANT=plain FLE_BOOT_LOG_CAP=268435456 FLE_BOOT_TIME_CAP=300 FLE_BOOT_QUIET_BIN=1 timeout "${FLE_BOOT_TIMEOUT:-600}" node "$HERE/fle_boot.mjs" "$W/fleboot_e4877.cjs" "$W/py4877_probe.json" --boot-only > "$LOG" 2>&1 || true
+FLE_PY4877_PC=1 FLE_DIAG_NULLFILL=0 FLE_BOOT_VARIANT=plain FLE_BOOT_LOG_CAP=268435456 FLE_BOOT_TIME_CAP=300 FLE_BOOT_QUIET_BIN=1 timeout "${FLE_BOOT_TIMEOUT:-600}" node "$HERE/fle_boot.mjs" "$W/fleboot_e4877.cjs" "$W/py4877_probe.json" --boot-only > "$LOG" 2>&1 || true
 echo "[py4877] PY4877-PC 行: $(grep -c '\[PY4877-PC\]' "$LOG" || true)"
-grep -E '\[PY4877|FLEBOOT_RESULT' "$LOG" | cut -c1-300 | head -400
+grep -E '\[PY4877|FLEBOOT_RESULT|FLEBOOT_PY4877' "$LOG" | cut -c1-300 | head -400
