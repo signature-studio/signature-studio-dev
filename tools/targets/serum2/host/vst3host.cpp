@@ -211,8 +211,9 @@ static LONG CALLBACK bpVeh(PEXCEPTION_POINTERS ep) {
     if (!(c->Dr6 & (1ULL << i)) || gBpHits >= 64) continue;
     gBpHits++;
     uintptr_t ret = *(uintptr_t*)c->Rsp;
-    L("[bp] hit#%d DR%d fn=0x%llx rip=%p ret=%p slot=%lld", gBpHits, i, (unsigned long long)(gBpAddr[i] - gDllBase),
-      (void*)c->Rip, (void*)ret, (long long)*(volatile long long*)(gDllBase + 0x17bf760));
+    L("[bp] hit#%d DR%d fn=0x%llx rip=%p ret=%p slot=%lld rax=%p r10=%p", gBpHits, i,
+      (unsigned long long)(gBpAddr[i] - gDllBase), (void*)c->Rip, (void*)ret,
+      (long long)*(volatile long long*)(gDllBase + 0x17bf760), (void*)c->Rax, (void*)c->R10);
   }
   c->Dr6 = 0;
   c->EFlags |= 0x10000;  // RF: 同じ命令で再度 trap しないよう再開する
@@ -781,8 +782,12 @@ int main(int argc, char** argv) {
   int nBlocks = (argc > 4) ? atoi(argv[4]) : 64;
   const char* contentDir = (argc > 5) ? argv[5] : nullptr;  // Tables/.. を含むルート (CWD)
   // S2HOST_BP は DR0〜DR3 を使う。S2HOST_SLOT・S2HOST_WATCH は DR0 を使い、armBp が DR7 全体を上書きするため併用は拒否する
-  if (getenv("S2HOST_BP") && (getenv("S2HOST_SLOT") || getenv("S2HOST_WATCH"))) {
-    fprintf(stderr, "S2HOST_BP は S2HOST_SLOT・S2HOST_WATCH と併用できない (DR レジスタを共用するため)\n");
+  if ((getenv("S2HOST_BP") || getenv("S2HOST_BPCALL")) && (getenv("S2HOST_SLOT") || getenv("S2HOST_WATCH"))) {
+    fprintf(stderr, "S2HOST_BP・S2HOST_BPCALL は S2HOST_SLOT・S2HOST_WATCH と併用できない (DR レジスタを共用するため)\n");
+    return 2;
+  }
+  if (getenv("S2HOST_BP") && getenv("S2HOST_BPCALL")) {
+    fprintf(stderr, "S2HOST_BP と S2HOST_BPCALL は併用できない (DR レジスタを共用するため)\n");
     return 2;
   }
 
@@ -963,6 +968,8 @@ int main(int argc, char** argv) {
   if (getenv("S2HOST_SLOT")) armWatch((volatile int*)(gDllBase + 0x17bf760), 8);
   // S2HOST_BP="rva,..." (SR-99 #5958): DR0〜DR3 を使うため S2HOST_SLOT・S2HOST_WATCH と併用しない
   if (const char* bp = getenv("S2HOST_BP")) armBp(bp);
+  // S2HOST_BPCALL="rva,..." (SR-99 #5958): slot 由来 call 命令の位置に execute bp (armBp と同じ DR 配列)
+  if (const char* bc = getenv("S2HOST_BPCALL")) armBp(bc);
 
   r = ctrl->initialize((FUnknown*)hostApp);  // IPluginBase slot3
   L("controller->initialize(hostApp) = %s", tresName(r));

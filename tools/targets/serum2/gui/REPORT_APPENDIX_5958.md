@@ -94,6 +94,17 @@
 - 未確定の残件: call 命令位置への bp、または call 直前の slot 読みで、slot 由来 call の実行の有無を測る必要がある。
 - 限界: 1 条件 (クリックなし・attach のみ) での観測。XferOnOffButton の操作 (クリック) を伴う条件では未測定。
 
+## 2f. slot 由来 call 命令への bp (S2HOST_BPCALL)
+
+- 目的: §2e の残件。slot 由来 call 命令の位置で実行の有無を見る。
+- 変更: `host/vst3host.cpp` に `S2HOST_BPCALL="rva,…"` (最大 4 件・armBp と同じ DR 配列) を追加。`[bp]` 行に rax・r10 を追加。`S2HOST_BP`・`S2HOST_BPCALL`・`S2HOST_SLOT`・`S2HOST_WATCH` の同時指定は起動時に拒否する。
+- 対象 RVA (逆アセンブルで確定。`call` 命令の先頭): `0x136ca7` (`call r10`)・`0x136ce8` (`call r10`)・`0x136d1d` (`call rax`)・`0x1381d8` (`call rax`)。各命令の直前は `mov reg,[0x17bf760]`・`test`・`je` (null チェック)。
+- 測定: 無改変 DLL・既定 state・4 block・`S2HOST_ATTACH=1 S2HOST_BPCALL="136ca7,136ce8,136d1d,1381d8"`・xvfb-run・`/usr/lib/wine/wine64` (wine 9.0)。
+  - 結果: `[bp] armed 4 execute breakpoints`。call 命令 4 箇所の hit は **0 件**。完走 `blocks=4 frames=512 nonzero_cells=1020/1024 peak=0.548306`。
+- 対照 (同じ DLL・同じ run 条件): `S2HOST_BP="136bf0"` (関数入口) は 9 件 hit。hit 時の slot は全て 0 (rax・r10 も slot 由来でない値)。よって bp 機構は動いている。
+- 解釈: slot=0 のとき `test; je` で call を飛ばす。入口 9 件はすべて slot=0 で、slot≠0 の hit は 0 件。call 命令 bp が 0 件なのは、この条件では slot 由来の call が**実行されていない**ことと整合する。ただし `je` の分岐先を直接見ていないため、「飛ばされた」の直接確認ではない。
+- 残件: `je` 分岐先 (`0x136cae`・`0x136cef`・`0x1381ef` 等) への bp で「null で飛ばされた」を直接確定する。XferOnOffButton の操作を伴う条件は未測定。
+
 ## 3. 判定と未達
 
 - 観測の範囲: §2 の 3 条件 (GUI 非操作) と §2b の 2 条件 (editor を attach し格子クリック) で、slot `0x1817bf760` は**全て 0・書込 0 件**。
