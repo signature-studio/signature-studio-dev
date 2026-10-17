@@ -9,6 +9,7 @@
 
 - 受入 1 (残件 490 件の読み方): **未達**。残件の内訳を分類し、再現した。読み方の規則は決めていない (子 MX-49)。
 - 受入 2 (MX-10 親 18 件の解決): **未達**。親が valid `.pdata` に無い理由を分類した。解決は未着手 (子 MX-50)。
+- (#4197 / MX-49 の受入 2「2 件以上 32 件を区別する規則の有無」は §5 で実測・達成。上記の「受入 2」は MX-15 #1810 の受入で、別の番号。)
 - 受入 3 (e2e PASS・negctl 3 件 FAIL<期待> の維持): **達成** (§4)。
 
 ## 2. 残件 490 件の内訳 (MX-12 §2 の再判定の後段)
@@ -41,3 +42,14 @@
 - **残件の再計測 (`mx_unres_residual.py`・測定 commit)**: `{parent18: 18, population: 7498, redo_0: 458, redo_1: 7008, redo_2: 32}`。REPORT_MX12 §2 と一致。
 - **§3 の所在別内訳 (同・測定 commit・出力 JSON `dsp/work/mx_unres_residual.json` の `parent18_location`)**: `{begin_in_pdata: 7, begin_not_in_pdata: 11, begin_in_text: 16, begin_not_in_text: 2, end_in_text: 11, end_not_in_text: 7}`。§3 の値はこの出力から転記した。
 - **測定 commit から HEAD までのコード差分 (差分 0 の証跡)**: `git diff 791d4f4a9 HEAD -- tools/targets/massivex/dsp/scripts` の出力は 0 バイト。本 REPORT の commit は docs のみ。
+
+## 5. MX-49 (#4197) 受入 2: 再判定後 2 件以上の 32 件を区別する規則の有無
+
+- 計測スクリプト: `dsp/scripts/mx_unres_pair32.py` (測定 commit `d4ba65dc4`)。残件 490 件の読み方 (受入 1) は本 run では未着手 (#4197 は部分達成)。
+- 再現: `mx_unres_residual.py` の 2 件以上 32 件を、同じ判定 (redo の `plain_ok` / `chain_ok`) で再抽出した。`pairs 32`・`n2 32` (全件 ok 2 候補)。
+- 候補間の比較 (32 pair): `same_ver` 32 / `same_cnt` 32 / `same_flags` 31 / `same_codes` 31 / `same_prolog` 29 / UNWIND_INFO バイト列 `same_uwind` 26。`diff_sec` は 32 件すべて。
+- 32 件中 26 件は UNWIND_INFO のバイト列が完全一致 (同一内容が 2 つの section に載る)。残り 6 件も差は flags / prolog / codes の数項目。
+- 読み取り: 32 件すべてで異なる欄は section 名のみ。section 名 (`.qtmimed` 31 / `.pdata` 1 と `.xdata` の組) で選ぶ規則は、どちらが正かの根拠が無いため採らない。**既存の規則 (mx10 / plain) では 2 件を区別できないことを実測で示した** (受入 2 達成)。
+- 検証 (commit `d4ba65dc4`・n=1): `e2e.sh` rc 0 / `OK elapsed=22s` / load 0.56 0.52 0.24 → 0.71 0.56 0.26 (受入 3 の e2e)。`negctl.sh` rc 0 / 9 s / NC1 insns 3118 unsup 5 → FAIL<期待>、NC2 insns 4575 unsup 285 → FAIL<期待>、NC3 insns 31 unsup 0 → FAIL<期待>。
+  - §4 で未解決としていた NC2 unsup の差 (292 と MX12 の 746) は、本 run で 285 (同 PE・同 commit の 2 回目も 285 で再現)。3 件の判定は全 run で FAIL<期待>。
+- 入力: `plugins-massivex` を `work/` に展開し、`Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` を再現 (95,356,824 B)。
