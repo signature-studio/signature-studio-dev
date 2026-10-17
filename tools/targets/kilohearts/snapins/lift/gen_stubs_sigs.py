@@ -34,7 +34,6 @@ IMP_SHIM = {
     'HeapAlloc': 'rax = kh_heap_alloc(r8);',
     'HeapFree': 'rax = 1;',
     'GetProcessHeap': 'rax = 1;',
-    'GetLastError': 'rax = 0;',
     'SetLastError': 'rax = 0;',
     'EnterCriticalSection': 'rax = 0;',
     'LeaveCriticalSection': 'rax = 0;',
