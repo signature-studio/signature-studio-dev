@@ -22,7 +22,7 @@
 | 基底レジスタ別 (全 547) | rax 374・rdi 47・rcx 44・rbx 35・rsi 20・rdx 17・r13 5・r8 3・ebp 1・r14 1 |
 | 測定時間 | 実測 2 分 0.7 秒 (real 2m0.660s・user 1m59.606s・load 0.43) |
 
-- 測定 commit: 本付録を含む PR のコード変更 commit (下記 §4 の差分確認)。
+- 測定 commit: `bc3dd88ea` (スクリプトを含むコード変更 commit。測定はこの commit の `pe_closure_ptr_writes_5792.py`)。
 - 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_closure_ptr_writes_5792.py 0x12cab20 3 > ptr.tsv`
   (展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'`・`<展開先>/extracted/` に置く)。
 
