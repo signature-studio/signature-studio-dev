@@ -134,6 +134,33 @@
 - 素材: `fl-win64` の `extracted/block19091_PE.bin` (`$RUNNER_TEMP` に展開)。RetDec・emcc は本節では使わない。
 - 未実施: 取り直した範囲での `not in loop` の段の測定 (RetDec・emcc が必要)。§4b の表の「範囲未収録」の未解決は、この範囲取得で解消した。
 
+## 4f. 修正版 `notloop_minset_err.sh` の全 12 組 + 0x683120 の再測定 (本 run)
+
+- 測定 commit: `35ce3f193` (origin/main。本 PR はコード変更なし)。素材 `toolchain-retdec` (RetDec v5.0)・`toolchain-emsdk` (6.0.12)・`fl-win64` (`extracted/block19091_PE.bin`) を `$RUNNER_TEMP` に展開。emcc は PATH に通した。load average (1 分値) 1.0〜1.2 (4 core)。
+- 方法: `notloop_minset_err.sh` を CamelCase 32 種 (`retdec_opt_names.txt`) で、`notloop_targets.txt` の範囲ごとに実行。
+- 結果 (最小集合 = 件数を 0 にする 1-minimal):
+
+| 関数範囲 | 最小集合 | 所要 |
+|---|---|---|
+| 0x408770-0x4087f3 | WhileTrueToWhileCondOptimizer | 57 s |
+| 0x412db0-0x412f41 | WhileTrueToWhileCondOptimizer | 54 s |
+| 0x4166b0-0x4168dd | WhileTrueToWhileCondOptimizer | 54 s |
+| 0x44abe0-0x44ac53 | WhileTrueToWhileCondOptimizer | 55 s |
+| 0x52ef40-0x52f0ad | WhileTrueToWhileCondOptimizer | 55 s |
+| 0x575480-0x57577a | WhileTrueToWhileCondOptimizer | 56 s |
+| 0x59a1c0-0x59a2b0 | WhileTrueToWhileCondOptimizer | 53 s |
+| 0x717600-0x7177e1 | WhileTrueToWhileCondOptimizer | 54 s |
+| 0x741340-0x741654 | WhileTrueToWhileCondOptimizer | 64 s |
+| 0x7c0570-0x7c06ba | WhileTrueToWhileCondOptimizer | 56 s |
+| 0x7c76b0-0x7c781d (飛び先 2 つ・1 行) | WhileTrueToWhileCondOptimizer | 55 s |
+
+- 0x683120-0x683629 は本 run のループに含めていない (未測定)。§4c の旧版値のみ。
+
+- 0x732ae0-0x732b95 (§4b の代表) も同じ 最小集合 (`WhileTrueToWhileCondOptimizer`) で、旧版 (#5890) と一致。
+- **件数 0 は正しさを意味しない (0x732ae0 で確認)**: 既定 C は `break` がループ外に 2 つ出る (構文エラー。`break` 4 個)。WhileTrueToWhileCond を外した C は `while (true)` になり `break` は 2 個に減るが、`break -> 0x732b75` の出口が `return v3 & -256 | 1` に変わる。既定 C の出口 (`return 0`) とは戻り値の式が違う。どちらが正しいかは asm で確かめていない。
+- したがって「`WhileTrueToWhileCond` が原因の段」とは言えるが、この段を外した C は正しい C ではない。段の切り分けは「制御フロー復元の段が `break` の出口を扱う」までで、止まる。wasm 実行による bit 一致は未実施 (未解決)。
+- 注釈を戻す段 (§4b・§4c の VarDefStmtOptimizer 単独) と、件数を 0 にする段 (本節の WhileTrueToWhileCond 単独) は一致しない。戻る注釈と消える件数の段が別であることは、本測定で再確認。
+
 ## 5. 採らなかった方式
 
 - 両方 disable した C を既定に採用する: 制御構造が既定と変わる。13 組は戻らないため、採用しても 27 件は解消しない。
